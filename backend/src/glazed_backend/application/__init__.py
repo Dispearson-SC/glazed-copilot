@@ -255,8 +255,17 @@ class ProposeOption:
         return issue
 
     def execute(self, case_id: str, issue_id: str, option_id: str | None, rationale: str = "",
-                agent_id: str = "") -> Proposal:
+                agent_id: str = "", idempotency_key: str | None = None) -> Proposal:
+        return self.execute_keyed(case_id, issue_id, option_id, rationale, agent_id, idempotency_key)[0]
+
+    def execute_keyed(self, case_id: str, issue_id: str, option_id: str | None, rationale: str = "",
+                      agent_id: str = "", idempotency_key: str | None = None) -> tuple[Proposal, bool]:
+        """(proposal, created). A repeated key within the same case returns the original proposal, created=False."""
         case = _case(self.cases, case_id)
+        if idempotency_key:
+            prior = self.proposals.find_by_idempotency_key(case.case_id, idempotency_key)
+            if prior is not None:
+                return prior, False
         if not option_id:
             raise DomainError("option_id is required: propose one of the options returned with the issue")
         issue = self._issue(case, issue_id)
@@ -272,8 +281,9 @@ class ProposeOption:
                                 {**option.get("params", {}), "option_id": option_id,
                                  "decision_as_of": case.sim_today.isoformat(), "expected": expected},
                                 option.get("tier") or "N2", rationale, agent_id)
+        proposal.idempotency_key = idempotency_key or None
         self.proposals.add(proposal)
-        return proposal
+        return proposal, True
 
 
 class DecideProposal:

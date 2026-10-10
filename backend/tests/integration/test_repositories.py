@@ -72,6 +72,20 @@ def test_proposals_and_executions(repos):
     assert repos.execs.list("c1") == [e] and repos.execs.list("c2") == []
 
 
+def test_proposal_idempotency_key_lookup_and_uniqueness(repos):
+    a = Proposal.new("c1", "S030", "i1", "place_order", {}, "N2", "why", "supply")
+    a.idempotency_key = "k" * 32
+    repos.props.add(a)
+    assert repos.props.find_by_idempotency_key("c1", "k" * 32).proposal_id == a.proposal_id
+    assert repos.props.find_by_idempotency_key("c2", "k" * 32) is None
+    assert repos.props.find_by_idempotency_key("c1", "zzz") is None
+    b = Proposal.new("c2", "S030", "i1", "place_order", {}, "N2", "why", "supply")
+    b.idempotency_key = "k" * 32  # same key in another case is allowed
+    repos.props.add(b)
+    repos.props.add(Proposal.new("c1", "S030", "i1", "place_order", {}, "N2", "why"))  # NULL keys never collide
+    repos.props.add(Proposal.new("c1", "S030", "i1", "place_order", {}, "N2", "why"))
+
+
 def test_backtests(repos):
     r = BacktestRun("r1", "c1", "S030", date(2026, 3, 1), date(2026, 3, 3), "simple_v0",
                     {"days": 3}, datetime(2026, 3, 4, tzinfo=timezone.utc))

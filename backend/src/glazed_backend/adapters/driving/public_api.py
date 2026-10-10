@@ -1,9 +1,9 @@
 """Public API /api/v1/* for the CLI and the frontend."""
 
 from datetime import date, timedelta
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Header, Response
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
@@ -182,9 +182,12 @@ def build_public_router(c: Any) -> APIRouter:
         return jsonable_encoder(c.proposals.list(case_id, store_id, status))
 
     @r.post("/proposals", status_code=201)
-    def propose(b: ProposeBody):
-        return jsonable_encoder(uc.ProposeOption(c.cases, c.proposals, c.alerts, c.metrics, c.served)
-                                .execute(b.case_id, b.issue_id, b.option_id, b.rationale))
+    def propose(b: ProposeBody, response: Response, idempotency_key: Annotated[str | None, Header()] = None):
+        proposal, created = uc.ProposeOption(c.cases, c.proposals, c.alerts, c.metrics, c.served).execute_keyed(
+            b.case_id, b.issue_id, b.option_id, b.rationale, idempotency_key=idempotency_key)
+        if not created:
+            response.status_code = 200
+        return jsonable_encoder(proposal)
 
     @r.get("/cases/{case_id}/order-plan")
     def order_plan(case_id: str):

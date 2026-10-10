@@ -105,6 +105,7 @@ class Proposal:
     created_at: datetime = field(default_factory=utcnow)
     reason_category: str | None = None  # Jev label of a rejection reason
     reason_confidence: float | None = None
+    idempotency_key: str | None = None  # client retry key, unique per case
 
     @classmethod
     def new(cls, case_id: str, store_id: str, issue_id: str, action_type: str,

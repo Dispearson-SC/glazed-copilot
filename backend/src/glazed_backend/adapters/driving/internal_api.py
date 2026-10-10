@@ -162,9 +162,15 @@ def build_internal_router(c: Any) -> APIRouter:
                  "created_at": e.created_at.isoformat(), "score": e.score, "verify": verify(e)} for e in found]
 
     @r.post("/proposals", status_code=201)
-    def post_proposal(case: Ctx, b: ProposalBody, x_glazed_agent: Annotated[str | None, Header()] = None):
-        return jsonable_encoder(uc.ProposeOption(c.cases, c.proposals, c.alerts, c.metrics, c.served).execute(
-            case.case_id, b.issue_id, b.option_id, b.rationale, canonical_agent_id(x_glazed_agent or "")))
+    def post_proposal(case: Ctx, b: ProposalBody, response: Response,
+                      x_glazed_agent: Annotated[str | None, Header()] = None,
+                      idempotency_key: Annotated[str | None, Header()] = None):
+        proposal, created = uc.ProposeOption(c.cases, c.proposals, c.alerts, c.metrics, c.served).execute_keyed(
+            case.case_id, b.issue_id, b.option_id, b.rationale, canonical_agent_id(x_glazed_agent or ""),
+            idempotency_key)
+        if not created:
+            response.status_code = 200  # replay of an earlier request: the original proposal
+        return jsonable_encoder(proposal)
 
     @r.post("/events", status_code=201)
     def post_event(case: Ctx, b: EventBody, x_glazed_agent: Annotated[str | None, Header()] = None):

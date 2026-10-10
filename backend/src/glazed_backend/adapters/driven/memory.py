@@ -64,6 +64,10 @@ class InMemoryProposals:
     def get(self, proposal_id: str) -> Proposal | None:
         return copy.deepcopy(self._d.get(proposal_id))
 
+    def find_by_idempotency_key(self, case_id: str, key: str) -> Proposal | None:
+        return next((copy.deepcopy(p) for p in self._d.values()
+                     if p.case_id == case_id and p.idempotency_key == key), None)
+
     def list(self, case_id: str | None = None, store_id: str | None = None,
              status: str | None = None) -> list[Proposal]:
         rows = [p for p in self._d.values() if case_id in (None, p.case_id)

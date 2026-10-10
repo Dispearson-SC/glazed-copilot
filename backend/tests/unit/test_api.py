@@ -405,3 +405,37 @@ def test_experiences_expose_ref_and_how_to_re_verify_it(env):
     got = client.get("/internal/v1/experiences", headers={"X-Glazed-Case": case["case_id"]}, params={"query": "bakery"}).json()
     assert got[0]["ref"] == "PR002" and got[0]["verify"] == {"tool": "evaluate_promo", "promo_id": "PR002"}
     assert got[1]["decision_id"] == "d9" and got[1]["verify"] == {"tool": "history", "decision_id": "d9"}
+
+
+def test_internal_proposal_idempotency_key_dedupes_per_case(env):
+    client, _ = env
+    c1, c2 = mkcase(client), mkcase(client)
+    for c in (c1, c2):
+        client.post(f"/api/v1/cases/{c['case_id']}/advance", json={"days": 1})
+    body = {"issue_id": ISSUE["issue_id"], "option_id": "opt-place", "rationale": "r"}
+
+    def post(case, key=None):
+        h = {"X-Glazed-Case": case["case_id"], "X-Glazed-Agent": "supply"}
+        if key:
+            h["Idempotency-Key"] = key
+        return client.post("/internal/v1/proposals", headers=h, json=body)
+
+    first = post(c1, "a" * 32)
+    again = post(c1, "a" * 32)
+    assert first.status_code == 201 and again.status_code == 200
+    assert again.json()["proposal_id"] == first.json()["proposal_id"]
+    assert len(client.get("/api/v1/proposals", params={"case_id": c1["case_id"]}).json()) == 1
+    other = post(c2, "a" * 32)  # same key, different case: a different request
+    assert other.status_code == 201 and other.json()["proposal_id"] != first.json()["proposal_id"]
+    assert post(c1).status_code == 201 and post(c1).status_code == 201  # no header: current behaviour
+    assert len(client.get("/api/v1/proposals", params={"case_id": c1["case_id"]}).json()) == 3
+
+
+def test_public_proposal_idempotency_key(env):
+    client, _ = env
+    c = mkcase(client)
+    client.post(f"/api/v1/cases/{c['case_id']}/advance", json={"days": 1})
+    body = {"case_id": c["case_id"], "issue_id": ISSUE["issue_id"], "option_id": "opt-place"}
+    a = client.post("/api/v1/proposals", json=body, headers={"Idempotency-Key": "k1"})
+    b = client.post("/api/v1/proposals", json=body, headers={"Idempotency-Key": "k1"})
+    assert (a.status_code, b.status_code) == (201, 200) and a.json()["proposal_id"] == b.json()["proposal_id"]
