@@ -15,6 +15,10 @@ from glazed_cli.state import State
 app = typer.Typer(help="Glazed store copilot CLI.", no_args_is_help=True, add_completion=False)
 case_app = typer.Typer(help="Manage cases (sessions): new, list, use, show, fork.", no_args_is_help=True)
 app.add_typer(case_app, name="case")
+alert_app = typer.Typer(help="Act on a single alert.", no_args_is_help=True)
+app.add_typer(alert_app, name="alert")
+backtest_app = typer.Typer(help="Run and read backtests (simulated, labelled 'backtest').", no_args_is_help=True)
+app.add_typer(backtest_app, name="backtest")
 
 
 @dataclass
@@ -212,6 +216,104 @@ def advance(ctx: typer.Context, days: Optional[int] = typer.Option(None, "--days
         else:
             out.print("No new alerts.")
     c.out(data, human)
+
+
+# ---- alerts, proposals ----
+
+@app.command()
+@_guard
+def alerts(ctx: typer.Context, store: Optional[str] = typer.Option(None, "--store"),
+           state: Optional[str] = typer.Option(None, "--state", help="e.g. nueva, vista, en_analisis.")) -> None:
+    """List alerts."""
+    c: Ctx = ctx.obj
+    data = c.api.get("/api/v1/alerts", store_id=store, state=state)
+    c.out(data, lambda d: render.console().print(render.alerts_table(d) if d else "No alerts."))
+
+
+@alert_app.command("seen")
+@_guard
+def alert_seen(ctx: typer.Context, alert_id: str) -> None:
+    """Mark an alert as seen (state 'vista')."""
+    c: Ctx = ctx.obj
+    data = c.api.patch(f"/api/v1/alerts/{alert_id}", {"state": "vista"})
+    c.out(data, lambda d: render.console().print(f"Alert {d['alert_id']} is now [bold]{d['state']}[/bold]."))
+
+
+@app.command()
+@_guard
+def proposals(ctx: typer.Context, status: Optional[str] = typer.Option(None, "--status", help="e.g. pending."),
+              case: Optional[str] = typer.Option(None, "--case"),
+              all_cases: bool = typer.Option(False, "--all", help="Do not filter by the current case.")) -> None:
+    """List proposals of the current case (use --all for every case)."""
+    c: Ctx = ctx.obj
+    case_id = None if all_cases else (case or State.load().current_case)
+    data = c.api.get("/api/v1/proposals", case_id=case_id, status=status)
+    c.out(data, lambda d: render.console().print(render.proposals_table(d) if d else "No proposals."))
+
+
+@app.command()
+@_guard
+def decide(ctx: typer.Context, proposal_id: str,
+           approve: bool = typer.Option(False, "--approve"), reject: bool = typer.Option(False, "--reject"),
+           reason: Optional[str] = typer.Option(None, "--reason")) -> None:
+    """Approve or reject a proposal (rejecting needs --reason)."""
+    c: Ctx = ctx.obj
+    if approve == reject:
+        raise CliError("Choose exactly one of --approve or --reject.")
+    if reject and not (reason or "").strip():
+        raise CliError("Rejecting needs a reason: --reason \"...\".")
+    body: dict[str, Any] = {"approved": approve}
+    if reason:
+        body["reason"] = reason
+    ex = c.api.post(f"/api/v1/proposals/{proposal_id}/decision", body)
+    c.out(ex, lambda d: render.console().print(
+        f"Proposal {proposal_id} {'approved' if approve else 'rejected'}: execution "
+        f"[bold]{d['status']}[/bold] (source: {d['source']}). {d.get('detail') or ''}"))
+
+
+# ---- backtest, trace ----
+
+@backtest_app.command("run")
+@_guard
+def backtest_run(ctx: typer.Context, date_from: str = typer.Option(..., "--from"),
+                 date_to: str = typer.Option(..., "--to"), policy: Optional[str] = typer.Option(None, "--policy"),
+                 store: Optional[str] = typer.Option(None, "--store", help="Create a fresh backtest case for this store."),
+                 case: Optional[str] = typer.Option(None, "--case")) -> None:
+    """Run a backtest over a period and print the report."""
+    c: Ctx = ctx.obj
+    if store:
+        created = c.api.post("/api/v1/cases", {
+            "store_id": store, "sim_today": date_to, "mode": "backtest",
+            "title": f"backtest {store} {date_from}..{date_to}"})
+        State(current_case=created["case_id"]).save()
+        case_id = created["case_id"]
+    else:
+        case_id = current_case_id(case)
+    body = {"date_from": date_from, "date_to": date_to}
+    if policy:
+        body["policy"] = policy
+    data = c.api.post(f"/api/v1/cases/{case_id}/backtests", body)
+    c.out(data, lambda d: render.backtest_report(d, render.console()))
+
+
+@backtest_app.command("show")
+@_guard
+def backtest_show(ctx: typer.Context, run_id: str) -> None:
+    """Show a backtest report."""
+    c: Ctx = ctx.obj
+    data = c.api.get(f"/api/v1/backtests/{run_id}")
+    c.out(data, lambda d: render.backtest_report(d, render.console()))
+
+
+@app.command()
+@_guard
+def trace(ctx: typer.Context, case: Optional[str] = typer.Option(None, "--case"),
+          store: Optional[str] = typer.Option(None, "--store")) -> None:
+    """Agent-communication timeline (current case, or a whole store with --store)."""
+    c: Ctx = ctx.obj
+    case_id = case if (case or store) else current_case_id(None)
+    data = c.api.get("/api/v1/trace", store_id=store, case_id=case_id)
+    c.out(data, lambda d: render.console().print(render.trace_table(d) if d else "No trace events."))
 
 
 def main() -> None:

@@ -1,0 +1,92 @@
+import json
+
+from conftest import CASE
+from glazed_cli.state import State
+
+RUN = {
+    "run_id": "r1", "case_id": "c1", "store_id": "S030", "period_from": "2026-03-01",
+    "period_to": "2026-03-14", "policy": "default", "label": "backtest", "created_at": "2026-10-10T10:00:00Z",
+    "results": {
+        "waste_usd": 100.0, "lost_sales_usd": 50.0, "net_usd": -150.0,
+        "baseline": {"waste_usd": 300.0, "lost_sales_usd": 200.0, "net_usd": -500.0},
+    },
+}
+
+
+def test_backtest_run_posts_to_current_case(api, run):
+    State(current_case="c1").save()
+    api.on("POST", "/api/v1/cases/c1/backtests", RUN, 201)
+    r = run("backtest", "run", "--from", "2026-03-01", "--to", "2026-03-14", "--policy", "default")
+    assert r.exit_code == 0, r.output
+    assert api.last_json() == {"date_from": "2026-03-01", "date_to": "2026-03-14", "policy": "default"}
+    assert "BACKTEST" in r.output and "r1" in r.output
+    assert "100.00" in r.output and "300.00" in r.output
+    assert "+350.00" in r.output  # net improvement vs current practice
+
+
+def test_backtest_run_with_store_creates_backtest_case(api, run):
+    api.on("POST", "/api/v1/cases", {**CASE, "case_id": "c7", "mode": "backtest"}, 201)
+    api.on("POST", "/api/v1/cases/c7/backtests", RUN, 201)
+    r = run("backtest", "run", "--store", "S030", "--from", "2026-03-01", "--to", "2026-03-14")
+    assert r.exit_code == 0, r.output
+    first = json.loads(api.calls[0].content)
+    assert first == {"store_id": "S030", "sim_today": "2026-03-14", "mode": "backtest",
+                     "title": "backtest S030 2026-03-01..2026-03-14"}
+    assert State.load().current_case == "c7"
+    assert "policy" not in json.loads(api.calls[1].content)
+
+
+def test_backtest_show(api, run):
+    api.on("GET", "/api/v1/backtests/r1", RUN)
+    r = run("backtest", "show", "r1")
+    assert "waste" in r.output.lower() and "lost sales" in r.output.lower() and "net" in r.output.lower()
+    assert "current practice" in r.output.lower() and "backtest" in r.output.lower()
+
+
+def test_backtest_show_without_baseline_still_renders(api, run):
+    api.on("GET", "/api/v1/backtests/r2", {**RUN, "run_id": "r2",
+           "results": {"waste_usd": 1.0, "lost_sales_usd": 2.0, "net_usd": -3.0, "extra": "x"}})
+    r = run("backtest", "show", "r2")
+    assert r.exit_code == 0 and "1.00" in r.output
+
+
+EVENTS = [
+    {"event_id": "e1", "case_id": "c1", "store_id": "S030", "ts": "2026-10-10T10:00:01Z",
+     "from_agent": "orchestrator", "to_agent": "present", "kind": "message", "payload": {"text": "sales?"}},
+    {"event_id": "e2", "case_id": "c1", "store_id": "S030", "ts": "2026-10-10T10:00:02Z",
+     "from_agent": "present", "to_agent": "backend", "kind": "tool_call",
+     "payload": {"tool": "day_summary", "args": {"date": "2026-03-09"}, "pad": "x" * 300}},
+]
+
+
+def test_trace_current_case(api, run):
+    State(current_case="c1").save()
+    api.on("GET", "/api/v1/trace", EVENTS)
+    r = run("trace")
+    q = api.last().url.params
+    assert q["case_id"] == "c1" and "store_id" not in q
+    assert "orchestrator" in r.output and "present" in r.output and "tool_call" in r.output
+    assert "->" in r.output or "→" in r.output
+    assert "x" * 200 not in r.output  # payload truncated
+
+
+def test_trace_by_store_only(api, run):
+    State(current_case="c1").save()
+    api.on("GET", "/api/v1/trace", [])
+    r = run("trace", "--store", "S030")
+    q = api.last().url.params
+    assert q["store_id"] == "S030" and "case_id" not in q
+    assert "No trace events" in r.output
+
+
+def test_trace_json_raw(api, run):
+    State(current_case="c1").save()
+    api.on("GET", "/api/v1/trace", EVENTS)
+    r = run("--json", "trace")
+    assert json.loads(r.output)[0]["event_id"] == "e1"
+
+
+def test_agent_color_is_stable():
+    from glazed_cli.render import agent_color
+    assert agent_color("present") == agent_color("present")
+    assert agent_color("present") != agent_color("supply")
