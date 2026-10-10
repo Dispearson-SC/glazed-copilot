@@ -294,5 +294,5 @@ class InboxCounts:
 
     def execute(self, case: Case) -> dict[str, int]:
         approvals, technical = self.pending.items(case)
-        open_alerts = [a for a in self.alerts.list(case.store_id) if a.case_id == case.case_id and a.state.value in self.OPEN]
+        open_alerts = [a for a in self.alerts.list(case.store_id) if a.state.value in self.OPEN]  # alerts live on their own issue cases: count the store inbox
         return {"approvals": len(approvals), "technical": len(technical), "alerts": len(open_alerts)}

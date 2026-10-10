@@ -6,7 +6,7 @@ from tests.unit.copilot_support import plan_line, stockout_issue, with_issues
 from tests.unit.test_pending_decisions import overstock
 
 
-def test_counts_match_the_pending_decisions_and_open_alerts_of_the_case():
+def test_counts_match_the_pending_decisions_and_the_open_alerts_of_the_store_inbox():
     reorder, over = stockout_issue("R1"), overstock("O1")
     def conf(m):
         m.plan = {"suppliers": [], "lines": [plan_line("R1", reorder)]}
@@ -20,7 +20,7 @@ def test_counts_match_the_pending_decisions_and_open_alerts_of_the_case():
         client.container.alerts.add(x)
     out = client.get(f"/api/v1/cases/{cid}/inbox-counts").json()
     pend = client.get(f"/api/v1/cases/{cid}/decisions/pending").json()
-    assert out == {"approvals": len(pend["approvals"]), "technical": len(pend["technical"]), "alerts": 1}
+    assert out == {"approvals": len(pend["approvals"]), "technical": len(pend["technical"]), "alerts": 2}  # the store inbox, as /alerts shows it
     assert out["approvals"] == 1 and out["technical"] == 1
 
 
