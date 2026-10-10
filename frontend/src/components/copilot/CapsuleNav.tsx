@@ -13,9 +13,12 @@ export type CapsuleBadges = Partial<Record<Tab, number>>;
 /** Floating capsule with the five copilot windows. */
 export default function CapsuleNav({ tab, onChange, badges }: { tab: Tab; onChange: (t: Tab) => void; badges: CapsuleBadges }) {
   return (
+    <>
+    {/* Solid strip behind the floating capsule so scrolled content never peeks under or around it. */}
+    <div aria-hidden="true" data-testid="capsule-backdrop" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 h-[88px] bg-surface" />
     <nav
       aria-label="Ventanas del copiloto"
-      className="fixed inset-x-3 bottom-4 z-50 mx-auto flex h-16 max-w-[616px] items-stretch gap-0.5 rounded-full border border-partition/60 bg-white/[.94] p-1.5 backdrop-blur-xl shadow-[0_1px_3px_rgba(75,48,37,.06),0_12px_32px_-6px_rgba(75,48,37,.16)]"
+      className="fixed inset-x-3 bottom-4 z-50 mx-auto flex h-16 max-w-[616px] items-stretch gap-0.5 rounded-full border border-partition/60 bg-white p-1.5 shadow-[0_1px_3px_rgba(75,48,37,.06),0_12px_32px_-6px_rgba(75,48,37,.16)]"
     >
       {TABS.map((t) => {
         const active = tab === t.id;
@@ -42,5 +45,6 @@ export default function CapsuleNav({ tab, onChange, badges }: { tab: Tab; onChan
         );
       })}
     </nav>
+    </>
   );
 }

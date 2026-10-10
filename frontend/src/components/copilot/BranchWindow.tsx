@@ -51,13 +51,13 @@ export default function BranchWindow({
   useEffect(() => setShowAll(false), [storeCode]);
   if (!view) {
     return (
-      <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-[112px]">
+      <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-[calc(var(--copilot-header-h,104px)_+_24px)]">
         <BranchSkeleton />
       </main>
     );
   }
   return (
-    <main className="mx-auto flex w-full max-w-[640px] flex-col gap-5 px-4 pb-28 pt-[104px]">
+    <main className="mx-auto flex w-full max-w-[640px] flex-col gap-5 px-4 pb-28 pt-[calc(var(--copilot-header-h,104px)_+_16px)]">
       <header className="flex flex-col gap-3 pt-3">
         <div>
           <span className="font-label-md text-label-md uppercase tracking-[0.05em] text-on-tertiary-container">Sucursal {storeCode}</span>
