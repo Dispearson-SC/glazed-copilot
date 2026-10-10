@@ -137,3 +137,18 @@ def test_trace_message_events_carry_the_turn_id(env):
                           "payload": {"tool": "kpis", "arguments": {}}}]
     events = client.get("/api/v1/trace", params={"case_id": cid}).json()
     assert [e["payload"]["turn_id"] for e in events] == ["tA", "tA"]
+
+
+def test_a_stored_envelope_user_text_is_shown_as_plain_text(env):
+    """Rows back-filled before the envelope fix hold the serialized envelope; history shows its content."""
+    import json
+    from datetime import datetime, timezone
+
+    from glazed_backend.domain.models import TurnRecord
+
+    client, c = env
+    cid = mkcase(client)
+    env_text = json.dumps({"kind": "request", "parts": [{"content": "¿Qué pido hoy?"}]})
+    c.turns.add(TurnRecord("t-old", cid, "S030", datetime(2026, 3, 9, tzinfo=timezone.utc), env_text))
+    (turn,) = client.get(f"/api/v1/cases/{cid}/turns").json()
+    assert turn["user_text"] == "¿Qué pido hoy?"

@@ -217,7 +217,7 @@ class ListTurns:
                 except Exception:  # noqa: BLE001 - Core cannot tell right now: the turn stays pending
                     live = {}
                 rec = self.turns.get(rec.turn_id) or rec
-            item: dict[str, Any] = {"turn_id": rec.turn_id, "ts": rec.ts.isoformat(), "user_text": rec.user_text,
+            item: dict[str, Any] = {"turn_id": rec.turn_id, "ts": rec.ts.isoformat(), "user_text": _message_text({"text": rec.user_text}),
                                     "reply": rec.reply if rec.final else None,
                                     "status": rec.status if rec.final else live.get("status", "pending")}
             if rec.error:
