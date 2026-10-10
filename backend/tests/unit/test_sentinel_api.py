@@ -104,3 +104,17 @@ def test_deviation_after_the_horizon_is_attributed_to_an_injected_event(env):
     assert body["diagnosis"] == "external_event" and body["events"][0]["type"] == "bloqueo"
     alerts = [a for a in client.get("/api/v1/alerts").json() if a["issue"]["kind"] == "compliance_deviation"]
     assert len(alerts) == 1 and alerts[0]["issue"]["compliance"]["diagnosis"] == "external_event"
+
+
+def test_public_promo_audit_uses_the_case_store_and_clock(env):
+    client, c = env
+    case = client.post("/api/v1/cases", json={"store_id": "S030", "sim_today": "2026-03-11"}).json()
+    r = client.post("/api/v1/promos/audit", json={"case_id": case["case_id"], "department": "Bakery", "discount_pct": 15})
+    assert r.status_code == 200
+    assert ("promo_audit", "S030", date(2026, 3, 11), "Bakery", 15.0) in c.metrics.calls
+
+
+def test_public_promo_audit_unknown_case_is_404(env):
+    client, _ = env
+    r = client.post("/api/v1/promos/audit", json={"case_id": "nope", "department": "Bakery", "discount_pct": 15})
+    assert r.status_code == 404

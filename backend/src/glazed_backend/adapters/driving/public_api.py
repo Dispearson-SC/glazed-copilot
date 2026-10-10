@@ -74,6 +74,12 @@ class InjectBody(BaseModel):
     event: InjectEventBody | None = None
 
 
+class PromoAuditBody(BaseModel):
+    case_id: str
+    department: str
+    discount_pct: float
+
+
 class TransitionBody(BaseModel):
     state: str
 
@@ -126,6 +132,11 @@ def build_public_router(c: Any) -> APIRouter:
         b = b or AdvanceBody()
         res = uc.AdvanceSimClock(c.cases, c.alerts, c.metrics, compliance=checker()).execute(case_id, b.days, b.to)
         return {"sim_today": res["sim_today"], "new_alerts": names.tag(jsonable_encoder(res["alerts"]))}
+
+    @r.post("/promos/audit")
+    def promo_audit(b: PromoAuditBody):
+        case = uc.ResumeCase(c.cases).execute(b.case_id)
+        return jsonable_encoder(c.metrics.promo_audit(case.store_id, case.sim_today, b.department, b.discount_pct))
 
     @r.get("/cases/{case_id}/compliance")
     def compliance(case_id: str):
