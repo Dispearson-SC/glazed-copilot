@@ -3,7 +3,7 @@ import os
 import duckdb
 import pytest
 
-URL = os.environ.get("GLAZED_TEST_DATABASE_URL", "postgresql://glazed_app:glazed_dev@localhost:55432/glazed_app")
+URL = os.environ.get("GLAZED_TEST_DATABASE_URL", "postgresql://glazed_app:glazed_dev@localhost:55432/glazed_test")
 pytestmark = pytest.mark.integration
 
 

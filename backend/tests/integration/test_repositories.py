@@ -8,7 +8,7 @@ from glazed_backend.domain import Alert, AlertState, BacktestRun, Case, Executio
 from tests.fakes import (InMemoryAlerts, InMemoryBacktests, InMemoryCases, InMemoryExecutions,
                          InMemoryProposals, InMemoryTrace)
 
-URL = os.environ.get("GLAZED_TEST_DATABASE_URL", "postgresql://glazed_app:glazed_dev@localhost:55432/glazed_app")
+URL = os.environ.get("GLAZED_TEST_DATABASE_URL", "postgresql://glazed_app:glazed_dev@localhost:55432/glazed_test")
 
 
 def _pg():
