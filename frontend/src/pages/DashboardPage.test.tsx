@@ -189,7 +189,7 @@ describe("DashboardPage activity chart", () => {
     expect(screen.getByTestId("activity-cap-2026-03-04")).toBeInTheDocument();
     expect(screen.getByTestId("activity-bar-2026-03-01")).toHaveStyle({ height: "112px" });
     expect(screen.getByTestId("activity-bar-2026-02-28")).toHaveStyle({ height: "112px" });
-    expect(screen.getByTestId("activity-bar-2026-03-02")).toHaveAttribute("title", expect.stringContaining("$2,000.00".replace(",", "")));
+    expect(screen.getByTestId("activity-bar-2026-03-02")).toHaveAttribute("title", expect.stringContaining("$2,000.00"));
   });
 
   it("draws 7 actual days quietly, without a model caption, when the forecast route is missing", async () => {

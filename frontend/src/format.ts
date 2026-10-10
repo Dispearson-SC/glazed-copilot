@@ -1,6 +1,8 @@
 
 /** US dollars with two decimals (the backend reports USD). */
-export const usd = (n: number): string => `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`;
+const usdDigits = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export const usd = (n: number): string => `${n < 0 ? "-" : ""}$${usdDigits.format(Math.abs(n))}`;
 
 const DAY_MS = 86_400_000;
 
