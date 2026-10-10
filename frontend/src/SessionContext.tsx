@@ -12,14 +12,37 @@ interface Session {
   bump: () => void;
 }
 
+const STORAGE_KEY = "glazed.storeId";
+
+function readStoredStore(): string {
+  try {
+    return localStorage.getItem(STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredStore(id: string) {
+  try {
+    if (id) localStorage.setItem(STORAGE_KEY, id);
+    else localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* storage unavailable: the choice just lasts for this session */
+  }
+}
+
 const Ctx = createContext<Session>({ storeId: "", setStoreId: () => {}, caseId: "", setCaseId: () => {}, refreshKey: 0, bump: () => {} });
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [storeId, setStoreId] = useState("");
+  const [storeId, setStoreIdState] = useState(readStoredStore);
+  const setStoreId = useCallback((id: string) => {
+    writeStoredStore(id);
+    setStoreIdState(id);
+  }, []);
   const [caseId, setCaseId] = useState("");
   const [refreshKey, setKey] = useState(0);
   const bump = useCallback(() => setKey((k) => k + 1), []);
-  const value = useMemo(() => ({ storeId, setStoreId, caseId, setCaseId, refreshKey, bump }), [storeId, caseId, refreshKey, bump]);
+  const value = useMemo(() => ({ storeId, setStoreId, caseId, setCaseId, refreshKey, bump }), [storeId, setStoreId, caseId, refreshKey, bump]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
