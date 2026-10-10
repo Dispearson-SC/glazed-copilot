@@ -30,8 +30,16 @@ export interface AuthUser {
   store_ids: string[];
 }
 
+export interface DemoUser {
+  email: string;
+  name: string;
+  role: "admin" | "manager";
+  store_ids: string[];
+}
+
 export interface Health {
   auth_required?: boolean;
+  demo_login?: boolean;
   [k: string]: unknown;
 }
 
@@ -75,6 +83,8 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
     },
     getHealth: () => request<Health>("/health"),
     login: (b: { email: string; password: string }) => request<{ user: AuthUser }>("/auth/login", send("POST", b)),
+    getDemoUsers: () => request<DemoUser[]>("/auth/demo-users"),
+    demoLogin: (email: string) => request<{ user: AuthUser }>("/auth/demo-login", send("POST", { email })),
     logout: () => request<unknown>("/auth/logout", { method: "POST" }),
     me: () => request<{ user: AuthUser }>("/auth/me"),
     listStores: () => request<Store[]>("/stores"),

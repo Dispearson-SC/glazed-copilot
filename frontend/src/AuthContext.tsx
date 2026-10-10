@@ -38,14 +38,20 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
   const [user, setUser] = useState<AuthUser | null>(null);
   const required = useRef(false);
+  const statusRef = useRef<Status>("loading");
+  statusRef.current = status;
+  const [demo, setDemo] = useState(false);
 
   const check = useCallback(async () => {
     setStatus("loading");
     let req = false;
     try {
-      req = (await api.getHealth()).auth_required === true;
+      const h = await api.getHealth();
+      req = h.auth_required === true;
+      setDemo(h.demo_login === true);
     } catch {
       req = false;
+      setDemo(false);
     }
     required.current = req;
     try {
@@ -66,7 +72,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     api.setOnUnauthorized?.(() => {
-      if (!required.current) return;
+      // Ignore 401s while loading or already on the login: only a live session can expire.
+      if (!required.current || statusRef.current !== "ready") return;
       setUser(null);
       setStatus("login");
     });
@@ -99,6 +106,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
           setUser(u);
           setStatus("ready");
         }}
+        demo={demo}
         loadFailed={status === "error"}
         onRetry={() => void check()}
       />
