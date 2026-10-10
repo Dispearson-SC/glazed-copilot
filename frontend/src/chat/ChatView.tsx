@@ -168,7 +168,7 @@ export default function ChatView({ chat, compact = false, footer }: { chat: Chat
         className={
           compact
             ? "flex flex-col gap-space-sm p-space-md overflow-y-auto"
-            : "bg-surface-container-lowest rounded-[18px] p-space-md shadow-sm shadow-primary/5 border border-surface-container flex flex-col gap-space-sm min-h-[320px]"
+            : "bg-surface-container-lowest rounded-[18px] p-space-md shadow-sm shadow-primary/5 border border-surface-container flex flex-col gap-space-sm min-h-[320px] max-h-[320px] box-border overflow-y-auto"
         }
       >
         {chat.messages.map((m) => (

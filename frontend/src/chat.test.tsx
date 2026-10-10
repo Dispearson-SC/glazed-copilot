@@ -20,9 +20,11 @@ const open = (path: string, api = fakeApi()) =>
   );
 
 describe("chat route and nav", () => {
-  it("adds a Chat entry to the bottom nav", async () => {
+  it("replaces the Chat entry of the bottom nav with Copiloto (handoff), and the dashboard still opens the chat from its floating button", async () => {
     open("/");
-    expect(await screen.findByRole("link", { name: /Chat/ })).toHaveAttribute("href", "/chat");
+    expect(await screen.findByRole("link", { name: /Copiloto/ })).toHaveAttribute("href", "/copiloto");
+    expect(screen.queryByRole("link", { name: /^chat/i })).toBeNull();
+    expect(await screen.findByRole("button", { name: "Abrir chat del turno" })).toBeInTheDocument();
   });
 
   it("serves the full chat at /chat with store name, sim date and suggestion chips", async () => {
@@ -280,5 +282,15 @@ describe("assistant markdown", () => {
     await userEvent.type(await screen.findByLabelText("Escribe un mensaje"), "pide **x**");
     await userEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
     expect(await screen.findByText("pide **x**")).toBeInTheDocument();
+  });
+});
+
+describe("chat page conversation box (Chat.dc.html)", () => {
+  it("is a 320px box that scrolls instead of growing", async () => {
+    open("/chat");
+    const box = await screen.findByRole("region", { name: "Conversación" });
+    expect(box.className).toMatch(/min-h-\[320px\]/);
+    expect(box.className).toMatch(/max-h-\[320px\]/);
+    expect(box.className).toMatch(/overflow-y-auto/);
   });
 });

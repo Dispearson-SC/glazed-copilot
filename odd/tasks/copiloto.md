@@ -41,8 +41,8 @@ Strict. Runner: `cd frontend && npm test -- --run`; plus `npm run build` and `np
 - [x] T2 (e9d9ced) Agente window over useChat (orb, status, pinned context, suggestions, composer, AnalysisCard). Route: delegated writer.
 - [x] T3 (ca8bf87) Decisiones window (ApprovalCard, TechDecisionCard, ⋯ menu, RejectSheet) wired to proposals/decision. Route: delegated writer.
 - [x] T4 (d803d40) Sucursal window (Ayer/Hoy/Mañana, sales card, weather, KPIs, inventory, scheduled purchases). Route: delegated writer.
-- [x] T5 Memorias and Advertencias windows. Route: delegated writer.
-- [ ] T6 Realign Main, Login and Chat to their `.dc.html`; BottomNav "Chat" → "Copiloto". Route: delegated writer.
+- [x] T5 (317f15e) Memorias and Advertencias windows. Route: delegated writer.
+- [x] T6 Realign Main, Login and Chat to their `.dc.html`; BottomNav "Chat" → "Copiloto". Route: delegated writer.
 - [ ] T7 390px screenshots vs the designs, README, and the GAP LIST (design field → backend status). Route: delegated writer.
 
 ## Progress
@@ -55,6 +55,8 @@ Strict. Runner: `cd frontend && npm test -- --run`; plus `npm run build` and `np
 - T4 done: RED observed (branch.test 7 and CopilotBranch.test 9 failing), GREEN 265/265, build ok, tsc ok. Sucursal window (Ayer/Hoy/Mañana) over forecast, day-summary (Ayer), kpis, expiring, inventory, deliveries, order-plan; Hoy/Mañana adapter prefers `/outlook` when it answers. Hoy never shows actual sales. Inventory pill shows days of cover (no invented status).
 
 - T5 done: RED observed (memories.test and CopilotMemAlerts.test failing), GREEN 282/282, build ok, tsc ok. Memorias (decision_log + supplier performance + session learnings) and Advertencias (open alerts + integrity issues; no Revertir; Automáticas empty state; Preguntar sends the question to the chat with context).
+
+- T6 done (scope narrowed to what differs structurally; the rest is judged in the T7 visual comparison): RED observed (4 failing), GREEN 284/284, build ok, tsc ok. BottomNav "Chat" -> "Copiloto" (/copiloto, icon forum); Chat conversation box is 320px with scroll. WEAKENED existing assertions on purpose (screen realigned): `App.test` bottom-nav links now `forumCopiloto -> /copiloto` instead of `chatChat -> /chat`; `App.test` current-page test now checks Resumen instead of Chat; `chat.test` "adds a Chat entry to the bottom nav" became "replaces the Chat entry with Copiloto". /chat stays reachable from the floating chat's "Abrir chat completo".
 
 ## Coordinator decisions applied (2026-10-10)
 - Approvals = `/issues` whose recommended option tier is N2/N3; technical = order-plan lines plus issue options with tier N1. Tiers are the backend's. Order-plan lines without issue/option are read-only with "Disponible pronto".

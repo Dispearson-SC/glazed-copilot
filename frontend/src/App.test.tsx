@@ -59,11 +59,11 @@ describe("top bar title", () => {
 });
 
 describe("App shell", () => {
-  it("links only the three remaining screens in the bottom navigation", async () => {
+  it("links only the three remaining screens in the bottom navigation (Chat became Copiloto)", async () => {
     open();
     const nav = await screen.findByRole("navigation", { name: "Navegación principal" });
     const links = Array.from(nav.querySelectorAll("a")).map((a) => [a.textContent, a.getAttribute("href")]);
-    expect(links).toEqual([["dashboardResumen", "/"], ["chatChat", "/chat"], ["storefrontSucursal", "/login"]]);
+    expect(links).toEqual([["dashboardResumen", "/"], ["forumCopiloto", "/copiloto"], ["storefrontSucursal", "/login"]]);
   });
 
   it("shows the store display name in the top bar and links to the picker", async () => {
@@ -77,8 +77,14 @@ describe("App shell", () => {
   });
 
   it("marks the current page in the bottom navigation", async () => {
+    open("/");
+    expect(await screen.findByRole("link", { name: /Resumen/, current: "page" })).toHaveAttribute("href", "/");
+  });
+
+  it("keeps the full chat reachable at /chat even though the nav now points to the copilot", async () => {
     open("/chat");
-    expect(await screen.findByRole("link", { name: /Chat/, current: "page" })).toHaveAttribute("href", "/chat");
+    expect(await screen.findByTestId("chat-header")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Copiloto/ })).toHaveAttribute("href", "/copiloto");
   });
 });
 
