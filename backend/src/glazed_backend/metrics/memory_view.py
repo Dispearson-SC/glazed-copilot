@@ -32,7 +32,8 @@ def action_in_text(text: str) -> str | None:
 
 
 def approved_text(action_type: str, product: str, when: str | None) -> str:
-    return f"Aprobaste {ACTION_ES.get(action_type, action_type)} de {product}" + (f" el {when}." if when else ".")
+    text = f"Aprobaste {ACTION_ES.get(action_type, action_type)} de {product}" + (f" el {when}." if when else ".")
+    return text.replace(" de el ", " del ")
 
 
 def rejected_text(action_type: str, product: str, when: str | None, reason: str, reason_category: str | None) -> str:
