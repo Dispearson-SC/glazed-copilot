@@ -24,6 +24,13 @@ def clamp_limit(limit: int | None, default: int = DEFAULT_LIMIT) -> int:
     return default if limit is None else max(1, min(int(limit), MAX_LIMIT))
 
 
+def kpis_vs_normal(metrics: Any, case: Case, date_from: date | None = None, date_to: date | None = None) -> dict[str, Any]:
+    """The case's KPIs with `baseline` and `delta_pct` (vs the previous 8 same-weekday windows). Shared by both /kpis routes."""
+    from ..metrics.kpi_baseline import with_baseline
+    end = date_to or case.sim_today
+    return with_baseline(lambda a, b: metrics.kpis(case.store_id, case.sim_today, a, b), date_from or end - timedelta(days=6), end)
+
+
 class _View:
     SOURCE = ""
 

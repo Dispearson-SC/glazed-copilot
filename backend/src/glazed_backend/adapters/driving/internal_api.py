@@ -79,8 +79,7 @@ def build_internal_router(c: Any) -> APIRouter:
 
     @r.get("/kpis")
     def kpis(case: Ctx, date_from: date | None = None, date_to: date | None = None):
-        end = date_to or case.sim_today
-        return names.tag(c.metrics.kpis(case.store_id, case.sim_today, date_from or end - timedelta(days=6), end), case.store_id)
+        return names.tag(uc_manager.kpis_vs_normal(c.metrics, case, date_from, date_to), case.store_id)
 
     @r.get("/snapshot")
     def snapshot(case: Ctx):

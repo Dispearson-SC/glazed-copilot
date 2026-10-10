@@ -253,9 +253,7 @@ def build_public_router(c: Any) -> APIRouter:
     @r.get("/cases/{case_id}/kpis")
     def kpis(case_id: str, date_from: date | None = None, date_to: date | None = None):
         case = uc.ResumeCase(c.cases).execute(case_id)
-        end = date_to or case.sim_today
-        out = c.metrics.kpis(case.store_id, case.sim_today, date_from or end - timedelta(days=6), end)
-        return names.tag({**out, "case_id": case.case_id})
+        return names.tag({**uc_manager.kpis_vs_normal(c.metrics, case, date_from, date_to), "case_id": case.case_id})
 
     @r.post("/proposals/{proposal_id}/decision")
     def decide(proposal_id: str, b: DecisionBody):
