@@ -30,6 +30,12 @@ _RISKS = [
     (re.compile(r"Lower stock raises the chance of a stockout\."), "Menos inventario aumenta la probabilidad de desabasto."),
     (re.compile(r"Skipping an order can cause a stockout before the next delivery\."), "Omitir el pedido puede causar un desabasto antes de la próxima entrega."),
     (re.compile(r"Sell-through at a discount is an assumption.*"), "La venta con descuento es un supuesto (no hay historial de rebajas ni datos por hora)."),
+    (re.compile(r"Lift is estimated from (\d+) past promotion\(s\) in this scope \(confidence (\w+)\); the method's noise floor is \+-10 points\."),
+     r"El efecto se estima con \1 promoción(es) pasada(s) del mismo alcance (confianza \2); el piso de ruido del método es de ±10 puntos."),
+    (re.compile(r"A promotion also discounts the units that would have sold at full price\."), "La promoción también rebaja las unidades que se habrían vendido a precio completo."),
+    (re.compile(r"The discount is deeper than any past promotion in this scope: the lift is extrapolated\."), "El descuento es mayor que el de cualquier promoción pasada del alcance: el efecto es una extrapolación."),
+    (re.compile(r"Sell-through follows the lift of (\d+) past promotion\(s\) in this scope \((\d+)% at (\d+)% off, confidence (\w+)\); noise floor \+-10 points\."),
+     r"La venta con descuento sigue el efecto de \1 promoción(es) pasada(s) del alcance (\2% con \3% de descuento, confianza \4); piso de ruido ±10 puntos."),
     (re.compile(r"The late order may arrive first and leave surplus\."), "El pedido atrasado puede llegar primero y dejar excedente."),
     (re.compile(r"Stock is held one extra day\."), "El inventario se mantiene un día más."),
     (re.compile(r"Values are per day, averaged over the 2-day cycle\."), "Los valores son por día, promediados en el ciclo de 2 días."),
@@ -58,6 +64,8 @@ def label(o: dict[str, Any], issue: dict[str, Any]) -> str:
         return f"Omitir el pedido de {name} en este ciclo"
     if at == "markdown_end_of_day":
         return f"Rebajar {name} {p.get('discount_pct', '')}% al cierre ({p.get('units', '?')} unidades)".replace("  ", " ")
+    if at == "activate_promo":
+        return f"Activar promoción de {p.get('discount_pct', '')}% en {name} por {p.get('days', '?')} días".replace("  ", " ")
     if at == "do_nothing":
         return "No hacer nada"
     return {"run_promo": f"Lanzar promoción en {name}", "transfer_stock": (f"Trasladar {int(qty)} unidades de {name} a {p.get('to_store_name') or p['to_store']}" if qty is not None and p.get("to_store")

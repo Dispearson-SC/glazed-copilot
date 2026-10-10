@@ -54,7 +54,7 @@ INFLATED_WASTE_RATE = 0.25
 def inflated_order_candidate(state: SkuState, cfg: Config, typical_qty: float | None) -> dict | None:
     """Alert 5: the order (plan qty or typical historical order) exceeds the optimum by at least half a case and
     the SKU's waste rate at the store is over 25%. Not limited to kiosks."""
-    rec, q_plan = recommended_qty(state, service_for(state, cfg))
+    rec, q_plan = recommended_qty(state, service_for(state, cfg), cfg)
     case = max(1, state.product.case_size or 1)
     ordered = max(float(q_plan), float(typical_qty or 0.0))
     excess = ordered - rec.qty_raw

@@ -121,7 +121,8 @@ def build_container(env: dict[str, str] | None = None) -> Container:
     path = env.get("GLAZED_DUCKDB_PATH")
     if not path or not os.path.exists(path):
         raise RuntimeError("GLAZED_DUCKDB_PATH must point to glazed.duckdb")
-    metrics = DuckDBMetrics(path, env.get("GLAZED_RAW_PATH"))
+    from ...metrics.types import config_from_env
+    metrics = DuckDBMetrics(path, env.get("GLAZED_RAW_PATH"), config_from_env(env))
     core_url = env.get("GLAZED_CORE_URL")
     if core_url:
         from ..driven.agent_core_http import AgentCoreHttp

@@ -48,6 +48,8 @@ def classify(o: dict, runner_up_net: float | None, cfg: Config, plan_qty: float 
         return "N3", ["options are close (net differs by <10%): needs a conversation"]
     if action == "markdown_end_of_day":
         return "N2", ["assumed elasticity: no discount history or hourly data, so autonomy is capped at N2"]
+    if action == "activate_promo":
+        return "N2", ["promotion lift is estimated from a handful of past promotions: needs the manager's approval (N2)"]
     fails = _n1_failures(o, cfg, plan_qty, case_size)
     if fails:
         return "N2", ["proposal: " + "; ".join(fails)]

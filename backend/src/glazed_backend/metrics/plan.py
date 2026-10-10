@@ -8,7 +8,7 @@ from statistics import NormalDist
 from .inventory import SkuState, is_short_life
 from .policy import Recommendation, loss_units, recommend, round_to_cases
 from .schedule import first_delivery
-from .service_level import SENSITIVITY, critical_ratio
+from .service_level import SENSITIVITY, overage_cost, service_target
 from .types import Config
 
 _N = NormalDist()
@@ -81,20 +81,27 @@ def scenario_losses(rec: Recommendation, qty: float, price: float, unit_cost: fl
 
 def service_for(state: SkuState, cfg: Config) -> float:
     p = state.product
-    cr = critical_ratio(p.price, p.unit_cost)
-    return cr if is_short_life(p.shelf_life_days) else max(cr, cfg.non_perishable_service)
+    return service_target(p.price, p.unit_cost, is_short_life(p.shelf_life_days), cfg)
 
 
-def _costs(state: SkuState, service: float) -> tuple[float, float]:
+def capped_service(service: float, state: SkuState, cfg: Config | None) -> float:
+    """A fixed sensitivity level (lean 0.60 / buffer 0.85) never exceeds the perishable cap of a waste_aware policy."""
+    if cfg is not None and cfg.waste_aware and cfg.perishable_service_cap is not None \
+            and is_short_life(state.product.shelf_life_days):
+        return min(service, cfg.perishable_service_cap)
+    return service
+
+
+def _costs(state: SkuState, service: float, cfg: Config | None = None) -> tuple[float, float]:
     p = state.product
     if is_short_life(p.shelf_life_days):
-        return max(p.price - p.unit_cost, 1e-6), max(p.unit_cost, 1e-6)
+        return max(p.price - p.unit_cost, 1e-6), overage_cost(p.unit_cost, cfg)
     return service / (1.0 - service), 1.0  # (s,S): implied by the target availability
 
 
-def recommended_qty(state: SkuState, service: float) -> tuple[Recommendation, int]:
+def recommended_qty(state: SkuState, service: float, cfg: Config | None = None) -> tuple[Recommendation, int]:
     rec = recommend(state, service)
-    cu, co = _costs(state, service)
+    cu, co = _costs(state, service, cfg)
     return rec, round_to_cases(rec.qty_raw, state.product.case_size, rec.base, rec.mean, rec.sd, cu, co)
 
 
@@ -102,11 +109,11 @@ def plan_line(state: SkuState, cfg: Config, typical_qty: float | None, window_re
               window_sold: float) -> dict | None:
     p = state.product
     service = service_for(state, cfg)
-    rec, qty = recommended_qty(state, service)
+    rec, qty = recommended_qty(state, service, cfg)
     if qty <= 0:
         return None
     perishable = is_short_life(p.shelf_life_days)
-    sens = {f"{s:.2f}": recommended_qty(state, s)[1] for s in SENSITIVITY}
+    sens = {f"{s:.2f}": recommended_qty(state, capped_service(s, state, cfg), cfg)[1] for s in SENSITIVITY}
     qtys = list(sens.values()) + [qty]
     stockout = projected_stockout(state, cfg.horizon_days)
     deadline, why = order_deadline(state, stockout)
@@ -129,7 +136,7 @@ def plan_line(state: SkuState, cfg: Config, typical_qty: float | None, window_re
         "est_cost_usd": round(qty * p.unit_cost, 2),
         "expected_delivery": _iso(rec.delivery), "days_to_next_delivery": (rec.delivery - state.t).days,
         "next_delivery_date": _iso(rec.delivery), "lead_time_days": max(1, round(state.supplier.lead_mean)),
-        "net_usd_mid": round(eval_delta(rec, qty, 0, p.price, p.unit_cost, perishable)["net_mid"], 2),
+        "net_usd_mid": round(eval_delta(rec, qty, 0, p.price, p.unit_cost, perishable, cfg)["net_mid"], 2),
         "do_nothing": do_nothing,
         "usable_stock": round(rec.usable, 2), "in_transit_qty": round(rec.arrivals, 2),
         "projected_stockout_date": _iso(stockout), "order_deadline": _iso(deadline), "order_deadline_status": why,

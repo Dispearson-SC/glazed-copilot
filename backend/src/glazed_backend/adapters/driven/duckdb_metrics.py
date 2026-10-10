@@ -6,6 +6,7 @@ date <= as_of, except backtest_day which reads next-day outcomes on purpose.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import math
 import os
 import threading
@@ -28,6 +29,7 @@ from ...metrics.sentinel import HORIZON_DAYS
 from ...metrics.calendar_effect import calendar_issue, event_effect
 from ...metrics.plan import apply_min_order, plan_line
 from ...metrics.promo_audit import BASELINE, PromoRef, audit_promo, promo_issue
+from ...metrics.promo_lift import PromoLiftTable, PromoObs, did_uplift_pct
 from ...metrics.deliveries import LATE_LOOKBACK_DAYS
 from ...metrics.schedule import next_delivery_after, parse_delivery_days
 from ...metrics import transfers as xfer
@@ -61,7 +63,7 @@ def _f(x: Any, nd: int = 2) -> float | None:
 
 
 class DuckDBMetrics:
-    def __init__(self, path: str, raw_dir: str | None = None) -> None:
+    def __init__(self, path: str, raw_dir: str | None = None, config: Config | None = None) -> None:
         self._con = duckdb.connect(path, read_only=True)
         self._raw_dir = raw_dir if raw_dir and os.path.exists(os.path.join(raw_dir, "sales_daily.csv")) else None
         self._raw_rows: list[tuple] | None = None
@@ -72,7 +74,9 @@ class DuckDBMetrics:
         self._issues: dict[tuple[str, date], list[dict[str, Any]]] = {}
         self._xfers: dict[tuple[str, date], dict[str, Any]] = {}
         self._fmt_days: dict[str, list[dict[str, Any]]] = {}
-        self.config = Config()
+        self.config = config or Config()
+        self._lift_obs: dict[tuple[str, date], PromoObs] = {}
+        self._lift_tables: dict[date, PromoLiftTable] = {}
 
     # -- helpers -----------------------------------------------------------------
     def _q(self, sql: str, params: list[Any] | None = None) -> list[tuple]:
@@ -187,11 +191,62 @@ class DuckDBMetrics:
         }
 
     # -- Issues ------------------------------------------------------------------
+    def _cfg(self, as_of: date) -> Config:
+        """The configured policy; waste_aware also carries the promo lift known at as_of (history only)."""
+        if not self.config.waste_aware:
+            return self.config
+        return dataclasses.replace(self.config, promo_lift=self.promo_lift_table(as_of))
+
+    def promo_lift_table(self, as_of: date) -> PromoLiftTable:
+        """Lift of every finished promotion measured with data <= as_of. Cached per week: the post-promo baseline
+        window only grows with as_of, so a Monday cut loses at most six days of it and never looks ahead."""
+        monday = as_of - timedelta(days=as_of.weekday())
+        if monday not in self._lift_tables:
+            promos = self._rows("SELECT promo_id, department, category, discount_pct, start_date, end_date FROM promotions"
+                                " ORDER BY promo_id")
+            obs = []
+            for pr in promos:
+                if pr["end_date"] > as_of or pr["promo_id"] not in BASELINE:
+                    continue
+                obs.append(self._promo_obs(pr, promos, min(pr["end_date"] + timedelta(days=28), max(monday, pr["end_date"]))))
+            self._lift_tables[monday] = PromoLiftTable(obs, as_of)
+            if len(self._lift_tables) > 8:
+                self._lift_tables.pop(next(iter(self._lift_tables)))
+        return self._lift_tables[monday]
+
+    def _promo_obs(self, pr: dict[str, Any], promos: list[dict[str, Any]], post_end: date) -> PromoObs:
+        key = (pr["promo_id"], post_end)
+        if key in self._lift_obs:
+            return self._lift_obs[key]
+        start, end, dep, cat = pr["start_date"], pr["end_date"], pr["department"], pr["category"]
+        scope = "p.department=? AND (?::VARCHAR IS NULL OR p.category=?)"
+        sp = [dep, cat, cat]
+        rows = self._q(
+            f"SELECT s.date, sum(CASE WHEN {scope} THEN s.units_sold ELSE 0 END),"
+            f" sum(CASE WHEN NOT ({scope}) AND s.promo_id IS NULL THEN s.units_sold ELSE 0 END)"
+            " FROM sales_daily s JOIN products p USING (sku)"
+            " WHERE s.date BETWEEN ? AND ? AND NOT coalesce(s.is_return, false) AND (s.promo_id IS NULL OR s.promo_id=?)"
+            " GROUP BY 1", [*sp, *sp, start - timedelta(days=28), post_end, pr["promo_id"]])
+        others = [o for o in promos if o["promo_id"] != pr["promo_id"] and o["department"] == dep
+                  and (o["category"] is None or cat is None or o["category"] == cat)]
+        w = [0.0, 0.0, 0.0, 0.0]
+        n_win = n_base = 0
+        for d, sc, ct in rows:
+            if start <= d <= end:
+                w[0] += sc; w[1] += ct; n_win += 1
+            elif not any(o["start_date"] <= d <= o["end_date"] for o in others):  # baseline day free of other promos
+                w[2] += sc; w[3] += ct; n_base += 1
+        placebo = BASELINE[pr["promo_id"]][2] == "placebo"
+        ob = PromoObs(pr["promo_id"], dep, cat, float(pr["discount_pct"] or 0), start, end,
+                      did_uplift_pct(*w) if n_win and n_base else None, n_win, n_base, placebo)
+        self._lift_obs[key] = ob
+        return ob
+
     def _calibration(self, store_id: str, as_of: date):
         key = (store_id, as_of)
         if key not in self._calib:
             ref = self._ref_date(store_id, as_of)
-            self._calib[key] = calibrate(self._snapshot(store_id, as_of), ref, self.config)
+            self._calib[key] = calibrate(self._snapshot(store_id, as_of), ref, self._cfg(as_of))
             if len(self._calib) > 16:
                 self._calib.pop(next(iter(self._calib)))
         return self._calib[key]
@@ -200,7 +255,7 @@ class DuckDBMetrics:
         key = (store_id, as_of)
         if key not in self._issues:
             ref = self._ref_date(store_id, as_of)
-            self._issues[key] = detect_issues(self._snapshot(store_id, as_of), store_id, as_of, ref, self.config,
+            self._issues[key] = detect_issues(self._snapshot(store_id, as_of), store_id, as_of, ref, self._cfg(as_of),
                                               self._calibration(store_id, as_of), limit=10_000)
             self._issues[key] += self._transfer_issues(store_id, as_of, ref) + self._promo_issues(store_id, as_of, ref) + self._calendar_issues(store_id, as_of, ref) \
                 + self._integrity_issues(store_id, as_of, ref)
@@ -488,7 +543,8 @@ class DuckDBMetrics:
                 r["date"], int(r["received_qty"] or 0), int(r["units_sold"] or 0), int(r["expired_qty"] or 0),
                 int(r["closing_qty"] or 0), float(r["stockout_hours"] or 0.0)))
         prods = {r["sku"]: Product(r["sku"], r["product_name"], r["supplier_id"], float(r["list_price_base"] or 0),
-                                   float(r["unit_cost"] or 0), int(r["case_size"] or 1), r["shelf_life_days"])
+                                   float(r["unit_cost"] or 0), int(r["case_size"] or 1), r["shelf_life_days"],
+                                   r["department"], r["category"])
                  for r in self._rows("SELECT * FROM products WHERE sku IN (SELECT DISTINCT sku FROM inventory_daily"
                                      " WHERE store_id=?) AND status IS DISTINCT FROM 'Discontinued'", [store_id])}
         pos = [PurchaseOrder(r["po_id"], r["sku"], r["order_date"], r["expected_date"],
@@ -523,7 +579,7 @@ class DuckDBMetrics:
             if state is None:
                 continue
             rec, sold = snap.window_totals(sku, ref)
-            ln = plan_line(state, self.config, snap.typical_order_qty(sku, ref), rec, sold)
+            ln = plan_line(state, self._cfg(as_of), snap.typical_order_qty(sku, ref), rec, sold)
             if ln:
                 ln["supplier_name"] = snap.supplier_names.get(ln["supplier_id"])
                 ln["confidence"] = line_confidence(calib, ln["net_usd_mid"], self.config)

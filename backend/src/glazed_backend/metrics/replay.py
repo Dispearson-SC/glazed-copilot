@@ -7,7 +7,7 @@ from .confidence import Calibration, realized_add_net, realized_reduce_net, scor
 from .demand import uncensor
 from .detect import expiring_candidate, overstock_candidate, stockout_candidate
 from .inventory import is_short_life
-from .plan import recommended_qty, service_for
+from .plan import capped_service, recommended_qty, service_for
 from .policy import delivery_window
 from .snapshot import StoreSnapshot
 from .types import Config
@@ -46,7 +46,7 @@ def calibrate(snap: StoreSnapshot, ref: date, cfg: Config) -> dict[tuple[str, st
                     nets.setdefault(("stockout_risk", "place_order"), []).append(
                         realized_add_net(win, demand, plan, prod.price, prod.unit_cost, perishable))
                     for svc in (0.60, 0.85):
-                        q = recommended_qty(state, svc)[1]
+                        q = recommended_qty(state, capped_service(svc, state, cfg), cfg)[1]
                         if q > 0 and q != plan:
                             nets.setdefault(("stockout_risk", "adjust_order_qty"), []).append(
                                 realized_add_net(win, demand, q, prod.price, prod.unit_cost, perishable))
@@ -58,7 +58,7 @@ def calibrate(snap: StoreSnapshot, ref: date, cfg: Config) -> dict[tuple[str, st
             if kinds:
                 win = _window(by_date, t + timedelta(days=1), OUTCOME_DAYS, ref)
                 if len(win) == OUTCOME_DAYS:
-                    rec, q_plan = recommended_qty(state, service_for(state, cfg))
+                    rec, q_plan = recommended_qty(state, service_for(state, cfg), cfg)
                     q_typ = snap.typical_order_qty(sku, t)
                     q_typ = float(q_typ) if q_typ is not None else sum(r.received for r in state.rows) / len(state.rows)
                     for kind in kinds:

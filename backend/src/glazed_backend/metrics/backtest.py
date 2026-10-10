@@ -4,7 +4,7 @@ from __future__ import annotations
 from .demand import uncensor, weekday_stats
 from .inventory import is_short_life
 from .policy import normal_quantile
-from .service_level import critical_ratio
+from .service_level import service_target
 from .types import Config, DayRow, Product
 
 
@@ -35,8 +35,7 @@ def backtest_sku(history: list[DayRow], outcome: DayRow, prod: Product, open_hou
     rate = sum(clean) / len(clean) if clean else mean
     lost_units = rate * frac
     cur_l = lost_units * price
-    service = critical_ratio(price, cost)
-    service = service if perishable else max(service, cfg.non_perishable_service)
+    service = service_target(price, cost, perishable, cfg)
     target = normal_quantile(mean, sd, service)
     available = float(outcome.sold + outcome.expired + outcome.closing)
     if target >= available:
