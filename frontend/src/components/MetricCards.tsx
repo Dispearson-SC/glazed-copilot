@@ -4,7 +4,7 @@ import { NO_DATA, avgTicket } from "../format";
 export default function MetricCards({ summary }: { summary: DaySummary }) {
   const t = summary.totals;
   const metrics = [
-    { id: "transactions", icon: "receipt_long", label: "Transacciones", value: t?.transactions == null ? NO_DATA : String(t.transactions) },
+    { id: "transactions", icon: "receipt_long", label: "Pedidos realizados", value: t?.transactions == null ? NO_DATA : String(t.transactions) },
     { id: "avg-ticket", icon: "payments", label: "Ticket promedio", value: t ? avgTicket(t.net_sales, t.transactions) : NO_DATA },
     { id: "units", icon: "local_cafe", label: "Items vendidos", value: t?.units_sold == null ? NO_DATA : String(t.units_sold) },
   ];

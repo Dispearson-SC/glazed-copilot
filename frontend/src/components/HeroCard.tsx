@@ -35,7 +35,7 @@ export default function HeroCard({ summary }: { summary: DaySummary }) {
                 <span aria-hidden="true" className="material-symbols-outlined text-[15px] font-bold">
                   {vs.delta_pct >= 0 ? "north_east" : "south_east"}
                 </span>
-                <span>{signedPct(vs.delta_pct)} vs promedio mismo día</span>
+                <span>{signedPct(vs.delta_pct)} vs promedio</span>
               </div>
             )}
           </div>

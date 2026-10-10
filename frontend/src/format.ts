@@ -27,7 +27,7 @@ export const money = (n: number | null | undefined): string => (n == null ? NO_D
 export const avgTicket = (sales: number | null | undefined, tx: number | null | undefined): string =>
   sales == null || !tx ? "—" : usd(sales / tx);
 
-export const signedPct = (n: number): string => `${n >= 0 ? "+" : "-"}${Math.abs(n).toFixed(1)}%`;
+export const signedPct = (n: number): string => `${n >= 0 ? "+" : "-"}${Math.round(Math.abs(n))}%`;
 
 /** "dd/mm" of an ISO date. */
 export const dayMonth = (iso: string): string => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;

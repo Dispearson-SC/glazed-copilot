@@ -48,10 +48,28 @@ describe("DashboardPage hero and metrics", () => {
     const hero = await screen.findByTestId("hero");
     expect(await within(hero).findByText("$733.91")).toBeInTheDocument();
     expect(within(hero).getByText("Ventas de hoy")).toBeInTheDocument();
-    expect(screen.getByTestId("hero-delta")).toHaveTextContent("+18.8% vs promedio mismo día");
+    expect(screen.getByTestId("hero-delta")).toHaveTextContent("+19% vs promedio");
     expect(hero).toHaveTextContent("Promedio mismo día (8 sem): $617.92");
     expect(screen.getByTestId("hero-progress")).toHaveTextContent("119% del promedio");
     expect(screen.getByTestId("hero-bar")).toHaveStyle({ width: "100%" });
+  });
+
+  it("puts the delta pill on the amount row, to its right, with the short text", async () => {
+    open();
+    const pill = await screen.findByTestId("hero-delta");
+    expect(pill).toHaveTextContent(/^north_east\+19% vs promedio$/);
+    const row = pill.parentElement!;
+    expect(row.className).toContain("justify-between");
+    expect(row.firstElementChild).toHaveTextContent("$733.91");
+    expect(row.lastElementChild).toBe(pill);
+  });
+
+  it("labels the metric cards as in the design", async () => {
+    open();
+    await screen.findByTestId("metric-transactions");
+    expect(screen.getByTestId("metric-transactions")).toHaveTextContent("Pedidos realizados");
+    expect(screen.getByTestId("metric-avg-ticket")).toHaveTextContent("Ticket promedio");
+    expect(screen.getByTestId("metric-units")).toHaveTextContent("Items vendidos");
   });
 
   it("caps the bar below the average and uses the weeks reported by the backend", async () => {
@@ -61,7 +79,7 @@ describe("DashboardPage hero and metrics", () => {
     expect(await screen.findByTestId("hero-progress")).toHaveTextContent("50% del promedio");
     expect(screen.getByTestId("hero")).toHaveTextContent("(7 sem)");
     expect(screen.getByTestId("hero-bar")).toHaveStyle({ width: "50%" });
-    expect(screen.getByTestId("hero-delta")).toHaveTextContent("-50.0%");
+    expect(screen.getByTestId("hero-delta")).toHaveTextContent("-50% vs promedio");
   });
 
   it("maps transactions, average ticket and units, without staff hours", async () => {
