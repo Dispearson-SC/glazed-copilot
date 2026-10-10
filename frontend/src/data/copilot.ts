@@ -122,13 +122,14 @@ export interface PromoView {
 const LIFT_CONFIDENCE_ES: Record<string, string> = { low: "baja", medium: "media", high: "alta" };
 const PROMO_LABEL = "Activar promoción";
 const isNum = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
+const isIsoDate = (d: unknown): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}/.test(d) && !Number.isNaN(Date.parse(d.slice(0, 10)));
 
 /** Formats an `activate_promo` option; null for any other action or params without the essentials. */
 export function promoView(option: { action_type?: string; params?: Record<string, unknown> | null; data_caveat?: string | null } | null | undefined): PromoView | null {
   if (!option || option.action_type !== "activate_promo") return null;
   const p = (option.params ?? {}) as Partial<PromoParams>;
   if (!isNum(p.discount_pct) || !isNum(p.days)) return null;
-  const dates = p.start_date && p.end_date ? ` (${shortDate(p.start_date)}–${shortDate(p.end_date)})` : "";
+  const dates = isIsoDate(p.start_date) && isIsoDate(p.end_date) ? ` (${shortDate(p.start_date)}–${shortDate(p.end_date)})` : "";
   const details: string[] = [];
   if (isNum(p.expected_units_cleared) && isNum(p.units_at_risk)) details.push(`Vende ~${Math.round(p.expected_units_cleared)} de ${Math.round(p.units_at_risk)} unidades en riesgo`);
   if (isNum(p.waste_avoided_usd)) details.push(`Merma evitada ${signedUsd(p.waste_avoided_usd)}`);
