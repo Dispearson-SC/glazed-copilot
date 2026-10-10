@@ -80,17 +80,19 @@ class CheckCompliance:
         """Decisions of this case plus, for a live case, earlier live decisions of the same store (scope "other_case").
         Sandbox and backtest cases never leak, and decisions dated after this case's clock are not shown."""
         from . import _case
+        from .scope import decision_date, visible
         case = _case(self.cases, case_id)
         events = self.events(case.store_id)
+        owners = {c.case_id: c for c in self.cases.list(case.store_id)}
         own = {p.proposal_id: "this_case" for p in self.proposals.list(case_id=case.case_id)}
         scoped = dict(own)
-        if case.mode == "live":
-            live = {c.case_id for c in self.cases.list(case.store_id) if c.mode == "live" and c.sim_today <= case.sim_today}
+        if case.mode == "live":  # other live cases only: never archived (test) ones, nothing decided after this date
             for p in self.proposals.list(store_id=case.store_id):
-                if p.case_id in live and p.proposal_id not in scoped:
+                if p.proposal_id not in scoped and visible(case, p, owners):
                     scoped[p.proposal_id] = "other_case"
         out = []
-        for p in sorted(self.proposals.list(store_id=case.store_id), key=lambda x: x.created_at):
+        dated = lambda x: (str(decision_date(x, owners) or ""), x.created_at)  # noqa: E731 - simulated day first
+        for p in sorted(self.proposals.list(store_id=case.store_id), key=dated):
             if p.proposal_id not in scoped:
                 continue
             res = self.check(p, case.sim_today, events)
@@ -114,10 +116,12 @@ class CheckCompliance:
         from . import _case
         case = _case(self.cases, case_id)
         events = self.events(case.store_id)
-        same = {c.case_id for c in self.cases.list(case.store_id) if c.mode == case.mode}
+        from .scope import decision_date
+        owners = {c.case_id: c for c in self.cases.list(case.store_id)}
+        same = {c.case_id for c in owners.values() if c.mode == case.mode and (c.case_id == case.case_id or not c.archived)}
         out = []
         for p in self.proposals.list(store_id=case.store_id, status="approved"):
-            if p.case_id in same:
+            if p.case_id in same and (decision_date(p, owners) or case.sim_today) <= case.sim_today:
                 res = self.check(p, case.sim_today, events)
                 if res["diagnosis"] in ("not_executed", "external_event", "forecast_error"):
                     out.append(res)

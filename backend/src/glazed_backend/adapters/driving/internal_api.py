@@ -226,8 +226,11 @@ def build_internal_router(c: Any) -> APIRouter:
 
     @r.get("/experiences")
     def experiences(case: Ctx, response: Response, query: str = "", limit: int = 5):
+        from ...application.scope import experience_visible
         found, warning = uc.RecallExperiences(getattr(c, "memory", None)).execute(
             case.store_id, query, max(1, min(limit, 20)))
+        owners = {x.case_id: x for x in c.cases.list(case.store_id)}
+        found = [e for e in found if experience_visible(case, e, c.proposals, owners)]  # no archived or look-ahead memory
         if warning:
             response.headers["X-Glazed-Warning"] = warning.replace("\n", " ")[:200]
         def verify(e: Any) -> dict[str, str] | None:

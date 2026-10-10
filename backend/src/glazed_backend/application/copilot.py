@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import timedelta
+from datetime import datetime, time, timedelta, timezone
 from typing import Any
 
 from ..domain import Case, DomainError, NotFound
@@ -170,10 +170,11 @@ class RecordDecision:
 
 class ListMemories:
     """What the copilot has learned about this store, newest first. Sources: approved decisions (decision log), the
-    store's Backboard experiences, and the preferences kept from rejection reasons. Decisions of cases that are later
-    than this one are never shown. Categories come from `memory_view.category_of`."""
+    store's Backboard experiences, the preferences kept from rejection reasons and the measured outcomes of decisions.
+    Items are dated by the simulated day they belong to (never the wall clock); decisions of archived or later
+    cases and anything dated after this case's date are never shown. Categories come from `memory_view.category_of`."""
 
-    SOURCES = ("decision_log", "backboard", "rejection_reason")
+    SOURCES = ("decision_log", "backboard", "rejection_reason", "outcome")
     NEW_FOR = timedelta(hours=24)
 
     def __init__(self, cases: Any, proposals: Any, metrics: Any, memory: Any, decision_memories: Any, clock: Any) -> None:
@@ -182,40 +183,48 @@ class ListMemories:
 
     def execute(self, case: Case, category: str | None = None, q: str | None = None) -> list[dict[str, Any]]:
         from ..metrics.memory_view import action_in_text, approved_text, category_of, valid_category
+        from .scope import decision_date, experience_visible, in_scope
         if not valid_category(category):
             raise DomainError(f"category must be one of {', '.join(MEMORY_CATEGORIES)}")
         store = case.store_id
-        scope = {case.case_id} | ({c.case_id for c in self.cases.list(store) if c.mode == "live" and c.sim_today <= case.sim_today}
-                                   if case.mode == "live" else set())
+        owners = {c.case_id: c for c in self.cases.list(store)}
         catalog = self.metrics.product_catalog(store) if hasattr(self.metrics, "product_catalog") else {}
-        props = {p.proposal_id: p for p in self.proposals.list(store_id=store) if p.case_id in scope}
-        now = self.clock.now()
+        props = {p.proposal_id: p for p in self.proposals.list(store_id=store) if in_scope(case, p.case_id, owners)}
+        seen = lambda d: d is None or d <= case.sim_today  # noqa: E731 - nothing dated after this case's day
         rows: list[dict[str, Any]] = []
         for p in props.values():
-            if p.status != "approved":
+            day = decision_date(p, owners)
+            if p.status != "approved" or not seen(day):
                 continue
             parts = p.issue_id.split("|")
             sku = p.params.get("sku")
             product = (catalog.get(sku) or {}).get("product_name") or sku or p.issue_id
             rows.append(self._row(f"dec-{p.proposal_id}", category_of(p.action_type, None, parts[1] if len(parts) > 2 else None),
                                   approved_text(p.action_type, product, p.params.get("decision_as_of")), "decision_log", True,
-                                  p.created_at, (p.action_type, sku or p.params.get("supplier_id")), p.case_id))
+                                  day, p.created_at, (p.action_type, sku or p.params.get("supplier_id")), p.case_id))
         for m in self.decision_memories.list(store):
-            if m.case_id in scope:
-                rows.append(self._row(m.memory_id, m.category, m.text, "rejection_reason", False, m.created_at,
-                                      (m.action_type, m.reason_category or "otro"), m.case_id))
+            if not in_scope(case, m.case_id, owners):
+                continue
+            own = props.get(m.decision_id)
+            day = m.sim_date or (decision_date(own, owners) if own is not None else None) or \
+                (owners[m.case_id].sim_today if m.case_id in owners else None)
+            if not seen(day):
+                continue
+            outcome = m.memory_id.startswith("out-")
+            rows.append(self._row(m.memory_id, m.category, m.text, "outcome" if outcome else "rejection_reason", outcome, day,
+                                  m.created_at, (m.action_type, m.sku if outcome else (m.reason_category or "otro")), m.case_id))
         for e in self._experiences(store):
+            if not experience_visible(case, e, self.proposals, owners):
+                continue
             local = props.get(e.decision_id or "")
             if local is not None and e.kind == "decision":
                 continue  # the same fact as the decision log / rejection memory
-            if e.decision_id and e.decision_id not in props and e.kind in ("decision", "outcome"):
-                known = self.proposals.get(e.decision_id)
-                if known is not None and known.case_id not in scope:
-                    continue  # recorded by a case that is later than this one
             action = (local.action_type if local else None) or action_in_text(e.text)
             cat = "demanda" if e.kind == "promo_evaluation" else category_of(action)
+            day = decision_date(local, owners) if local is not None else None
             rows.append(self._row("bb-" + hashlib.sha1(f"{e.kind}|{e.decision_id}|{e.text}".encode()).hexdigest()[:12], cat,
-                                  e.text, "backboard", bool(local), e.created_at, (action, e.ref or e.decision_id), local.case_id if local else None))
+                                  e.text, "backboard", bool(local), day, e.created_at, (action, e.ref or e.decision_id),
+                                  local.case_id if local else None))
         holders: dict[tuple, set[str]] = {}
         for r in rows:  # cases_count: distinct cases holding a memory of the same category and pattern
             holders.setdefault((r["category"], r["_key"]), set()).add(r["_case"])
@@ -233,10 +242,12 @@ class ListMemories:
         except Exception:  # noqa: BLE001 - memory problems degrade to "no experiences"
             return []
 
-    def _row(self, memory_id: str, category: str, text: str, source: str, verified: bool, created_at: Any, key: tuple,
-             case_id: str | None) -> dict[str, Any]:
+    def _row(self, memory_id: str, category: str, text: str, source: str, verified: bool, day: Any, recorded_at: Any,
+             key: tuple, case_id: str | None) -> dict[str, Any]:
+        """`created_at` is the simulated day the memory belongs to; `new` reads the moment it was recorded."""
+        at = datetime.combine(day, time.min, tzinfo=timezone.utc) if day is not None else recorded_at
         return {"memory_id": memory_id, "category": category, "text": text, "source": source, "cases_count": 1,
-                "verified": verified, "created_at": created_at.isoformat(), "new": self.clock.now() - created_at < self.NEW_FOR,
+                "verified": verified, "created_at": at.isoformat(), "new": self.clock.now() - recorded_at < self.NEW_FOR,
                 "_key": key, "_case": case_id}
 
 

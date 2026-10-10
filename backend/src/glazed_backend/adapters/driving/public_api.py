@@ -146,6 +146,12 @@ def build_public_router(c: Any) -> APIRouter:
     def get_case(case_id: str):
         return names.tag(jsonable_encoder(uc.ResumeCase(c.cases).execute(case_id)))
 
+    @r.post("/cases/{case_id}/archive")
+    def archive(case_id: str):
+        case = uc.ArchiveCase(c.cases).execute(case_id)
+        c.briefings.clear()
+        return names.tag(jsonable_encoder(case))
+
     @r.post("/cases/{case_id}/fork", status_code=201)
     def fork(case_id: str, b: ForkBody | None = None):
         child = uc.ForkCase(c.cases, c.proposals, c.executions).execute(case_id, (b.title if b else ""))
@@ -214,7 +220,7 @@ def build_public_router(c: Any) -> APIRouter:
             st = AlertState(state) if state else None
         except ValueError:
             raise DomainError(f"unknown alert state {state!r}") from None
-        return names.tag([alert_view(a) for a in uc.ListAlerts(c.alerts).execute(store_id, st)])
+        return names.tag([alert_view(a) for a in uc.ListAlerts(c.alerts, c.cases).execute(store_id, st)])
 
     @r.patch("/alerts/{alert_id}")
     def transition(alert_id: str, b: TransitionBody):

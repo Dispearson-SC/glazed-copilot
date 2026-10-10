@@ -60,12 +60,12 @@ class _Repo:
 
 class _Cases(_Repo):
     _COLS = ("case_id", "store_id", "sim_today", "mode", "parent_case_id", "core_conversation_id", "title",
-             "created_at", "issue_key")
+             "created_at", "issue_key", "archived")
 
     def add(self, c: Case) -> None:
         cols = ", ".join(self._COLS)
         sets = ", ".join(f"{k}=EXCLUDED.{k}" for k in self._COLS[1:])
-        self.s.q(f"INSERT INTO glazed.cases ({cols}) VALUES ({', '.join(['%s'] * 9)})"
+        self.s.q(f"INSERT INTO glazed.cases ({cols}) VALUES ({', '.join(['%s'] * len(self._COLS))})"
                  f" ON CONFLICT (case_id) DO UPDATE SET {sets}", [getattr(c, k) for k in self._COLS])
 
     update = add
@@ -222,7 +222,7 @@ class _Turns(_Repo):
 
 class _DecisionMemories(_Repo):
     _COLS = ("memory_id", "store_id", "case_id", "decision_id", "category", "text", "reason_category", "action_type", "sku",
-             "created_at", "reason")
+             "created_at", "reason", "sim_date")
 
     def add(self, m: DecisionMemory) -> None:
         sets = ", ".join(f"{k}=EXCLUDED.{k}" for k in self._COLS[1:])

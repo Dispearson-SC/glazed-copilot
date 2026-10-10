@@ -49,6 +49,15 @@ def test_cases_roundtrip_update_and_lookups(repos):
     assert [x.store_id for x in repos.cases.list("S030")] == ["S030"] and len(repos.cases.list()) == 2
 
 
+def test_archived_flag_roundtrips(repos):
+    c = Case.new("S030", date(2026, 3, 10))
+    assert c.archived is False
+    repos.cases.add(c)
+    c.archived = True
+    repos.cases.update(c)
+    assert repos.cases.get(c.case_id).archived is True and repos.cases.list("S030")[0].archived is True
+
+
 def test_alerts_roundtrip_filter_and_order(repos):
     a1 = Alert.new(2, "S030", "c1", 10.0, {"issue_id": "i1", "x": [1]}, "i1", date(2026, 3, 10))
     a2 = Alert.new(1, "S030", "c2", 99.0, {"issue_id": "i2"}, "i2", date(2026, 3, 10))
@@ -128,7 +137,7 @@ def test_decision_memories_roundtrip_and_store_scope():
     from glazed_backend.domain import DecisionMemory
     for repo in (InMemoryDecisionMemories(), _pg().memories):
         m = DecisionMemory("m1", "S030", "c1", "d1", "preferencias", "Rechazaste pedir X", "precio", "place_order", "SKU-1",
-                           datetime(2026, 3, 1, tzinfo=timezone.utc), reason="muy caro")
+                           datetime(2026, 3, 1, tzinfo=timezone.utc), reason="muy caro", sim_date=date(2026, 2, 27))
         repo.add(m)
         repo.add(DecisionMemory("m2", "S001", "c9", "d9", "preferencias", "otra tienda", None, "skip_order", None,
                                 datetime(2026, 3, 2, tzinfo=timezone.utc)))

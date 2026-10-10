@@ -40,6 +40,30 @@ class ListCases:
         return self.cases.list(store_id)
 
 
+class ArchiveCase:
+    """Mark a test case (and every case it opened or forked) as archived: it keeps its own data but leaves every
+    cross-case view. Idempotent."""
+
+    def __init__(self, cases: CaseRepository) -> None:
+        self.cases = cases
+
+    def execute(self, case_id: str) -> Case:
+        root = _case(self.cases, case_id)
+        everyone = self.cases.list()
+        family, frontier = {root.case_id}, [root.case_id]
+        while frontier:
+            parent = frontier.pop()
+            for c in everyone:
+                if c.parent_case_id == parent and c.case_id not in family:
+                    family.add(c.case_id)
+                    frontier.append(c.case_id)
+        for c in everyone:
+            if c.case_id in family and not c.archived:
+                c.archived = True
+                self.cases.update(c)
+        return _case(self.cases, root.case_id)
+
+
 class ResumeCase:
     def __init__(self, cases: CaseRepository) -> None:
         self.cases = cases
@@ -423,11 +447,17 @@ class AdvanceSimClock:
 
 
 class ListAlerts:
-    def __init__(self, alerts: AlertRepository) -> None:
-        self.alerts = alerts
+    """Alerts of the store; those raised by archived (test) cases are left out when the case repository is given."""
+
+    def __init__(self, alerts: AlertRepository, cases: CaseRepository | None = None) -> None:
+        self.alerts, self.cases = alerts, cases
 
     def execute(self, store_id: str | None = None, state: AlertState | None = None) -> list[Alert]:
-        return self.alerts.list(store_id, state)
+        found = self.alerts.list(store_id, state)
+        if self.cases is None:
+            return found
+        archived = {c.case_id for c in self.cases.list(store_id) if c.archived}
+        return [a for a in found if a.case_id not in archived]
 
 
 class SubmitProposal:
@@ -534,7 +564,8 @@ class DecideProposal:
             text = rejected_text(p.action_type, subject or p.params.get("sku") or p.issue_id, when, p.reason, p.reason_category)
             self.decision_memories.add(DecisionMemory(
                 f"rej-{p.proposal_id}", p.store_id, p.case_id, p.proposal_id, "preferencias", text, p.reason_category,
-                p.action_type, p.params.get("sku"), self.clock.now() if self.clock else utcnow(), p.reason))
+                p.action_type, p.params.get("sku"), self.clock.now() if self.clock else utcnow(), p.reason,
+                case.sim_today if case else None))
         except Exception:  # noqa: BLE001 - never blocks a decision
             pass
 

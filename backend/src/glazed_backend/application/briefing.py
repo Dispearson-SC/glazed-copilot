@@ -67,8 +67,8 @@ class SnapshotBuilder:
     """Composes MetricsPort reads into the snapshot payload. `served` receives the full issues so that an agent can
     propose one of the snapshot's options without calling /issues first."""
 
-    def __init__(self, metrics: Any, proposals: Any, name_of: Callable[[str], str], served: dict) -> None:
-        self.metrics, self.proposals, self.name_of, self.served = metrics, proposals, name_of, served
+    def __init__(self, metrics: Any, proposals: Any, name_of: Callable[[str], str], served: dict, cases: Any = None) -> None:
+        self.metrics, self.proposals, self.name_of, self.served, self.cases = metrics, proposals, name_of, served, cases
 
     def core(self, case: Case) -> dict[str, Any]:
         sid, as_of = case.store_id, case.sim_today
@@ -114,8 +114,11 @@ class SnapshotBuilder:
     def live(self, case: Case) -> dict[str, Any]:
         """Pending proposals of THIS case only (the other cases of the store are just counted); recent decisions list
         this case first and then the store's, each labelled with its scope."""
+        from .scope import visible
         mine = self.proposals.list(case_id=case.case_id)
-        rest = [p for p in self.proposals.list(store_id=case.store_id) if p.case_id != case.case_id]
+        owners = {c.case_id: c for c in self.cases.list(case.store_id)} if self.cases is not None else {}
+        rest = [p for p in self.proposals.list(store_id=case.store_id)
+                if p.case_id != case.case_id and (self.cases is None or visible(case, p, owners))]
         tagged = [(p, "this_case") for p in mine] + [(p, "other_case") for p in rest]
         pending = [_trim_proposal(p, s) for p, s in tagged if p.status == "pending" and s == "this_case"][:MAX_PENDING]
         decided = sorted(((p, s) for p, s in tagged if p.status in ("approved", "rejected")),

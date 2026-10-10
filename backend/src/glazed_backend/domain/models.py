@@ -104,6 +104,7 @@ class Case:
     title: str
     created_at: datetime
     issue_key: str | None = None
+    archived: bool = False  # test data: out of every cross-case view (history, memories, alerts, briefing counts)
 
     @classmethod
     def new(cls, store_id: str, sim_today: date, mode: str = "live", title: str = "",
@@ -321,3 +322,4 @@ class DecisionMemory:
     sku: str | None
     created_at: datetime
     reason: str = ""
+    sim_date: date | None = None  # the simulated day it was written on (created_at is the wall clock)
