@@ -230,7 +230,8 @@ class ListMemories:
                 continue
             parts = p.issue_id.split("|")
             sku = p.params.get("sku")
-            product = (catalog.get(sku) or {}).get("product_name") or sku or p.issue_id
+            supplier = p.params.get("supplier_name") or p.params.get("supplier_id") or (parts[2] if len(parts) > 2 and not sku else None)
+            product = (catalog.get(sku) or {}).get("product_name") or sku or (f"el proveedor {supplier}" if supplier else "la tienda")
             rows.append(self._row(f"dec-{p.proposal_id}", category_of(p.action_type, None, parts[1] if len(parts) > 2 else None),
                                   approved_text(p.action_type, product, p.params.get("decision_as_of")), "decision_log", True,
                                   day, p.created_at, (p.action_type, sku or p.params.get("supplier_id")), p.case_id))
@@ -266,7 +267,7 @@ class ListMemories:
         for r in rows:
             r["cases_count"] = len(holders[(r["category"], r.pop("_key"))] - {None}) or 1
             r.pop("_case")
-        rows.sort(key=lambda r: r["created_at"], reverse=True)
+        rows.sort(key=lambda r: (r["created_at"], r["recorded_at"]), reverse=True)  # newest first, ties by write time
         return [r for r in rows if (category is None or r["category"] == category) and (not q or q.lower() in r["text"].lower())]
 
     def _experiences(self, store_id: str) -> list[Any]:
@@ -282,8 +283,8 @@ class ListMemories:
         """`created_at` is the simulated day the memory belongs to; `new` reads the moment it was recorded."""
         at = datetime.combine(day, time.min, tzinfo=timezone.utc) if day is not None else recorded_at
         return {"memory_id": memory_id, "category": category, "text": text, "source": source, "cases_count": 1,
-                "verified": verified, "created_at": at.isoformat(), "new": self.clock.now() - recorded_at < self.NEW_FOR,
-                "_key": key, "_case": case_id}
+                "verified": verified, "created_at": at.isoformat(), "recorded_at": recorded_at.isoformat(),
+                "new": self.clock.now() - recorded_at < self.NEW_FOR, "_key": key, "_case": case_id}
 
 
 class AgentsStatus:
