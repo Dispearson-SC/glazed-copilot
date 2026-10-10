@@ -41,6 +41,31 @@ def looks_portuguese(text: str) -> bool:
     return bool(_PT_STRONG.search(t)) or len(set(m.group(0) for m in _PT_WEAK.finditer(t))) >= 2
 
 
+_ES_WORDS = frozenset("""que qué el la los las lo de del con para por hoy mañana ayer cuánto cuánta cuántos cuántas cuanto
+cuantos cuantas pedir pido debo debería es son hay está están estoy mi mis me se en un una unos unas y o pero cómo como
+cuál cuando cuándo dónde donde porque por qué sí no más menos tengo tiene vender vendí vendo pasa pasó tienda sucursal
+pedido pedidos producto productos merma ventas venta semana día días hola gracias favor quiero puedes dime""".split())
+_FOREIGN_WORDS = frozenset("""che oggi domani gli sono perché della questo quanti quante il cosa fare
+the what how today tomorrow should is are my order sell sold store you""".split())
+_ES_MARK = re.compile(r"[ñ¿¡]|[áéíóú]")
+_WORD = re.compile(r"[a-záéíóúüñãõçàèìòù]+", re.I)
+
+
+def looks_foreign(text: str) -> bool:
+    """True when a transcript asked for in Spanish reads as another language (the provider drifts to Portuguese or
+    Italian on short clips). Portuguese markers, foreign function words outnumbering Spanish ones, or a sentence of
+    four or more words with almost no Spanish evidence all count; one- or two-word utterances are trusted."""
+    t = (text or "").lower()
+    if looks_portuguese(t):
+        return True
+    words = _WORD.findall(t)
+    es = sum(w in _ES_WORDS for w in words) + (1 if _ES_MARK.search(t) else 0)
+    foreign = sum(w in _FOREIGN_WORDS for w in words)
+    if foreign and foreign >= es:
+        return True
+    return len(words) >= 4 and es == 0
+
+
 def _money(m: re.Match) -> str:
     whole, cents = m.group(1).replace(",", ""), (m.group(2) or "")[1:3].ljust(2, "0")
     return f"{whole} dólares" + (f" con {int(cents)} centavos" if m.group(2) and int(cents) else "")
@@ -120,15 +145,16 @@ class VoiceDesk:
         return self.service.transcribe(audio, mime, language).strip()
 
     def transcribe_checked(self, audio: bytes, mime: str, language: str = "es") -> tuple[str, bool]:
-        """Returns (text, language_suspect). For Spanish, a Portuguese-looking result is retried up to STT_RETRIES times."""
+        """Returns (text, language_suspect). For Spanish, a result that reads as another language is retried up to
+        STT_RETRIES times."""
         text = self.transcribe(audio, mime, language)
         if not language.lower().startswith("es"):
             return text, False
         for _ in range(STT_RETRIES):
-            if not looks_portuguese(text):
+            if not looks_foreign(text):
                 return text, False
             text = self.transcribe(audio, mime, language)
-        return text, looks_portuguese(text)
+        return text, looks_foreign(text)
 
     def speak(self, text: str) -> bytes:
         spoken = speakable_text(text, 10 ** 9)

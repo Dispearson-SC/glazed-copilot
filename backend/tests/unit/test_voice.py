@@ -2,6 +2,7 @@
 from datetime import date
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from glazed_backend.adapters.driven.minimax_voice import MiniMaxVoice
@@ -286,3 +287,13 @@ def test_non_spanish_language_is_never_checked():
     v = SeqVoice(PT)
     assert VoiceDesk(v, "v", "m").transcribe_checked(b"a", "audio/webm", "pt") == (PT, False)
     assert v.calls == 1
+
+
+@pytest.mark.parametrize("text,foreign", [
+    ("Che passa con lo speck oggi?", True), ("O que acontece com os bagels hoje?", True),
+    ("What should I order today?", True), ("¿Cuánto vendí ayer?", False),
+    ("Cuántas donas glaseadas debo pedir para mañana", False), ("Qué pasa con los bagels hoy", False),
+    ("Sí", False), ("Bagels", False), ("Donas glaseadas", False)])
+def test_language_guard_flags_any_non_spanish_transcript(text, foreign):
+    from glazed_backend.application.voice import looks_foreign
+    assert looks_foreign(text) is foreign
