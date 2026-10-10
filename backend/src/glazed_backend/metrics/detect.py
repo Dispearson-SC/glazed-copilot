@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from .inventory import SkuState, expiring_units
-from .plan import plan_line
+from .plan import plan_line, recommended_qty, service_for
 from .types import Config
 
 MIN_DAILY_DEMAND = 1.0
@@ -45,4 +45,23 @@ def expiring_candidate(state: SkuState) -> dict | None:
     units = expiring_units(state)
     if units >= MIN_EXPIRING_UNITS:
         return {"units": units, "value_usd": units * state.product.unit_cost}
+    return None
+
+
+INFLATED_WASTE_RATE = 0.25
+
+
+def inflated_order_candidate(state: SkuState, cfg: Config, typical_qty: float | None) -> dict | None:
+    """Alert 5: the order (plan qty or typical historical order) exceeds the optimum by at least half a case and
+    the SKU's waste rate at the store is over 25%. Not limited to kiosks."""
+    rec, q_plan = recommended_qty(state, service_for(state, cfg))
+    case = max(1, state.product.case_size or 1)
+    ordered = max(float(q_plan), float(typical_qty or 0.0))
+    excess = ordered - rec.qty_raw
+    received = sum(r.received for r in state.rows)
+    waste_rate = sum(r.expired for r in state.rows) / received if received > 0 else 0.0
+    if excess >= case / 2 and excess > 0 and waste_rate > INFLATED_WASTE_RATE:
+        return {"ordered_qty": round(ordered), "optimum_qty": round(rec.qty_raw, 2), "excess_units": round(excess, 2),
+                "case_size": case, "waste_rate": round(waste_rate, 4), "plan_qty": q_plan,
+                "typical_qty": None if typical_qty is None else float(typical_qty)}
     return None

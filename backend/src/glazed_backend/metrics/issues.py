@@ -4,8 +4,9 @@ from __future__ import annotations
 from datetime import date
 
 from .confidence import Calibration, confidence_for
-from .detect import avg_daily_demand, expiring_candidate, overstock_candidate, stockout_candidate
-from .options import expiring_options, late_options, overstock_options, stockout_options
+from .detect import (avg_daily_demand, expiring_candidate, inflated_order_candidate, overstock_candidate,
+                     stockout_candidate)
+from .options import expiring_options, inflated_order_options, late_options, overstock_options, stockout_options
 from .snapshot import StoreSnapshot
 from .tiers import classify
 from .types import Config
@@ -89,6 +90,20 @@ def detect_issues(snap: StoreSnapshot, store_id: str, as_of: date, ref: date, cf
                       "inventory_daily")]
             out.append(_issue(store_id, "overstock_waste", sku, as_of, ref, over["waste_usd_14d"], ev, base_cav, opts, rec,
                               sku=sku, product_name=p.name, supplier_id=p.supplier_id))
+        infl = inflated_order_candidate(state, cfg, typical)
+        if infl:
+            iid = f"{store_id}|inflated_order|{sku}"
+            opts = inflated_order_options(iid, state, cfg, infl)
+            rec = finalize_options(opts, "inflated_order", calib, cfg)
+            dn = next(o for o in opts if o["action_type"] == "do_nothing")
+            ev = [_ev("ordered_qty", infl["ordered_qty"], "units", "plan / typical order", "purchase_orders"),
+                  _ev("optimum_qty", infl["optimum_qty"], "units", per, "glazed_metrics"),
+                  _ev("excess_over_optimum", infl["excess_units"], "units", per, "glazed_metrics"),
+                  _ev("case_size", infl["case_size"], "units", "product", "products"),
+                  _ev("waste_rate", infl["waste_rate"], "share of received", "last 56 days", "inventory_daily")]
+            out.append(_issue(store_id, "inflated_order", sku, as_of, ref, dn["cost_usd"], ev, base_cav + [
+                "Whether the supplier accepts less than a full case is unconfirmed."], opts, rec, sku=sku,
+                product_name=p.name, supplier_id=p.supplier_id))
         if exp:
             iid = f"{store_id}|expiring|{sku}"
             opts = expiring_options(iid, state, cfg, typical)

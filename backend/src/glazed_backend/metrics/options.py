@@ -1,6 +1,7 @@
 """Deterministic options per issue: closed action list, numbers from the same loss model as the order plan."""
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import math
@@ -9,7 +10,7 @@ from datetime import timedelta
 from .detect import expiring_candidate  # noqa: F401  (re-export for callers building expiring issues)
 from .inventory import SkuState, expiring_units, is_short_life
 from .plan import recommended_qty, scenario_losses, service_for
-from .policy import Recommendation, loss_units
+from .policy import Recommendation, loss_units, normal_quantile
 from .types import Config
 
 _Z = (-0.674, 0.0, 0.674)
@@ -205,4 +206,42 @@ def late_options(issue_id: str, supplier_id: str, states: list[SkuState], ref_da
                                ["The late order may arrive first and leave surplus."]))
     out.append(_do_nothing(issue_id, 0.0, nothing[1], "Expected lost sales if the overdue delivery lands in 2 days."))
     out[-1]["cost_of_inaction_usd"] = {"low": _r(nothing[0]), "mid": _r(nothing[1]), "high": _r(nothing[2])}
+    return out
+
+
+def inflated_order_options(issue_id: str, state: SkuState, cfg: Config, cand: dict) -> list[dict]:
+    """Alert 5: order the optimum instead of the full case; alternate days when the shelf life allows holding a day;
+    do_nothing prices the expected waste of the current order size."""
+    p, perishable = state.product, is_short_life(state.product.shelf_life_days)
+    service = service_for(state, cfg)
+    rec, _ = recommended_qty(state, service)
+    ordered, case = float(cand["ordered_qty"]), cand["case_size"]
+    urgency = {"deadline_date": state.t.isoformat(), "reason": "Applies to the next order for this SKU."}
+    qty = round(cand["optimum_qty"])
+    base = {"sku": p.sku, "supplier_id": p.supplier_id, "qty": qty, "case_size": case, "plan_qty": cand["plan_qty"],
+            "typical_qty": ordered, "optimum_qty": cand["optimum_qty"], "order_date": state.t.isoformat()}
+    ev = eval_delta(rec, qty, ordered, p.price, p.unit_cost, perishable)
+    risk = ["Ordering below a full case may need the supplier's agreement.", "Lower stock raises the chance of a stockout."]
+    if qty == 0:  # the optimum is to order nothing this cycle
+        out = [make_option(issue_id, "skip_order", {"sku": p.sku, "supplier_id": p.supplier_id,
+                                                    "cycle_date": state.t.isoformat(), "typical_qty": ordered,
+                                                    "optimum_qty": cand["optimum_qty"]}, ev, urgency, risk)]
+    else:
+        out = [make_option(issue_id, "adjust_order_qty", {**base, "delta_pct": round((qty - ordered) / ordered * 100, 1)},
+                           ev, urgency, risk)]
+    sl = p.shelf_life_days
+    q_alt = 0
+    if qty > 0 and (sl is None or sl >= 2):
+        rec2 = dataclasses.replace(rec, mean=rec.mean * 2, sd=rec.sd * math.sqrt(2))
+        q_alt = max(1, round(normal_quantile(rec2.mean, rec2.sd, service) - rec.base))
+    if q_alt:
+        ev2 = eval_delta(rec2, q_alt, 2 * ordered, p.price, p.unit_cost, perishable)
+        half = {"benefit": {k: v / 2 for k, v in ev2["benefit"].items()}, "cost_usd": ev2["cost_usd"] / 2,
+                "net_mid": ev2["net_mid"] / 2, "waste_delta": ev2["waste_delta"] / 2, "lost_delta": ev2["lost_delta"] / 2}
+        out.append(make_option(issue_id, "adjust_order_qty",
+                               {**base, "qty": q_alt, "pattern": "alternate_days", "cycle_days": 2, "basis": "per_day"},
+                               half, urgency, ["Stock is held one extra day.", "Values are per day, averaged over the 2-day cycle."]))
+    waste = scenario_losses(rec, ordered, p.price, p.unit_cost, perishable)
+    out.append(_do_nothing(issue_id, waste["waste_usd"]["mid"], waste["lost_sales_usd"]["mid"],
+                           "Expected waste per cycle if the full order keeps arriving."))
     return out

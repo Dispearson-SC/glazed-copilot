@@ -53,7 +53,8 @@ def test_issues_are_sorted_stable_and_keyed(m):
     assert [x["severity_usd"] for x in a] == sorted((x["severity_usd"] for x in a), reverse=True)
     for i in a:
         assert i["issue_id"].startswith(f"{S}|{i['kind']}|") and i["as_of_date"] == "2026-03-10"
-        assert i["kind"] in {"stockout_risk", "overstock_waste", "expiring", "late_delivery"}
+        assert i["kind"] in {"stockout_risk", "overstock_waste", "expiring", "late_delivery", "inflated_order", "misleading_promo",
+                           "calendar_uplift", "sku_key_mismatch", "orphan_sku"}
 
 
 def test_issues_follow_the_wave5_contract_with_deterministic_options(m):
@@ -163,3 +164,14 @@ def test_stores_expose_display_name_with_site(m):
     assert s030["site_name"] and s030["site_type"]
     names = [r["display_name"] for r in m.stores()]
     assert len(set(names)) == len(names)  # unique, unlike store_name alone
+
+
+def test_inflated_order_issue_has_evidence_and_deterministic_options(m):
+    found = [i for i in m.issues(S, AS_OF, limit=1000) if i["kind"] == "inflated_order"]
+    assert found
+    i = found[0]
+    assert i["issue_id"] == f"{S}|inflated_order|{i['sku']}"
+    ev = {e["metric"]: e["value"] for e in i["evidence"]}
+    assert ev["waste_rate"] > 0.25 and ev["excess_over_optimum"] >= ev["case_size"] / 2
+    assert i["options"][-1]["action_type"] == "do_nothing" and len(i["options"]) <= 4
+    assert i == next(x for x in m.issues(S, AS_OF, limit=1000) if x["issue_id"] == i["issue_id"])
