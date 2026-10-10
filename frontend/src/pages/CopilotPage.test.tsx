@@ -58,6 +58,21 @@ describe("Decisiones window", () => {
     expect(screen.getByText(/1 aceptada por ti/)).toBeInTheDocument();
   });
 
+  it("treats a 409 as 'already decided': neutral toast, refetches pending, no success claim and no local memory", async () => {
+    const api = await openDecisiones(apiWith({ recordDecision: async () => { throw new ApiError(409, "already decided"); } }));
+    const calls = vi.mocked(api.getPending).mock.calls.length;
+    const card = (await screen.findByRole("heading", { name: /Pedir 10 unidades/ })).closest("article")!;
+    await userEvent.click(within(card).getByRole("button", { name: /Rechazar/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Mal momento" }));
+    await userEvent.click(screen.getByRole("button", { name: "Enviar motivo y rechazar" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Esta decisión ya se había registrado");
+    expect(screen.getByRole("status")).not.toHaveTextContent(/Aceptada|Aprobada|aprenderá/);
+    await waitFor(() => expect(vi.mocked(api.getPending).mock.calls.length).toBeGreaterThan(calls));
+    expect(screen.getByRole("button", { name: "Decisiones, 2 pendientes" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Memorias, / })).toBeNull();
+    expect(screen.getByText(/Sin decisiones resueltas hoy/)).toBeInTheDocument();
+  });
+
   it("keeps the card and shows the error when the backend refuses", async () => {
     await openDecisiones(apiWith({ recordDecision: async () => { throw new ApiError(400, "unknown option"); } }));
     await userEvent.click(await screen.findByRole("button", { name: /Aceptar/ }));

@@ -39,7 +39,11 @@ export function useDecide(caseId: string, refresh: () => Promise<void> | void) {
           keys.current.delete(intent);
         } catch (e) {
           if (isDefinitive(e)) keys.current.delete(intent);
-          if (!(e instanceof ApiError && e.status === 409)) throw e; // already decided elsewhere: reconcile below
+          if (!(e instanceof ApiError && e.status === 409)) throw e;
+          // 409: the option was already decided elsewhere. Nothing was recorded by this click: say so, reconcile with the backend.
+          showToast("Esta decisión ya se había registrado");
+          void refresh();
+          return true;
         }
       } catch (e) {
         showToast(`No se pudo registrar: ${(e as Error).message}`);
