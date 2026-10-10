@@ -526,6 +526,25 @@ class DuckDBMetrics:
                           " FROM store_daily_kpis WHERE store_id=? AND date BETWEEN ? AND ? ORDER BY date",
                           [store_id, start, as_of])
 
+    # -- Manager metrics inputs (Wave 12) ---------------------------------------
+    def store_profile(self, store_id: str) -> dict[str, Any]:
+        r = self._rows("SELECT s.format, si.region, coalesce(s.typical_open_hours, 12) open_hours FROM stores s"
+                       " LEFT JOIN sites si ON si.site_id=s.site_id WHERE s.store_id=?", [store_id])
+        if not r:
+            raise NotFound(f"store {store_id!r} not found")
+        return {"format": r[0]["format"], "region": r[0]["region"], "open_hours": float(r[0]["open_hours"] or 12.0)}
+
+    def product_catalog(self, store_id: str) -> dict[str, dict[str, Any]]:
+        rows = self._rows("SELECT sku, product_name, department, supplier_id, unit_cost, list_price_base price, shelf_life_days"
+                          " FROM products WHERE sku IN (SELECT DISTINCT sku FROM inventory_daily WHERE store_id=?)", [store_id])
+        return {r["sku"]: {"product_name": r["product_name"], "department": r["department"], "supplier_id": r["supplier_id"],
+                           "unit_cost": float(r["unit_cost"] or 0), "price": float(r["price"] or 0),
+                           "shelf_life_days": r["shelf_life_days"]} for r in rows}
+
+    def selling_skus(self, store_id: str, as_of: date, start: date) -> set[str]:
+        return {r[0] for r in self._q("SELECT DISTINCT sku FROM sales_daily WHERE store_id=? AND date BETWEEN ? AND ?"
+                                      " AND units_sold>0", [store_id, start, as_of])}
+
     # -- Sentinel ----------------------------------------------------------------
     def observed_outcome(self, store_id: str, as_of: date, action_type: str, params: dict[str, Any]) -> dict[str, Any] | None:
         sku, d0 = params.get("sku"), params.get("decision_as_of")

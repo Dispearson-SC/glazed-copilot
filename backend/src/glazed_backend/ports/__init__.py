@@ -32,6 +32,25 @@ class MetricsPort(Protocol):
     def flow_history(self, store_id: str, as_of: date, start: date) -> list[dict[str, Any]]:
         """Store daily {date, transactions, footfall|None, net_sales} from `start` to as_of, never past it."""
         ...
+    def store_profile(self, store_id: str) -> dict[str, Any]:
+        """{format, region, open_hours} of the store."""
+        ...
+    def product_catalog(self, store_id: str) -> dict[str, dict[str, Any]]:
+        """sku -> {product_name, department, supplier_id, unit_cost, price, shelf_life_days} for the SKUs the store holds."""
+        ...
+    def selling_skus(self, store_id: str, as_of: date, start: date) -> set[str]:
+        """SKUs with sales between `start` and as_of (never past it)."""
+        ...
+    def delivery_inputs(self, store_id: str, as_of: date, until: date) -> dict[str, Any]:
+        """{pos, suppliers}: purchase orders known at as_of (open ones plus those due or received on as_of) and the
+        supplier delivery weekdays. Receipts after as_of are reported as not received."""
+        ...
+    def promotions(self, store_id: str, as_of: date) -> list[dict[str, Any]]:
+        """Promotions in scope for the store's region (planned dates included; no result data)."""
+        ...
+    def staffing_history(self, store_id: str, as_of: date, start: date) -> dict[str, Any]:
+        """{format, rows[{store_id, date, transactions, staff_hours}]} for every store of the store's format, dates start..as_of."""
+        ...
     def backtest_day(self, store_id: str, day: date, policy: str) -> dict[str, Any]:
         """Replay one day: {current: {waste_usd, lost_sales_usd}, policy: {...}} using only data <= day
         for decisions and the following day for outcomes."""

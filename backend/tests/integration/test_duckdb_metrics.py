@@ -289,3 +289,22 @@ def test_flow_history_has_transactions_and_never_passes_as_of(m):
     rows = m.flow_history(S, AS_OF, AS_OF - timedelta(days=20))
     assert 15 <= len(rows) <= 21 and max(r["date"] for r in rows) <= AS_OF
     assert all(r["transactions"] is not None and r["net_sales"] is not None for r in rows)
+
+
+# -- Wave 12 manager inputs -------------------------------------------------------------------------------------
+JUL = date(2026, 7, 19)
+
+
+def test_store_profile_and_catalog(m):
+    p = m.store_profile(S)
+    assert p["format"] == "Shop-in-Shop" and p["region"] and p["open_hours"] > 0
+    cat = m.product_catalog(S)
+    assert len(cat) > 10
+    one = next(iter(cat.values()))
+    assert {"product_name", "department", "unit_cost", "price", "shelf_life_days", "supplier_id"} <= set(one)
+
+
+def test_selling_skus_counts_sales_in_the_window_only(m):
+    sold = m.selling_skus(S, JUL, JUL - timedelta(days=27))
+    assert 40 <= len(sold) <= 80
+    assert m.selling_skus(S, JUL, JUL + timedelta(days=1)) == set()  # nothing at or before as_of from a later start

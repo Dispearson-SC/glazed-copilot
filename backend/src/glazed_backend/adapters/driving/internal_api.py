@@ -11,7 +11,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
-from ...application import forecast as uc_forecast, sentinel
+from ...application import forecast as uc_forecast, manager as uc_manager, sentinel
 from .store_names import StoreNames
 from ...domain import Case, DomainError, canonical_agent_id, case_id_from_session
 
@@ -139,6 +139,13 @@ def build_internal_router(c: Any) -> APIRouter:
         """Store transactions, footfall and average ticket on a future day (> the case date)."""
         own_case(case, store_id, as_of)
         return uc_forecast.FlowForecast(c.metrics, c.flow_forecaster).execute(case, target_date)
+
+    @r.get("/inventory")
+    def inventory(case: Ctx, sort: str | None = None, limit: int | None = None, store_id: str | None = None,
+                  as_of: date | None = None):
+        """Stock, cover, turnover and slow movers; the same use case as the public /cases/{id}/inventory."""
+        own_case(case, store_id, as_of)
+        return uc_manager.InventoryView(c.metrics, names).execute(case, sort, limit)
 
     @r.get("/inventory/projection")
     def projection(case: Ctx, sku: str, horizon: int = 7):

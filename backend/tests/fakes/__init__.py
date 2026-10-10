@@ -48,6 +48,39 @@ class FakeMetrics:
         self.calls.append(("flow_history", store_id, as_of))
         return [dict(r) for r in self.flow if r["date"] >= start and (self.leak or r["date"] <= as_of)]
 
+    # -- Wave 12 manager metrics inputs --------------------------------------------------------------------
+    catalog: dict = {}  # sku -> {product_name, department, supplier_id, unit_cost, price, shelf_life_days}
+    selling: set = set()  # SKUs with sales in the window
+    profile: dict = {"format": "Shop-in-Shop", "region": "Northeast", "open_hours": 12.0}
+    pos: list = []  # open_purchase_orders rows (served as-is; `leak` skips the as_of filter)
+    suppliers_sched: list = []  # {supplier_id, supplier_name, delivery_days}
+    promos: list = []  # promotions rows
+    staff: list = []  # {store_id, date, transactions, staff_hours}
+    projections: dict = {}  # sku -> inventory_projection override
+
+    def store_profile(self, store_id):
+        return dict(self.profile)
+
+    def product_catalog(self, store_id):
+        return {k: dict(v) for k, v in self.catalog.items()}
+
+    def selling_skus(self, store_id, as_of, start):
+        self.calls.append(("selling_skus", store_id, as_of))
+        return set(self.selling)
+
+    def delivery_inputs(self, store_id, as_of, until):
+        self.calls.append(("delivery_inputs", store_id, as_of, until))
+        return {"pos": [dict(p) for p in self.pos], "suppliers": [dict(s) for s in self.suppliers_sched]}
+
+    def promotions(self, store_id, as_of):
+        self.calls.append(("promotions", store_id, as_of))
+        return [dict(p) for p in self.promos]
+
+    def staffing_history(self, store_id, as_of, start):
+        self.calls.append(("staffing_history", store_id, as_of))
+        return {"format": self.profile["format"],
+                "rows": [dict(r) for r in self.staff if r["date"] >= start and (self.leak or r["date"] <= as_of)]}
+
     def stores(self):
         return [{"store_id": "S030", "name": "Gate Area West", "format": "Shop-in-Shop", "site_id": "ST12",
                  "region": "Northeast", "site_name": "Bayfront Municipal Airport", "site_type": "Airport",
@@ -69,7 +102,9 @@ class FakeMetrics:
         return self.issues_by_date.get(as_of, [])[:limit]
 
     def inventory_projection(self, store_id, as_of, sku, horizon=7):
-        return {"sku": sku, "as_of": str(as_of), "horizon": horizon}
+        self.calls.append(("inventory_projection", store_id, as_of, sku, horizon))
+        return self.projections.get(sku, {"sku": sku, "as_of": str(as_of), "horizon": horizon,
+                                          "projected_stockout_date": None})
 
     def order_plan(self, store_id, as_of):
         return {"store_id": store_id, "as_of": str(as_of), "method": "simple_v0", "lines": []}
@@ -122,11 +157,12 @@ class FakeCore:
         return list(self.transcript)
 
 
-def make_series(sku: str, price: float, start: date, end: date, units, shelf_life=None, stockout=lambda d: 0.0) -> SkuSeries:
+def make_series(sku: str, price: float, start: date, end: date, units, shelf_life=None, stockout=lambda d: 0.0,
+                closing=lambda d: 5, received=lambda d: 0) -> SkuSeries:
     """A SKU with one DayRow per day in [start, end]; `units(d)` is the units sold that day."""
     from datetime import timedelta
     rows, d = [], start
     while d <= end:
-        rows.append(DayRow(d, 0, int(units(d)), 0, 5, float(stockout(d))))
+        rows.append(DayRow(d, int(received(d)), int(units(d)), 0, int(closing(d)), float(stockout(d))))
         d += timedelta(days=1)
     return SkuSeries(sku, price, shelf_life, tuple(rows))
