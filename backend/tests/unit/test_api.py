@@ -170,3 +170,23 @@ def test_internal_experiences_returns_list_and_degrades(env):
     got = client.get("/internal/v1/experiences", headers=h, params={"query": "promo", "limit": 3}).json()
     assert got[0].keys() >= {"text", "decision_id", "kind", "created_at", "score"} and got[0]["decision_id"] == "d7"
     assert client.get("/internal/v1/experiences").status_code == 400
+
+
+def test_cors_allows_the_frontend_dev_origins(env):
+    client, _ = env
+    for origin in ("http://localhost:5173", "http://127.0.0.1:5173"):
+        r = client.get("/api/v1/health", headers={"Origin": origin})
+        assert r.headers["access-control-allow-origin"] == origin
+        pre = client.options("/api/v1/alerts/x", headers={
+            "Origin": origin, "Access-Control-Request-Method": "PATCH",
+            "Access-Control-Request-Headers": "content-type"})
+        assert pre.status_code == 200 and "PATCH" in pre.headers["access-control-allow-methods"]
+    assert "access-control-allow-origin" not in client.get(
+        "/api/v1/health", headers={"Origin": "http://evil.example"}).headers
+
+
+def test_cors_origins_are_configurable_via_env():
+    from glazed_backend.adapters.driving.app import cors_origins_from_env
+    assert cors_origins_from_env({}) == ["http://localhost:5173", "http://127.0.0.1:5173"]
+    assert cors_origins_from_env({"GLAZED_CORS_ORIGINS": "https://a.test, https://b.test"}) == [
+        "https://a.test", "https://b.test"]

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from ...domain import DomainError, FutureDate, InvalidTransition, NotFound
@@ -28,6 +29,16 @@ class Container:
     memory: Any = None
     storage: str = "memory"
     core_status: str = "configured"
+    cors_origins: list[str] | None = None  # None -> DEFAULT_CORS_ORIGINS
+
+
+DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+
+def cors_origins_from_env(env: dict[str, str]) -> list[str]:
+    raw = env.get("GLAZED_CORS_ORIGINS", "")
+    parsed = [o.strip() for o in raw.split(",") if o.strip()]
+    return parsed or list(DEFAULT_CORS_ORIGINS)
 
 
 class _NoCore:
@@ -39,6 +50,8 @@ class _NoCore:
 
 def create_app(c: Container) -> FastAPI:
     app = FastAPI(title="glazed-backend")
+    app.add_middleware(CORSMiddleware, allow_origins=c.cors_origins or DEFAULT_CORS_ORIGINS,
+                       allow_methods=["GET", "POST", "PATCH", "OPTIONS"], allow_headers=["*"])
 
     def err(status: int):
         async def handler(_: Request, exc: Exception) -> JSONResponse:
@@ -70,6 +83,7 @@ def build_container(env: dict[str, str] | None = None) -> Container:
         core: Any = AgentCoreHttp(core_url, env.get("GLAZED_CORE_PROFILE", "orchestrator"))
     else:
         core = _NoCore()
+    cors = cors_origins_from_env(env)
     key = env.get("BACKBOARD_API_KEY", "")
     from ..driven.backboard_memory import BackboardMemory
     if env.get("GLAZED_STORAGE", "memory") == "postgres":
@@ -79,11 +93,11 @@ def build_container(env: dict[str, str] | None = None) -> Container:
         return Container(metrics, core, store.cases, store.alerts, store.proposals, store.executions,
                          store.backtests, store.trace, SystemClock(),
                          BackboardMemory(key, store.assistants), "postgres",
-                         "configured" if core_url else "missing")
+                         "configured" if core_url else "missing", cors)
     return Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
                      InMemoryBacktests(), InMemoryTrace(), SystemClock(),
                      BackboardMemory(key, InMemoryAssistants()), "memory",
-                     "configured" if core_url else "missing")
+                     "configured" if core_url else "missing", cors)
 
 
 def create_app_from_env() -> FastAPI:
