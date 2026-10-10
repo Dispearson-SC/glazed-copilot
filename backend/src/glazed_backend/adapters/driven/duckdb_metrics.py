@@ -570,6 +570,10 @@ class DuckDBMetrics:
                           " FROM promotions WHERE upper(coalesce(region_scope,'ALL'))='ALL' OR region_scope=?"
                           " ORDER BY start_date, promo_id", [region])
 
+    def holidays(self, as_of: date, until: date) -> dict[date, str]:
+        return {r[0]: r[1] or "Feriado" for r in self._q(
+            "SELECT date, holiday_name FROM calendar WHERE is_holiday AND date BETWEEN ? AND ? ORDER BY date", [as_of, until])}
+
     def delivery_inputs(self, store_id: str, as_of: date, until: date) -> dict[str, Any]:
         """Orders placed by as_of that are open, overdue (within the lookback) or received on as_of, expected by `until`;
         a receipt after as_of is reported as not received. Plus the delivery weekdays of the store's suppliers."""

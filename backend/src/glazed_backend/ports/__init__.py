@@ -49,6 +49,9 @@ class MetricsPort(Protocol):
         """{pos, suppliers}: purchase orders known at as_of (open ones plus those due or received on as_of) and the
         supplier delivery weekdays. Receipts after as_of are reported as not received."""
         ...
+    def holidays(self, as_of: date, until: date) -> dict[date, str]:
+        """Named holidays from as_of to until (the calendar is known in advance: it is not store data)."""
+        ...
     def promotions(self, store_id: str, as_of: date) -> list[dict[str, Any]]:
         """Promotions in scope for the store's region (planned dates included; no result data)."""
         ...

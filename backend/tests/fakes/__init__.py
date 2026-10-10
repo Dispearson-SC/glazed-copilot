@@ -76,6 +76,11 @@ class FakeMetrics:
         self.calls.append(("delivery_inputs", store_id, as_of, until))
         return {"pos": [dict(p) for p in self.pos], "suppliers": [dict(s) for s in self.suppliers_sched]}
 
+    holiday_map: dict = {}  # date -> holiday name
+
+    def holidays(self, as_of, until):
+        return {d: n for d, n in self.holiday_map.items() if as_of <= d <= until}
+
     def promotions(self, store_id, as_of):
         self.calls.append(("promotions", store_id, as_of))
         return [dict(p) for p in self.promos]

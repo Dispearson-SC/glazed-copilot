@@ -13,6 +13,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Callable
 
 from ..domain import Case
+from ..metrics.calendar_view import CALENDAR_DAYS, build_calendar, weekday_es
 
 log = logging.getLogger(__name__)
 
@@ -82,8 +83,12 @@ class SnapshotBuilder:
                 self.served[(case.case_id, ln["issue"]["issue_id"])] = ln["issue"]
         trimmed = [trim_line(ln) for ln in lines]
         today, tomorrow = as_of.isoformat(), (as_of + timedelta(days=1)).isoformat()
+        until = as_of + timedelta(days=CALENDAR_DAYS - 1)
+        calendar = build_calendar(as_of, self.metrics.holidays(as_of, until),
+                                  self.metrics.delivery_inputs(sid, as_of, until)["suppliers"])
         return {
             "store_id": sid, "store_display_name": self.name_of(sid), "as_of": as_of.isoformat(),
+            "as_of_weekday_es": weekday_es(as_of), "calendar": calendar,
             "window": {"from": start.isoformat(), "to": as_of.isoformat()},
             "kpis": {n: k.get(n) for n in ("net_sales", "transactions", "waste_usd", "lost_sales_usd", "tx_per_staff_hour")},
             "top_issues": [trim_issue(i) for i in ops[:MAX_ISSUES]],
@@ -179,7 +184,8 @@ class BriefingService:
 
     def briefing(self, case: Case) -> dict[str, Any]:
         entry = self._entry(case)
-        return {"snapshot": self.snapshot(case), "headline": entry.headline, "suggested_focus": entry.focus}
+        return {"snapshot": self.snapshot(case), "headline": entry.headline, "suggested_focus": entry.focus,
+                "as_of_weekday_es": entry.core["as_of_weekday_es"], "calendar": entry.core["calendar"]}
 
     def refresh(self, case: Case) -> None:
         """Recompute now, replacing the entry for the case's simulated day and dropping its earlier days."""

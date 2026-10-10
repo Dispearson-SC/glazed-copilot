@@ -12,7 +12,7 @@ from tests.unit.snapshot_support import AS_OF, RichMetrics, env, mkcase, snap  #
 def test_briefing_shape_and_code_computed_headline(env):
     client, _, _ = env
     b = client.get("/internal/v1/briefing", headers={"X-Glazed-Case": mkcase(client)}).json()
-    assert set(b) == {"snapshot", "headline", "suggested_focus"}
+    assert set(b) == {"snapshot", "headline", "suggested_focus", "calendar", "as_of_weekday_es"}
     h = b["headline"]
     assert 1 <= len(h) <= 5 and all(set(f) >= {"key", "text", "value", "unit", "source"} for f in h)
     by = {f["key"]: f for f in h}
@@ -82,7 +82,7 @@ def test_public_briefing_mirror(env):
     client, _, _ = env
     cid = mkcase(client)
     r = client.get(f"/api/v1/cases/{cid}/briefing")
-    assert r.status_code == 200 and set(r.json()) == {"snapshot", "headline", "suggested_focus"}
+    assert r.status_code == 200 and set(r.json()) == {"snapshot", "headline", "suggested_focus", "calendar", "as_of_weekday_es"}
     assert client.get("/api/v1/cases/nope/briefing").status_code == 404
 
 
