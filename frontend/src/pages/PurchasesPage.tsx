@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { useApi } from "../ApiContext";
 import { ErrorBox } from "../components";
 import IssueDetail from "../IssueDetail";
-import { deadlineUrgency, usd } from "../issues";
+import { asRange, deadlineUrgency, usd } from "../issues";
 import { useSession } from "../SessionContext";
 import type { Issue, OrderLine } from "../types";
 import { useCurrentCase } from "../useCurrentCase";
@@ -53,13 +53,17 @@ function Line({ line, simToday, onOpen }: { line: OrderLine; simToday: string; o
         hoy recibes {vs.received_to_sold.toFixed(1)}× lo que vendes
         {line.min_order_warning && (
           <div>
-            <span className="badge badge-soft" data-testid="min-warning">{line.min_order_warning}</span>
+            <span className="badge badge-soft" data-testid="min-warning">
+              {typeof line.min_order_warning === "string"
+                ? line.min_order_warning
+                : `Pedido ${usd(line.min_order_warning.order_value_usd)} bajo el mínimo de ${usd(line.min_order_warning.min_order_value)}`}
+            </span>
           </div>
         )}
       </td>
       <td>
         {line.expected_waste_usd !== undefined && line.expected_lost_sales_usd !== undefined && (
-          <MiniBar waste={line.expected_waste_usd} lost={line.expected_lost_sales_usd} />
+          <MiniBar waste={asRange(line.expected_waste_usd).mid} lost={asRange(line.expected_lost_sales_usd).mid} />
         )}
       </td>
       <td>{line.issue && <button onClick={() => onOpen(line.issue!)}>Ver opciones</button>}</td>

@@ -163,10 +163,28 @@ export interface OrderLine {
   projected_stockout_date: string | null;
   stockout_risk_without_order: number;
   vs_current_practice: { received_to_sold: number; qty_delta: number };
-  min_order_warning: string | null;
-  expected_waste_usd?: number;
-  expected_lost_sales_usd?: number;
+  min_order_warning: string | MinOrderWarning | null;
+  /** Legacy fixtures send a number; the live route sends {low,mid,high}. */
+  expected_waste_usd?: number | Range3;
+  expected_lost_sales_usd?: number | Range3;
+  est_cost_usd?: number;
+  expected_delivery?: string | null;
+  order_deadline_status?: string;
+  stockout_risk_with_order?: number;
   issue?: Issue;
+}
+
+export interface MinOrderWarning {
+  min_order_value: number;
+  order_value_usd: number;
+  suggestion?: string;
+}
+
+export interface PlanSupplier {
+  supplier_id: string;
+  supplier_name: string;
+  order_value_usd: number;
+  min_order_value: number;
 }
 
 export interface OrderPlan {
@@ -174,6 +192,7 @@ export interface OrderPlan {
   store_id: string;
   as_of: string;
   lines: OrderLine[];
+  suppliers?: PlanSupplier[];
 }
 
 export interface Kpis {
@@ -251,11 +270,43 @@ export interface HeadlineItem {
   high?: number;
 }
 
+/** A line of the briefing's order_plan summary (due_today / due_tomorrow / top_lines). */
+export interface BriefOrderLine {
+  sku?: string;
+  name?: string;
+  supplier_id?: string;
+  supplier_name?: string;
+  qty?: number;
+  cases?: number;
+  est_cost_usd?: number;
+  expected_delivery?: string | null;
+  projected_stockout_date?: string | null;
+  order_deadline?: string | null;
+  order_deadline_status?: string;
+  stockout_risk_without_order?: number;
+  below_min_order?: boolean;
+}
+
+export interface BriefSupplier {
+  supplier_id: string;
+  supplier_name?: string;
+  on_time_pct?: number | null;
+  fill_pct?: number | null;
+  next_delivery?: string | null;
+}
+
 export interface Briefing {
   snapshot?: {
     as_of?: string;
     kpis?: { lost_sales_usd?: Range3 | null } & Record<string, unknown>;
-    order_plan?: { due_today?: unknown[]; due_tomorrow?: unknown[]; top_lines?: unknown[]; total_lines?: number; deadline_passed?: number };
+    order_plan?: {
+      due_today?: BriefOrderLine[];
+      due_tomorrow?: BriefOrderLine[];
+      top_lines?: BriefOrderLine[];
+      total_lines?: number;
+      deadline_passed?: number;
+    };
+    suppliers?: BriefSupplier[];
   };
   headline?: HeadlineItem[];
   suggested_focus?: string[];

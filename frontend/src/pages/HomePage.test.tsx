@@ -151,3 +151,18 @@ describe("HomePage dashboard", () => {
     expect(await screen.findByText(/sin briefing/)).toBeInTheDocument();
   });
 });
+
+describe("HomePage Lo que viene", () => {
+  it("renders the upcoming card from briefing and order plan", async () => {
+    const { briefingLive, planLive } = await import("../test/fixtures");
+    open(fakeApi({ getBriefing: async () => briefingLive, getOrderPlan: async () => planLive }));
+    expect(await screen.findByTestId("upcoming")).toHaveTextContent("Lo que viene");
+    expect(await screen.findByTestId("upcoming-stockouts")).toHaveTextContent("Cold Foam");
+  });
+
+  it("keeps the rest of Home when the order plan fails", async () => {
+    open(fakeApi({ getOrderPlan: async () => { throw new Error("plan caído"); } }));
+    expect(await screen.findByTestId("hero")).toBeInTheDocument();
+    expect(await screen.findByText(/plan caído/)).toBeInTheDocument();
+  });
+});

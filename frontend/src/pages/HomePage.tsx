@@ -7,6 +7,7 @@ import ContextChips from "../dashboard/ContextChips";
 import Hero from "../dashboard/Hero";
 import MetricCards from "../dashboard/MetricCards";
 import TopProducts from "../dashboard/TopProducts";
+import UpcomingCard from "../dashboard/UpcomingCard";
 import TrendChart from "../dashboard/TrendChart";
 import { lastSevenDays } from "../dashboard/format";
 import { rangeText, usd, wasteMid } from "../issues";
@@ -43,6 +44,7 @@ export default function HomePage() {
     [caseId, day, session.refreshKey],
   );
   const briefing = usePolling(() => (caseId ? api.getBriefing(caseId) : Promise.resolve(null)), 60_000, true, [caseId, session.refreshKey]);
+  const plan = usePolling(() => (caseId ? api.getOrderPlan(caseId) : Promise.resolve(null)), 60_000, true, [caseId, session.refreshKey]);
   const error = storesError ?? caseError ?? kpis.error ?? alerts.error;
   const summaryError = summary.error;
   const open = (alerts.data ?? []).filter((a) => !CLOSED.includes(a.state));
@@ -64,6 +66,7 @@ export default function HomePage() {
         </div>
       )}
       {currentCase && <BriefingCard briefing={briefing.data} error={briefing.error} />}
+      {currentCase && <UpcomingCard briefing={briefing.data} plan={plan.data} error={plan.error} />}
       {!error && !loading && !currentCase && <p className="muted">Sin caso activo para esta sucursal</p>}
       {kpis.data && (
         <>

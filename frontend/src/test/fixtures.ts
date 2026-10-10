@@ -98,3 +98,63 @@ export const briefingA: Briefing = {
   ],
   suggested_focus: ["i1", "i2"],
 };
+
+// Shapes captured from the live backend (case at 2026-07-19, store S030).
+export const briefingLive: Briefing = {
+  snapshot: {
+    as_of: "2026-07-19",
+    order_plan: {
+      due_today: [
+        { sku: "SKU-1", name: "Cold Foam", supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", qty: 10, cases: 1, est_cost_usd: 14.6,
+          expected_delivery: "2026-07-21", projected_stockout_date: "2026-07-21", order_deadline: "2026-07-19", order_deadline_status: "ok",
+          stockout_risk_without_order: 0.9971, below_min_order: true },
+        { sku: "SKU-2", name: "Sand", supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", qty: 10, cases: 1, est_cost_usd: 19.7,
+          expected_delivery: "2026-07-21", projected_stockout_date: "2026-07-22", order_deadline: "2026-07-19", order_deadline_status: "ok",
+          stockout_risk_without_order: 0.84, below_min_order: true },
+      ],
+      due_tomorrow: [
+        { sku: "SKU-3", name: "Coffee Beans", supplier_id: "SUP06", supplier_name: "Evergreen Coffee Roasters", qty: 5, cases: 1, est_cost_usd: 16.5,
+          expected_delivery: "2026-07-22", projected_stockout_date: "2026-07-23", order_deadline: "2026-07-20", order_deadline_status: "ok",
+          stockout_risk_without_order: 0.5, below_min_order: true },
+      ],
+      top_lines: [],
+      total_lines: 3,
+      deadline_passed: 0,
+    },
+    suppliers: [
+      { supplier_id: "SUP01", supplier_name: "Northfield Bakery Partners", on_time_pct: 92.7, fill_pct: 100, next_delivery: "2026-07-20" },
+      { supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", on_time_pct: 90.1, fill_pct: 99.9, next_delivery: "2026-07-21" },
+    ],
+  },
+  headline: [
+    { key: "orders_due_today", text: "2 pedidos vencen hoy", value: 2, unit: "pedidos" },
+    { key: "worst_supplier", text: "Proveedor con menor puntualidad: Pioneer Merch & Packaging (85.7%)", value: 85.7, unit: "%" },
+  ],
+  suggested_focus: [],
+};
+
+export const planLive: OrderPlan = {
+  case_id: "c1", store_id: "S030", as_of: "2026-07-19",
+  suppliers: [
+    { supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", order_value_usd: 106.1, min_order_value: 300 },
+    { supplier_id: "SUP06", supplier_name: "Evergreen Coffee Roasters", order_value_usd: 16.5, min_order_value: 350 },
+  ],
+  lines: [
+    { sku: "SKU-1", name: "Cold Foam", supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", qty: 10, cases: 1, case_size: 10,
+      service_level_target: 0.68, est_cost_usd: 14.6, expected_delivery: "2026-07-21", order_deadline: "2026-07-19", order_deadline_status: "ok",
+      projected_stockout_date: "2026-07-21", stockout_risk_without_order: 0.9971, stockout_risk_with_order: 0.4001,
+      expected_waste_usd: { low: 0.29, mid: 0.96, high: 2.38 }, expected_lost_sales_usd: { low: 4.84, mid: 10.63, high: 18.78 },
+      vs_current_practice: { received_to_sold: 1.25, qty_delta: 0 },
+      min_order_warning: { min_order_value: 300, order_value_usd: 106.1, suggestion: "Below the supplier minimum" } },
+    { sku: "SKU-2", name: "Sand", supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", qty: 10, cases: 1, case_size: 10,
+      service_level_target: 0.7, est_cost_usd: 19.7, expected_delivery: "2026-07-21", order_deadline: "2026-07-19", order_deadline_status: "ok",
+      projected_stockout_date: "2026-07-22", stockout_risk_without_order: 0.84, stockout_risk_with_order: 0.3,
+      expected_waste_usd: { low: 0.1, mid: 0.5, high: 1 }, expected_lost_sales_usd: { low: 1, mid: 2, high: 3 },
+      vs_current_practice: { received_to_sold: 1, qty_delta: 0 }, min_order_warning: null },
+    { sku: "SKU-9", name: "Never runs out", supplier_id: "SUP06", supplier_name: "Evergreen Coffee Roasters", qty: 5, cases: 1, case_size: 5,
+      service_level_target: 0.9, est_cost_usd: 16.5, expected_delivery: "2026-07-22", order_deadline: "2026-07-20", order_deadline_status: "ok",
+      projected_stockout_date: null, stockout_risk_without_order: 0.01, stockout_risk_with_order: 0,
+      expected_waste_usd: { low: 0, mid: 0, high: 0 }, expected_lost_sales_usd: { low: 0, mid: 0, high: 0 },
+      vs_current_practice: { received_to_sold: 1, qty_delta: 0 }, min_order_warning: null },
+  ],
+};
