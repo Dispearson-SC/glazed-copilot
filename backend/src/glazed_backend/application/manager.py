@@ -6,9 +6,10 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-from ..domain import Case, DomainError
+from ..domain import Case, DomainError, NotFound
 from ..metrics.deliveries import LATE_LOOKBACK_DAYS, build_delivery_days
 from ..metrics.expiry import MAX_SHELF_LIFE_DAYS, expiring_items, summarize_expiry
+from ..metrics.staffing import WINDOW_DAYS, productivity_p50, recommended_hours
 from ..metrics.promos_view import STATUSES, in_window, promo_status, sort_promos
 from ..metrics.inventory_view import SORTS, inventory_item, sort_items
 
@@ -162,3 +163,40 @@ class PromosView(_View):
                           "audit_verdict": audit.get("verdict"), "evaluation": ev,
                           "projected": p["end_date"] > as_of})
         return self.envelope(case, window_days=days, items=sort_promos(items)[:clamp_limit(limit)])
+
+
+class StaffingView(_View):
+    """Recommended staff hours per future day = forecast transactions / the format's median transactions per staff hour.
+    Daily basis: there is no hourly staffing. No roster exists in the data, and staff hours dated after the case date are
+    never read, so planned hours are null."""
+    SOURCE = "store_daily_kpis (format benchmark)+flow forecast"
+    MAX_DAYS = 14
+    NOTE = "sin datos por hora"
+
+    def __init__(self, metrics: Any, names: Any, flow_forecaster: Any) -> None:
+        super().__init__(metrics, names)
+        self.flow_forecaster = flow_forecaster
+
+    def execute(self, case: Case, days: int | None = None) -> dict[str, Any]:
+        from .forecast import FlowForecast
+        days = 7 if days is None else days
+        if not 1 <= days <= self.MAX_DAYS:
+            raise DomainError(f"days must be between 1 and {self.MAX_DAYS}")
+        as_of = case.sim_today
+        hist = self.metrics.staffing_history(case.store_id, as_of, as_of - timedelta(days=WINDOW_DAYS))
+        p50, n = productivity_p50(hist["rows"], as_of)
+        if p50 is None or p50 <= 0:
+            raise NotFound(f"no staffing history to benchmark store {case.store_id} before {as_of}")
+        flow = FlowForecast(self.metrics, self.flow_forecaster)
+        out = []
+        for i in range(1, days + 1):
+            d = as_of + timedelta(days=i)
+            tx = flow.execute(case, d)["transactions"]
+            rng = {"low": tx["p10"], "mid": tx["p50"], "high": tx["p90"]}
+            out.append({"date": d.isoformat(), "forecast_transactions": rng,
+                        "recommended_staff_hours": recommended_hours(rng, p50), "planned_staff_hours": None, "gap_hours": None,
+                        "basis": "daily", "projected": True})
+        return self.envelope(case, benchmark={"format": hist["format"], "tx_per_staff_hour_p50": round(p50, 2),
+                                              "n_store_days": n, "window_days": WINDOW_DAYS},
+                             days=out, note=self.NOTE,
+                             planned_hours_note="no roster in the data; staff hours dated after the case date are never read")

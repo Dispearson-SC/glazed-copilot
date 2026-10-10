@@ -323,3 +323,10 @@ def test_promotions_in_scope_carry_plan_dates_only(m):
     ps = m.promotions(S, JUL)
     assert len(ps) >= 5 and {"promo_id", "promo_name", "department", "discount_pct", "start_date", "end_date"} <= set(ps[0])
     assert not any(k in ps[0] for k in ("applied_rows", "first_applied", "last_applied"))
+
+
+def test_staffing_history_is_the_stores_format_and_stops_at_as_of(m):
+    got = m.staffing_history(S, JUL, JUL - timedelta(days=89))
+    assert got["format"] == "Shop-in-Shop" and len(got["rows"]) > 500
+    assert max(r["date"] for r in got["rows"]) <= JUL and len({r["store_id"] for r in got["rows"]}) > 5
+    assert all(r["staff_hours"] > 0 for r in got["rows"])

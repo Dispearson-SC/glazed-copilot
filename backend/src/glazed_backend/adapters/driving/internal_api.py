@@ -146,6 +146,12 @@ def build_internal_router(c: Any) -> APIRouter:
         own_case(case, store_id, as_of)
         return uc_manager.DeliveriesView(c.metrics, names).execute(case, days)
 
+    @r.get("/staffing")
+    def staffing(case: Ctx, days: int | None = None, store_id: str | None = None, as_of: date | None = None):
+        """Recommended staff hours per future day from the flow forecast; the same use case as the public route."""
+        own_case(case, store_id, as_of)
+        return uc_manager.StaffingView(c.metrics, names, c.flow_forecaster).execute(case, days)
+
     @r.get("/inventory/projection")
     def projection(case: Ctx, sku: str, horizon: int = 7):
         return uc_manager.inventory_projection(c.metrics, case, sku, horizon)

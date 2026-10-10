@@ -546,6 +546,14 @@ class DuckDBMetrics:
         return {r[0] for r in self._q("SELECT DISTINCT sku FROM sales_daily WHERE store_id=? AND date BETWEEN ? AND ?"
                                       " AND units_sold>0", [store_id, start, as_of])}
 
+    def staffing_history(self, store_id: str, as_of: date, start: date) -> dict[str, Any]:
+        """Transactions and staff hours per store-day for every store of this store's format, start..as_of."""
+        fmt = self.store_profile(store_id)["format"]
+        rows = self._rows("SELECT k.store_id, k.date, k.transactions, k.staff_hours FROM store_daily_kpis k"
+                          " JOIN stores s USING (store_id) WHERE s.format=? AND k.date BETWEEN ? AND ?"
+                          " AND k.staff_hours>0 ORDER BY k.date, k.store_id", [fmt, start, as_of])
+        return {"format": fmt, "rows": rows}
+
     def promotions(self, store_id: str, as_of: date) -> list[dict[str, Any]]:
         """Promotions whose scope covers the store's region (ALL or the region); planned dates only, no result data."""
         region = self.store_profile(store_id)["region"]

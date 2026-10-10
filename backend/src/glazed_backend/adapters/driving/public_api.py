@@ -281,6 +281,10 @@ def build_public_router(c: Any) -> APIRouter:
     def promos(case_id: str, status: str | None = None, days: int | None = None, limit: int | None = None):
         return uc_manager.PromosView(c.metrics, names).execute(case_of(case_id), status, days, limit)
 
+    @r.get("/cases/{case_id}/staffing")
+    def staffing(case_id: str, days: int | None = None):
+        return uc_manager.StaffingView(c.metrics, names, c.flow_forecaster).execute(case_of(case_id), days)
+
     @r.get("/cases/{case_id}/executions")
     def executions(case_id: str):
         uc.ResumeCase(c.cases).execute(case_id)
