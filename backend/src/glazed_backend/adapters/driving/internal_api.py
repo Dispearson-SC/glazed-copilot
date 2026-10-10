@@ -6,7 +6,7 @@ The store and the as-of date are never parameters: they come from the case named
 from datetime import date, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
@@ -118,6 +118,17 @@ def build_internal_router(c: Any) -> APIRouter:
             raise DomainError("store_id does not match the case's store; it comes from X-Glazed-Case")
         if as_of is not None and as_of != case.sim_today:
             raise DomainError("as_of does not match the case date; it comes from X-Glazed-Case")
+
+    @r.get("/forecast")
+    def forecast_series(case: Ctx, metric: str = "net_sales", level: str | None = "store",
+                        date_from: Annotated[date | None, Query(alias="from")] = None,
+                        date_to: Annotated[date | None, Query(alias="to")] = None,
+                        store_id: str | None = None, as_of: date | None = None):
+        """Store forecast series of one metric (net_sales, transactions, footfall, avg_ticket, conversion); the same
+        use case as the public /cases/{id}/forecast?metric=."""
+        own_case(case, store_id, as_of)
+        return uc_forecast.StoreMetricForecast(c.cases, c.metrics, c.forecasters, c.flow_forecaster, names).execute(
+            case.case_id, metric, date_from, date_to, level)
 
     @r.get("/forecast/demand")
     def forecast_demand(case: Ctx, sku: str, target_date: date, store_id: str | None = None, as_of: date | None = None):

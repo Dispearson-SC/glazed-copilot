@@ -273,8 +273,12 @@ def build_public_router(c: Any) -> APIRouter:
 
     @r.get("/cases/{case_id}/forecast")
     def forecast(case_id: str, sku: str | None = None, date_from: Annotated[date | None, Query(alias="from")] = None,
-                 date_to: Annotated[date | None, Query(alias="to")] = None, level: str | None = None):
-        return uc_forecast.GetForecast(c.cases, c.metrics, c.forecasters).execute(case_id, sku, date_from, date_to, level)
+                 date_to: Annotated[date | None, Query(alias="to")] = None, level: str | None = None,
+                 metric: str | None = None):
+        if metric is None:
+            return uc_forecast.GetForecast(c.cases, c.metrics, c.forecasters).execute(case_id, sku, date_from, date_to, level)
+        return uc_forecast.StoreMetricForecast(c.cases, c.metrics, c.forecasters, c.flow_forecaster, names).execute(
+            case_id, metric, date_from, date_to, level, sku)
 
     @r.get("/cases/{case_id}/forecast/accuracy")
     def forecast_accuracy(case_id: str, by: str | None = None, date_from: Annotated[date | None, Query(alias="from")] = None,

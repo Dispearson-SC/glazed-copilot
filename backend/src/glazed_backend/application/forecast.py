@@ -284,3 +284,94 @@ class FlowForecast:
         return {"target_date": target_date.isoformat(), "granularity": res.granularity, "transactions": res.transactions,
                 "footfall": res.footfall, "avg_ticket": res.avg_ticket, "model": res.model,
                 "forecast_origin": res.origin.isoformat()}
+
+
+METRICS = ("net_sales", "transactions", "footfall", "avg_ticket", "conversion")
+_FLOW_UNITS = {"transactions": "transactions", "footfall": "visitors", "avg_ticket": "usd", "conversion": "ratio"}
+
+
+class StoreMetricForecast:
+    """The store forecast of one metric as {date, forecast, p10, p90, baseline, actual, censored, projected} points.
+    net_sales is the calibrated SKU-based path; transactions, footfall and average ticket come from the flow forecast;
+    conversion = transactions / footfall (null where the footfall counter is not valid). Nothing after as_of has an
+    actual: those points are projections."""
+
+    def __init__(self, cases, metrics, forecasters: list[Any], flow_forecaster, names: Any = None) -> None:
+        self.cases, self.metrics, self.forecasters, self.flow, self.names = cases, metrics, forecasters, flow_forecaster, names
+
+    def execute(self, case_id: str, metric: str | None = None, date_from: date | None = None, date_to: date | None = None,
+                level: str | None = None, sku: str | None = None) -> dict[str, Any]:
+        metric = metric or "net_sales"
+        if metric not in METRICS:
+            raise DomainError(f"metric must be one of {', '.join(METRICS)}")
+        if metric != "net_sales" and (sku or level not in (None, "store")):
+            raise DomainError(f"metric {metric} is only available at level=store")
+        if metric == "net_sales":
+            out = GetForecast(self.cases, self.metrics, self.forecasters).execute(case_id, sku, date_from, date_to, level)
+            as_of = out["as_of"]
+            out["points"] = [{**p, "projected": p["date"] > as_of} for p in out["points"]]
+            return {**out, "metric": "net_sales", "source": "store_daily_kpis+sku forecast",
+                    "store_display_name": self.names.of(out["store_id"]) if self.names else out["store_id"]} if out["level"] == "store" else out
+        from . import _case
+        case = _case(self.cases, case_id)
+        as_of = case.sim_today
+        date_from = date_from or as_of - timedelta(days=DEFAULT_PAST_DAYS)
+        date_to = date_to or as_of + timedelta(days=DEFAULT_AHEAD_DAYS)
+        if date_from > date_to:
+            raise DomainError("from must not be after to")
+        if (date_to - date_from).days > 120:
+            raise DomainError("the window must not exceed 120 days")
+        start = min(date_from, as_of) - timedelta(days=FLOW_LOOKBACK_DAYS)
+        rows = [r for r in self.metrics.flow_history(case.store_id, as_of, start) if r["date"] <= as_of]  # NO LOOK-AHEAD
+        actual = self._actuals(rows, metric)
+        points, origin, model, valid = [], as_of, None, any(r.get("footfall") is not None for r in rows)
+        d = date_from
+        while d <= date_to:
+            known = d - timedelta(days=1) if d <= as_of else as_of  # a past day is forecast as it was known the day before
+            hist = [r for r in rows if r["date"] <= known]
+            res = self.flow.flow(case.store_id, known, d, hist) if hist else None
+            band = self._band(res, metric) if res else None
+            if res and model is None:
+                model = res.model
+            if res:
+                origin = max(origin, res.origin) if d > as_of else origin
+            base = weekday_samples(actual, d, known)
+            act = actual.get(d) if d <= as_of else None
+            points.append({"date": d.isoformat(), "forecast": _r(band["p50"]) if band else None,
+                           "p10": _r(band["p10"]) if band else None, "p90": _r(band["p90"]) if band else None,
+                           "baseline": _r(sum(base) / len(base)) if base else None, "actual": _r(act),
+                           "censored": False, "projected": d > as_of})
+            d += timedelta(days=1)
+        if not rows:
+            raise NotFound(f"no flow data to forecast {metric} for store {case.store_id}")
+        return {"as_of": as_of.isoformat(), "store_id": case.store_id,
+                "store_display_name": self.names.of(case.store_id) if self.names else case.store_id,
+                "source": "store_daily_kpis+flow forecast", "level": "store", "metric": metric,
+                "unit": _FLOW_UNITS[metric], "forecast_origin": as_of.isoformat(), "model": model or self.flow.MODEL,
+                "horizon_days": max(0, (date_to - as_of).days), "conversion_valid": valid if metric == "conversion" else None,
+                "points": points}
+
+    @staticmethod
+    def _actuals(rows: list[dict[str, Any]], metric: str) -> dict[date, float]:
+        out: dict[date, float] = {}
+        for r in rows:
+            tx, ff, ns = r.get("transactions"), r.get("footfall"), r.get("net_sales")
+            v = {"transactions": tx, "footfall": ff,
+                 "avg_ticket": (ns / tx) if tx and ns is not None else None,
+                 "conversion": (tx / ff) if tx is not None and ff else None}[metric]
+            if v is not None:
+                out[r["date"]] = float(v)
+        return out
+
+    @staticmethod
+    def _band(res: Any, metric: str) -> dict[str, float] | None:
+        if metric == "transactions":
+            return res.transactions
+        if metric == "footfall":
+            return res.footfall
+        if metric == "avg_ticket":
+            return res.avg_ticket
+        tx, ff = res.transactions, res.footfall
+        if not tx or not ff or not ff["p10"] or not ff["p50"] or not ff["p90"]:
+            return None
+        return {"p10": tx["p10"] / ff["p90"], "p50": tx["p50"] / ff["p50"], "p90": tx["p90"] / ff["p10"]}
