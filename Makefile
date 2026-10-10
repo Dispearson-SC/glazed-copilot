@@ -28,7 +28,7 @@ down:
 load-data:
 	cd backend && PYTHONPATH=.deps:src $(PY) -m glazed_backend.loader $(or $(PARQUET_DIR),../../Dataset/clean)
 seed-memory:
-	cd backend && PYTHONPATH=.deps:src $(PY) scripts/seed_experiences.py --stores $(or $(STORES),S030)
+	set -a; [ -f .env ] && . ./.env; set +a; cd backend && PYTHONPATH=.deps:src $(PY) scripts/seed_experiences.py --stores $(or $(STORES),S030)
 
 # make cli ARGS="day --json"
 cli:
