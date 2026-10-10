@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import DaySwitcher from "../DaySwitcher";
 import StoreSwitcher from "../StoreSwitcher";
 
 /** Fixed 64px top bar: logo, brand, store code and the settings button. */
@@ -29,6 +30,7 @@ export default function CopilotTopBar({ storeCode, onSettings }: { storeCode: st
           <span aria-hidden="true" className="material-symbols-outlined text-[22px]">tune</span>
         </button>
       </div>
+      <DaySwitcher storeId={storeCode} className="pb-1" />
     </header>
   );
 }

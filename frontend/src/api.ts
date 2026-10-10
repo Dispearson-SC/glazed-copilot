@@ -1,4 +1,4 @@
-import type { AgentsStatusResponse, AlertRecord, Case, CaseDecisionBody, CaseDecisionResult, InboxCounts, IssueAnalysis, MemoryRecord, MessageContext, PendingResponse, CaseMode, DaySummary, DeliveriesResponse, ExpiringResponse, HistoryResponse, InventoryResponse, Kpis, Outlook, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, SupplierPerformance, TraceEvent, Turn, TurnRecord } from "./types";
+import type { AdvanceResult, AgentsStatusResponse, AlertRecord, Case, CaseDecisionBody, CaseDecisionResult, InboxCounts, IssueAnalysis, MemoryRecord, MessageContext, PendingResponse, CaseMode, DaySummary, DeliveriesResponse, ExpiringResponse, HistoryResponse, InventoryResponse, Kpis, Outlook, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, SupplierPerformance, TraceEvent, Turn, TurnRecord } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -55,6 +55,7 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
     listCases: (query: { store_id?: string }) => request<Case[]>("/cases", {}, query),
     createCase: (b: { store_id: string; sim_today: string; mode?: CaseMode; title?: string }) =>
       request<Case>("/cases", send("POST", b)),
+    advanceCase: (caseId: string, b: { days: number }) => request<AdvanceResult>(`/cases/${caseId}/advance`, send("POST", b)),
     sendMessage: (caseId: string, text: string, context?: MessageContext) =>
       request<{ turn_id: string }>(`/cases/${caseId}/messages`, send("POST", context ? { text, context } : { text })),
     listTurns: (caseId: string) => request<TurnRecord[]>(`/cases/${caseId}/turns`),

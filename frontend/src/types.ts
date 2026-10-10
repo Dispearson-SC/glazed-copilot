@@ -27,6 +27,15 @@ export interface Case {
   core_conversation_id: string | null;
   title: string;
   created_at: string;
+  issue_key?: string | null;
+  archived?: boolean;
+}
+
+/** POST /cases/{id}/advance. `outcomes` lists decisions whose result became measurable. */
+export interface AdvanceResult {
+  sim_today: string;
+  new_alerts: unknown[];
+  outcomes: unknown[];
 }
 
 export interface Proposal {

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useApi } from "../ApiContext";
 import ActionsFooter from "../components/ActionsFooter";
 import ActivityChart from "../components/ActivityChart";
+import DaySwitcher from "../components/DaySwitcher";
 import HeroCard from "../components/HeroCard";
 import MetricCards from "../components/MetricCards";
 import PageHeader from "../components/PageHeader";
@@ -61,6 +62,7 @@ export default function DashboardPage() {
       columnClass="flex flex-col w-full space-y-space-lg max-w-[1024px] mx-auto"
       floating={currentCase ? <FloatingChat storeId={storeId} caseId={currentCase.case_id} storeName={store?.display_name} /> : null}
     >
+      {storeId && <DaySwitcher storeId={storeId} />}
       <ErrorBox error={error} />
       <ErrorBox error={summary.error} />
       {ready && data && currentCase && (

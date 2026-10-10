@@ -44,13 +44,13 @@ export default function BranchWindow({
 }) {
   if (!view) {
     return (
-      <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-20">
+      <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-[112px]">
         <p className="m-0 font-body-md text-body-md text-on-surface-variant">Cargando sucursal…</p>
       </main>
     );
   }
   return (
-    <main className="mx-auto flex w-full max-w-[640px] flex-col gap-5 px-4 pb-28 pt-[68px]">
+    <main className="mx-auto flex w-full max-w-[640px] flex-col gap-5 px-4 pb-28 pt-[104px]">
       <header className="flex flex-col gap-3 pt-3">
         <div>
           <span className="font-label-md text-label-md uppercase tracking-[0.05em] text-on-tertiary-container">Sucursal {storeCode}</span>

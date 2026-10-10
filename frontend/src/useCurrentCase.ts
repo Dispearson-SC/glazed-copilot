@@ -22,23 +22,21 @@ export const pickCase = (cases: Case[], preferredId = "", defaultSimToday = DEFA
 
 const inFlight = new Map<string, Promise<Case[]>>();
 
-/** Creates the default-date live case once per store (shared across concurrent callers), then re-lists. */
-function ensureDefaultCase(api: Api, storeId: string): Promise<Case[]> {
-  let p = inFlight.get(storeId);
+/** Creates a live case at `simToday` once per store+date (shared across concurrent callers), then re-lists. */
+export function ensureCaseAt(api: Api, storeId: string, simToday: string, title = `Demo ${simToday}`): Promise<Case[]> {
+  const key = `${storeId}|${simToday}`;
+  let p = inFlight.get(key);
   if (!p) {
     p = (async () => {
-      await api.createCase({
-        store_id: storeId,
-        sim_today: DEFAULT_SIM_TODAY,
-        mode: "live",
-        title: `Demo ${DEFAULT_SIM_TODAY}`,
-      });
+      await api.createCase({ store_id: storeId, sim_today: simToday, mode: "live", title });
       return api.listCases({ store_id: storeId });
-    })().finally(() => inFlight.delete(storeId));
-    inFlight.set(storeId, p);
+    })().finally(() => inFlight.delete(key));
+    inFlight.set(key, p);
   }
   return p;
 }
+
+const ensureDefaultCase = (api: Api, storeId: string) => ensureCaseAt(api, storeId, DEFAULT_SIM_TODAY);
 
 export function useCurrentCase(storeId: string, refreshKey = 0) {
   const api = useApi();

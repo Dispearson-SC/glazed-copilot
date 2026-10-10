@@ -32,6 +32,7 @@ export function fakeApi(over: Partial<Record<keyof Api, unknown>> = {}): Api {
     listStores: vi.fn(async () => [store, store2]),
     listCases: vi.fn(async () => [caseA]),
     createCase: vi.fn(async () => caseA),
+    advanceCase: vi.fn(async () => ({ sim_today: "2026-03-02", new_alerts: [], outcomes: [] })),
     sendMessage: vi.fn(async () => ({ turn_id: "t1" })),
     getTurn: vi.fn(async () => ({ turn_id: "t1", status: "done", reply: "listo" })),
     listProposals: vi.fn(async () => [proposalA]),
