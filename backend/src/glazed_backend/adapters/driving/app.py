@@ -18,6 +18,7 @@ from ...domain.models import CoreError
 from .auth_api import AuthGuard, build_auth_router
 from .internal_api import build_internal_router
 from .public_api import build_public_router
+from .voice_api import build_voice_router
 
 
 @dataclass
@@ -53,6 +54,7 @@ class Container:
     sessions: Any = None  # SessionTokens; a random-secret instance is built when not given
     hasher: Any = field(default_factory=PasswordHasher)
     login_throttle: Any = field(default_factory=LoginThrottle)
+    voice: Any = None  # VoiceDesk (STT/TTS for the chat); None -> voice routes answer 503
 
 
 DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -105,6 +107,7 @@ def create_app(c: Container) -> FastAPI:
     app.add_exception_handler(DomainError, err(400))
     app.include_router(build_auth_router(c, guard))
     app.include_router(build_public_router(c, guard))
+    app.include_router(build_voice_router(c, guard))
     app.include_router(build_internal_router(c))
     if c.warm_on_startup:
         @app.on_event("startup")
@@ -165,7 +168,22 @@ def _with_auth(c: Container, env: dict[str, str]) -> Container:
     c.cookie_secure = _flag(env, "GLAZED_COOKIE_SECURE")
     c.sessions = SessionTokens.from_env(env)
     ensure_admin(c.users, c.hasher, env)
+    c.voice = build_voice(env)
     return c
+
+
+def build_voice(env: dict[str, str]) -> Any:
+    """Voice needs MINIMAX_API_KEY; GLAZED_VOICE=false switches it off. Without a key the desk is None (routes answer 503)."""
+    from ...application.voice import VoiceDesk
+    from ..driven.minimax_voice import DEFAULT_STT_MODEL, DEFAULT_TTS_MODEL, DEFAULT_VOICE, MiniMaxVoice
+    key = env.get("MINIMAX_API_KEY", "")
+    voice_id = env.get("GLAZED_TTS_VOICE") or DEFAULT_VOICE
+    model = env.get("GLAZED_TTS_MODEL") or DEFAULT_TTS_MODEL
+    if not key:
+        return VoiceDesk(None, voice_id, model, enabled=False)
+    svc = MiniMaxVoice(key, voice_id, model, env.get("GLAZED_STT_MODEL") or DEFAULT_STT_MODEL,
+                       env.get("MINIMAX_API_BASE", "https://api.minimax.io/v1"))
+    return VoiceDesk(svc, voice_id, model, enabled=env.get("GLAZED_VOICE", "true").strip().lower() not in ("0", "false", "no", "off"))
 
 
 def build_forecasters(env: dict[str, str]) -> list[Any]:

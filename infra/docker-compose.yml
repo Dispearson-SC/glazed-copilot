@@ -51,6 +51,11 @@ services:
       GLAZED_CORS_ORIGINS: ${GLAZED_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       BACKBOARD_API_KEY: ${BACKBOARD_API_KEY:-}
       MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
+      # Voice (push-to-talk): STT/TTS proxied through the backend so the key never reaches the browser.
+      GLAZED_VOICE: ${GLAZED_VOICE:-true}
+      GLAZED_TTS_VOICE: ${GLAZED_TTS_VOICE:-Spanish_ConfidentWoman}
+      GLAZED_TTS_MODEL: ${GLAZED_TTS_MODEL:-speech-2.8-turbo}
+      GLAZED_STT_MODEL: ${GLAZED_STT_MODEL:-asr-1.0}
       # Login. Values come from the git-ignored .env; GLAZED_AUTH_REQUIRED=false keeps /api/v1 open until the UI integrates.
       GLAZED_AUTH_REQUIRED: ${GLAZED_AUTH_REQUIRED:-false}
       # Demo only: passwordless user picker. Never enable on a real deployment.
