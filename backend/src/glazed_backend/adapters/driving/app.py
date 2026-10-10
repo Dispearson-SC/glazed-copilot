@@ -31,7 +31,7 @@ class Container:
     storage: str = "memory"
     core_status: str = "configured"
     cors_origins: list[str] | None = None  # None -> DEFAULT_CORS_ORIGINS
-    turn_timeout_s: float = 120.0  # a Core turn with no answer after this long is reported as failed
+    turn_timeout_s: float = 600.0  # soft timeout: past it a turn Core still runs is flagged still_running, not failed
     turn_tracker: Any = field(default_factory=TurnTracker)
     classifier: Any = None  # TextClassifierPort (Jev via Backboard, LLM fallback); None -> escape labels
     served: dict = field(default_factory=dict)  # (case_id, issue_id) -> issue as served, for option lookup
@@ -101,13 +101,13 @@ def build_container(env: dict[str, str] | None = None) -> Container:
                          store.backtests, store.trace, SystemClock(),
                          BackboardMemory(key, store.assistants, display_name=StoreNames(metrics).of), "postgres",
                          "configured" if core_url else "missing", cors,
-                         float(env.get("GLAZED_TURN_TIMEOUT_S", "120")), classifier=classifier)
+                         float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier)
     classifier = build_classifier(env, None)
     return Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
                      InMemoryBacktests(), InMemoryTrace(), SystemClock(),
                      BackboardMemory(key, InMemoryAssistants(), display_name=StoreNames(metrics).of), "memory",
                      "configured" if core_url else "missing", cors,
-                         float(env.get("GLAZED_TURN_TIMEOUT_S", "120")), classifier=classifier)
+                         float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier)
 
 
 def build_classifier(env: dict[str, str], assistants: Any = None) -> Any:

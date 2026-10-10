@@ -102,15 +102,19 @@ class AskAgent:
         return turn_id
 
 
+_LIVE_STATUSES = ("running", "waiting", "started", "pending", "queued")
+
+
 class GetTurn:
     """Poll a turn and normalize Core's quirks into the public contract
     `{turn_id, status: pending|done|failed|waiting_approval, reply?, error?}`:
     - Core answers 404 for about a second after the 202 -> pending during a short grace period.
     - Core `waiting` means suspended on a peer OR on an approval -> waiting_approval only if an approval is open.
-    - A turn stuck in `running` (tool exception, model 400) never ends in Core -> failed after `timeout_s`."""
+    - Past `timeout_s` a turn Core still reports running/waiting/started stays pending with `still_running: true`
+      (real multi-peer turns take 4-7 min); only a Core failure or an unknown status fails it."""
 
     def __init__(self, cases: CaseRepository, core: CorePort, tracker: TurnTracker | None = None,
-                 clock: Clock | None = None, timeout_s: float = 120.0, grace_s: float = 120.0) -> None:
+                 clock: Clock | None = None, timeout_s: float = 600.0, grace_s: float = 120.0) -> None:
         self.cases, self.core, self.tracker, self.clock = cases, core, tracker, clock
         self.timeout_s, self.grace_s = timeout_s, grace_s
 
@@ -137,10 +141,13 @@ class GetTurn:
             return out
         if core_status in ("failed", "error"):
             return {**out, "status": "failed", "error": raw.get("error") or text or "Agent-Core reported a failed turn"}
-        if age is not None and age > self.timeout_s:
+        overdue = age is not None and age > self.timeout_s
+        if overdue and core_status not in _LIVE_STATUSES:
             return {**out, "status": "failed",
                     "error": f"turn timed out after {self.timeout_s:g}s without an answer from Agent-Core"}
         out["status"] = "waiting_approval" if core_status == "waiting" and self._approval_open(case, turn_id) else "pending"
+        if overdue and out["status"] == "pending":
+            out["still_running"] = True  # past the soft timeout but Core still works on it: never a false failure
         return out
 
     def _approval_open(self, case: Case, turn_id: str) -> bool:

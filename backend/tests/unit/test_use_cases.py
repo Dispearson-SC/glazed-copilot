@@ -333,13 +333,26 @@ def test_waiting_is_pending_unless_an_approval_is_open(w):
     assert get.execute(c.case_id, tid)["status"] == "pending"
 
 
-def test_stuck_turn_fails_after_the_overall_timeout(w):
+def test_long_running_turn_is_flagged_not_failed_after_the_soft_timeout(w):
     ask, get = _turns(w, timeout_s=120)
     c, tid = _sent_turn(w, ask, {"turn_id": "x", "status": "running", "text": None})
     w.clock._now += timedelta(seconds=119)
-    assert get.execute(c.case_id, tid)["status"] == "pending"
-    w.clock._now += timedelta(seconds=2)
+    assert "still_running" not in get.execute(c.case_id, tid)
+    w.clock._now += timedelta(seconds=500)
     out = get.execute(c.case_id, tid)
-    assert out["status"] == "failed" and "120" in out["error"] and "timed out" in out["error"]
+    assert out["status"] == "pending" and out["still_running"] is True
+    for st in ("waiting", "started"):
+        w.core.turns[tid] = {"turn_id": tid, "status": st, "text": None}
+        assert get.execute(c.case_id, tid)["status"] in ("pending", "waiting_approval")
+    w.core.turns[tid] = {"turn_id": tid, "status": "failed", "error": "boom"}
+    assert get.execute(c.case_id, tid)["status"] == "failed"  # only a Core failure fails it
     w.core.turns[tid] = {"turn_id": tid, "status": "finished", "text": "late"}
     assert get.execute(c.case_id, tid)["status"] == "done"  # a real answer always wins over the timeout
+
+
+def test_unknown_core_status_past_the_timeout_fails(w):
+    ask, get = _turns(w, timeout_s=120)
+    c, tid = _sent_turn(w, ask, {"turn_id": "x", "status": "mystery", "text": None})
+    w.clock._now += timedelta(seconds=121)
+    out = get.execute(c.case_id, tid)
+    assert out["status"] == "failed" and "timed out" in out["error"]
