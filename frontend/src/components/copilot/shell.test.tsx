@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import AgentOrb from "./AgentOrb";
 import CapsuleNav from "./CapsuleNav";
@@ -44,7 +45,7 @@ describe("CapsuleNav", () => {
 describe("CopilotTopBar", () => {
   it("shows the brand, the store code and an accessible settings button", async () => {
     const onSettings = vi.fn();
-    render(<CopilotTopBar storeCode="S030" onSettings={onSettings} />);
+    render(<MemoryRouter><CopilotTopBar storeCode="S030" onSettings={onSettings} /></MemoryRouter>);
     const bar = screen.getByRole("banner");
     expect(within(bar).getByText("Glazed Co.")).toBeInTheDocument();
     expect(within(bar).getByText(/Copiloto · Sucursal S030/)).toBeInTheDocument();
