@@ -4,7 +4,8 @@ from datetime import date, datetime, timezone
 
 import pytest
 
-from glazed_backend.domain import Alert, AlertState, BacktestRun, Case, Execution, Proposal, TraceEvent
+from glazed_backend.adapters.driven.memory import InMemoryUsers
+from glazed_backend.domain import User, Alert, AlertState, BacktestRun, Case, Execution, Proposal, TraceEvent
 from tests.fakes import (InMemoryAlerts, InMemoryBacktests, InMemoryCases, InMemoryExecutions,
                          InMemoryProposals, InMemoryTrace)
 
@@ -144,3 +145,21 @@ def test_decision_memories_roundtrip_and_store_scope():
         assert [x.memory_id for x in repo.list("S030")] == ["m1"] and repo.list("S030")[0] == m
         repo.add(m)  # upsert by memory_id: no duplicate
         assert len(repo.list("S030")) == 1 and repo.get("m2").store_id == "S001" and repo.get("zz") is None
+
+
+@pytest.fixture(params=["memory", pytest.param("postgres", marks=pytest.mark.integration)])
+def users(request):
+    return InMemoryUsers() if request.param == "memory" else _pg().users
+
+
+def test_users_roundtrip_unique_email_and_decided_by(users):
+    u = User.new("Ana@X.io", "Ana", "manager", ["S030", "S001"], "scrypt$h")
+    users.add(u)
+    got = users.get_by_email("ANA@x.io")
+    assert got.user_id == u.user_id and got.store_ids == ["S001", "S030"] and got.active
+    u.active = False
+    users.add(u)
+    assert users.get(u.user_id).active is False and len(users.list()) == 1
+    with pytest.raises(Exception):
+        users.add(User.new("ana@x.io", "Dup", "admin", [], "h"))
+    assert users.get_by_email("nobody@x.io") is None

@@ -11,9 +11,11 @@ from fastapi.responses import JSONResponse
 
 from ...application import TurnTracker
 from ..driven.forecast import BaselineForecast, WeekdayFlow
-from ..driven.memory import InMemoryDecisionMemories, InMemoryOutcomes, InMemoryTurns
-from ...domain import DomainError, FutureDate, InvalidTransition, NotFound, Unprocessable
+from ..driven.memory import InMemoryDecisionMemories, InMemoryOutcomes, InMemoryTurns, InMemoryUsers
+from ...application.auth import LoginThrottle, PasswordHasher, SessionTokens, ensure_admin
+from ...domain import DomainError, FutureDate, InvalidCredentials, InvalidTransition, NotFound, TooManyAttempts, Unprocessable
 from ...domain.models import CoreError
+from .auth_api import AuthGuard, build_auth_router
 from .internal_api import build_internal_router
 from .public_api import build_public_router
 
@@ -44,6 +46,12 @@ class Container:
     turns: Any = field(default_factory=InMemoryTurns)  # TurnRepository: stored replies for the conversation history
     outcomes: Any = field(default_factory=InMemoryOutcomes)  # measured outcomes of approved decisions
     decision_memories: Any = field(default_factory=InMemoryDecisionMemories)  # preferences kept from rejection reasons
+    users: Any = field(default_factory=InMemoryUsers)  # UserRepository
+    auth_required: bool = False  # GLAZED_AUTH_REQUIRED: every /api/v1 route but health, login, logout and me needs a session
+    cookie_secure: bool = False  # GLAZED_COOKIE_SECURE: the session cookie carries the Secure attribute (behind HTTPS)
+    sessions: Any = None  # SessionTokens; a random-secret instance is built when not given
+    hasher: Any = field(default_factory=PasswordHasher)
+    login_throttle: Any = field(default_factory=LoginThrottle)
 
 
 DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -70,8 +78,11 @@ def create_app(c: Container) -> FastAPI:
         notes = ManagerNotes(c.cases, c.trace, c.decision_memories, c.memory, c.clock)
         c.briefings = BriefingService(SnapshotBuilder(c.metrics, c.proposals, StoreNames(c.metrics).of, c.served, c.cases, notes), c.clock, c.cases,
                                    (c.memory.warm,) if hasattr(c.memory, "warm") else ())
+    if c.sessions is None:
+        c.sessions = SessionTokens.from_env({})
+    guard = AuthGuard(c)
     app = FastAPI(title="glazed-backend")
-    app.add_middleware(CORSMiddleware, allow_origins=c.cors_origins or DEFAULT_CORS_ORIGINS,
+    app.add_middleware(CORSMiddleware, allow_origins=c.cors_origins or DEFAULT_CORS_ORIGINS, allow_credentials=True,
                        allow_methods=["GET", "POST", "PATCH", "OPTIONS"], allow_headers=["*"])
 
     def err(status: int):
@@ -79,13 +90,20 @@ def create_app(c: Container) -> FastAPI:
             return JSONResponse(status_code=status, content={"detail": str(exc)})
         return handler
 
+    async def too_many(_: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse(status_code=429, content={"detail": str(exc)},
+                            headers={"Retry-After": str(getattr(exc, "retry_after_s", 300))})
+
+    app.add_exception_handler(InvalidCredentials, err(401))
+    app.add_exception_handler(TooManyAttempts, too_many)
     app.add_exception_handler(NotFound, err(404))
     app.add_exception_handler(InvalidTransition, err(409))
     app.add_exception_handler(FutureDate, err(400))
     app.add_exception_handler(CoreError, err(502))
     app.add_exception_handler(Unprocessable, err(422))
     app.add_exception_handler(DomainError, err(400))
-    app.include_router(build_public_router(c))
+    app.include_router(build_auth_router(c, guard))
+    app.include_router(build_public_router(c, guard))
     app.include_router(build_internal_router(c))
     if c.warm_on_startup:
         @app.on_event("startup")
@@ -118,19 +136,33 @@ def build_container(env: dict[str, str] | None = None) -> Container:
         store = PostgresStore(env["GLAZED_DATABASE_URL"])
         store.migrate()
         classifier = build_classifier(env, store.assistants)
-        return Container(metrics, core, store.cases, store.alerts, store.proposals, store.executions,
+        return _with_auth(Container(metrics, core, store.cases, store.alerts, store.proposals, store.executions,
                          store.backtests, store.trace, SystemClock(),
                          BackboardMemory(key, store.assistants, display_name=StoreNames(metrics).of), "postgres",
                          "configured" if core_url else "missing", cors,
                          float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier, warm_on_startup=True, turns=store.turns,
-                         decision_memories=store.memories, outcomes=store.outcomes, forecasters=build_forecasters(env))
+                         decision_memories=store.memories, outcomes=store.outcomes, forecasters=build_forecasters(env),
+                         users=store.users), env)
     classifier = build_classifier(env, None)
-    return Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
+    return _with_auth(Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
                      InMemoryBacktests(), InMemoryTrace(), SystemClock(),
                      BackboardMemory(key, InMemoryAssistants(), display_name=StoreNames(metrics).of), "memory",
                      "configured" if core_url else "missing", cors,
                          float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier, warm_on_startup=True,
-                         forecasters=build_forecasters(env))
+                         forecasters=build_forecasters(env)), env)
+
+
+def _flag(env: dict[str, str], name: str) -> bool:
+    return env.get(name, "false").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _with_auth(c: Container, env: dict[str, str]) -> Container:
+    """Auth settings from the environment, plus the optional GLAZED_ADMIN_EMAIL/PASSWORD bootstrap."""
+    c.auth_required = _flag(env, "GLAZED_AUTH_REQUIRED")
+    c.cookie_secure = _flag(env, "GLAZED_COOKIE_SECURE")
+    c.sessions = SessionTokens.from_env(env)
+    ensure_admin(c.users, c.hasher, env)
+    return c
 
 
 def build_forecasters(env: dict[str, str]) -> list[Any]:

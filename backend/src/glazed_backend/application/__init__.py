@@ -533,11 +533,12 @@ class DecideProposal:
         self.memory, self.classifier = memory, classifier
         self.decision_memories, self.clock = decision_memories, clock
 
-    def execute(self, proposal_id: str, approved: bool, reason: str = "", subject: str | None = None) -> Execution:
+    def execute(self, proposal_id: str, approved: bool, reason: str = "", subject: str | None = None,
+                decided_by: str | None = None) -> Execution:
         proposal = self.proposals.get(proposal_id)
         if proposal is None:
             raise NotFound(f"proposal {proposal_id!r} not found")
-        proposal.decide(approved, reason)
+        proposal.decide(approved, reason, decided_by)
         if not approved and self.classifier is not None and reason.strip():
             try:  # Jev turns the free-text reason into a label; it never blocks the decision
                 res = self.classifier.classify("rejection_reason", reason)

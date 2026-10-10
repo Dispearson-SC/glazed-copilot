@@ -5,7 +5,7 @@ import copy
 import dataclasses
 from datetime import datetime, timezone
 
-from ...domain import Alert, AlertState, BacktestRun, Case, DecisionMemory, Execution, Outcome, Proposal, TraceEvent, TurnRecord
+from ...domain import Alert, AlertState, BacktestRun, Case, DecisionMemory, Execution, Outcome, Proposal, TraceEvent, TurnRecord, User
 
 
 class InMemoryCases:
@@ -189,3 +189,23 @@ class InMemoryExperienceMemory:
                 scored.append((s, e))
         scored.sort(key=lambda x: -x[0])
         return [dataclasses.replace(e, score=float(s)) for s, e in scored[:limit]]
+
+
+class InMemoryUsers:
+    def __init__(self) -> None:
+        self._d: dict[str, User] = {}
+
+    def add(self, user: User) -> None:
+        clash = next((u for u in self._d.values() if u.email == user.email and u.user_id != user.user_id), None)
+        if clash is not None:
+            raise ValueError(f"email {user.email!r} already exists")
+        self._d[user.user_id] = copy.deepcopy(user)
+
+    def get(self, user_id: str) -> User | None:
+        return copy.deepcopy(self._d.get(user_id))
+
+    def get_by_email(self, email: str) -> User | None:
+        return next((copy.deepcopy(u) for u in self._d.values() if u.email == email.strip().lower()), None)
+
+    def list(self) -> list[User]:
+        return copy.deepcopy(sorted(self._d.values(), key=lambda u: u.email))

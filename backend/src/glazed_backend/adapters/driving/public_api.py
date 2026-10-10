@@ -3,7 +3,7 @@
 from datetime import date, timedelta
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Header, Query, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
@@ -11,6 +11,7 @@ from ... import application as uc
 from ...application import copilot as uc_copilot, decisions as uc_decisions, outcomes as uc_outcomes, forecast as uc_forecast, manager as uc_manager, notes as uc_notes, sentinel, transfers as uc_transfers
 from ...domain import AlertState, DomainError, NotFound
 from ...domain.models import alert_agent, alert_category
+from .auth_api import AuthGuard
 from .store_names import StoreNames
 
 
@@ -122,8 +123,11 @@ def alert_view(alert: Any) -> dict[str, Any]:
             "title_es": f"{label}: {product}" if product else label}
 
 
-def build_public_router(c: Any) -> APIRouter:
-    r = APIRouter(prefix="/api/v1")
+def build_public_router(c: Any, guard: AuthGuard) -> APIRouter:
+    root = APIRouter()
+    open_r = APIRouter(prefix="/api/v1")  # reachable without a session
+    r = APIRouter(prefix="/api/v1", dependencies=[Depends(guard)])
+    decider = lambda request: (guard.user(request).user_id if guard.user(request) else None)  # noqa: E731
     names = StoreNames(c.metrics)
     agents = uc_copilot.AgentsStatus(lambda: c.core, c.clock)
 
@@ -133,27 +137,31 @@ def build_public_router(c: Any) -> APIRouter:
     def case_of(case_id: str) -> Any:
         return uc._case(c.cases, case_id)
 
-    @r.get("/health")
+    @open_r.get("/health")
     def health() -> dict[str, Any]:
-        return {"status": "ok", "storage": c.storage, "core": c.core_status}
+        return {"status": "ok", "storage": c.storage, "core": c.core_status, "auth_required": c.auth_required}
 
     @r.get("/agents/status")
     def agents_status():
         return agents.execute()
 
     @r.get("/stores")
-    def stores():
-        return c.metrics.stores()
+    def stores(request: Request):
+        return [s for s in c.metrics.stores() if guard.allowed(request, s["store_id"])]
 
     @r.post("/cases", status_code=201)
-    def create_case(b: NewCase):
+    def create_case(b: NewCase, request: Request):
+        guard.ensure_store(request, b.store_id)
         case = uc.StartCase(c.cases).execute(b.store_id, b.sim_today, b.mode, b.title)
         c.briefings.refresh_async(case)
         return names.tag(jsonable_encoder(case))
 
     @r.get("/cases")
-    def list_cases(store_id: str | None = None):
-        return names.tag(jsonable_encoder(uc.ListCases(c.cases).execute(store_id)))
+    def list_cases(request: Request, store_id: str | None = None):
+        if store_id:
+            guard.ensure_store(request, store_id)
+        rows = [k for k in uc.ListCases(c.cases).execute(store_id) if guard.allowed(request, k.store_id)]
+        return names.tag(jsonable_encoder(rows))
 
     @r.get("/cases/{case_id}")
     def get_case(case_id: str):
@@ -208,8 +216,9 @@ def build_public_router(c: Any) -> APIRouter:
         return jsonable_encoder(c.briefings.briefing(uc.ResumeCase(c.cases).execute(case_id)))
 
     @r.post("/promos/audit")
-    def promo_audit(b: PromoAuditBody):
+    def promo_audit(b: PromoAuditBody, request: Request):
         case = uc.ResumeCase(c.cases).execute(b.case_id)
+        guard.ensure_store(request, case.store_id)
         return jsonable_encoder(c.metrics.promo_audit(case.store_id, case.sim_today, b.department, b.discount_pct))
 
     @r.get("/cases/{case_id}/compliance")
@@ -231,7 +240,9 @@ def build_public_router(c: Any) -> APIRouter:
         return out
 
     @r.get("/alerts")
-    def alerts(store_id: str | None = None, state: str | None = None):
+    def alerts(request: Request, store_id: str | None = None, state: str | None = None):
+        if store_id:
+            guard.ensure_store(request, store_id)
         try:
             st = AlertState(state) if state else None
         except ValueError:
@@ -242,7 +253,8 @@ def build_public_router(c: Any) -> APIRouter:
             if live:
                 latest = max(live, key=lambda k: k.created_at)
                 uc.AdvanceSimClock(c.cases, c.alerts, c.metrics).detect(latest.case_id)
-        return names.tag([alert_view(a) for a in uc.ListAlerts(c.alerts, c.cases).execute(store_id, st)])
+        return names.tag([alert_view(a) for a in uc.ListAlerts(c.alerts, c.cases).execute(store_id, st)
+                          if guard.allowed(request, a.store_id)])
 
     @r.patch("/alerts/{alert_id}")
     def transition(alert_id: str, b: TransitionBody):
@@ -258,11 +270,16 @@ def build_public_router(c: Any) -> APIRouter:
         return names.tag(alert_view(alert))
 
     @r.get("/proposals")
-    def proposals(case_id: str | None = None, store_id: str | None = None, status: str | None = None):
-        return jsonable_encoder(c.proposals.list(case_id, store_id, status))
+    def proposals(request: Request, case_id: str | None = None, store_id: str | None = None, status: str | None = None):
+        if case_id:
+            guard.ensure_store(request, uc._case(c.cases, case_id).store_id)
+        if store_id:
+            guard.ensure_store(request, store_id)
+        return jsonable_encoder([p for p in c.proposals.list(case_id, store_id, status) if guard.allowed(request, p.store_id)])
 
     @r.post("/proposals", status_code=201)
-    def propose(b: ProposeBody, response: Response, idempotency_key: Annotated[str | None, Header()] = None):
+    def propose(b: ProposeBody, request: Request, response: Response, idempotency_key: Annotated[str | None, Header()] = None):
+        guard.ensure_store(request, uc._case(c.cases, b.case_id).store_id)
         proposal, created = uc.ProposeOption(c.cases, c.proposals, c.alerts, c.metrics, c.served).execute_keyed(
             b.case_id, b.issue_id, b.option_id, b.rationale, idempotency_key=idempotency_key)
         if not created:
@@ -284,9 +301,9 @@ def build_public_router(c: Any) -> APIRouter:
         return names.tag({**uc_manager.kpis_vs_normal(c.metrics, case, date_from, date_to), "case_id": case.case_id})
 
     @r.post("/proposals/{proposal_id}/decision")
-    def decide(proposal_id: str, b: DecisionBody):
+    def decide(proposal_id: str, b: DecisionBody, request: Request):
         return jsonable_encoder(uc.DecideProposal(c.cases, c.proposals, c.executions, c.alerts, c.memory, c.classifier,
-                                                  c.decision_memories, c.clock).execute(proposal_id, b.approved, b.reason))
+                                                  c.decision_memories, c.clock).execute(proposal_id, b.approved, b.reason, decided_by=decider(request)))
 
     @r.post("/proposals/{proposal_id}/outcome", status_code=201)
     def outcome(proposal_id: str, b: OutcomeBody):
@@ -302,11 +319,11 @@ def build_public_router(c: Any) -> APIRouter:
         return uc_copilot.PendingDecisions(c.metrics, c.proposals, c.served, names).execute(case_of(case_id))
 
     @r.post("/cases/{case_id}/decisions", status_code=201)
-    def post_decision(case_id: str, b: CaseDecisionBody, response: Response,
+    def post_decision(case_id: str, b: CaseDecisionBody, request: Request, response: Response,
                       idempotency_key: Annotated[str | None, Header()] = None):
         out, created = uc_copilot.RecordDecision(c.cases, c.proposals, c.executions, c.alerts, c.metrics, c.served,
                                                  c.memory, c.classifier, c.decision_memories, c.clock).execute(
-            case_id, b.issue_id, b.option_id, b.approved, b.reason, idempotency_key)
+            case_id, b.issue_id, b.option_id, b.approved, b.reason, idempotency_key, decider(request))
         if not created:
             response.status_code = 200
         return jsonable_encoder(out)
@@ -412,9 +429,15 @@ def build_public_router(c: Any) -> APIRouter:
         return jsonable_encoder(run)
 
     @r.get("/trace")
-    def trace(case_id: str | None = None, store_id: str | None = None):
+    def trace(request: Request, case_id: str | None = None, store_id: str | None = None):
         if not case_id and not store_id:
             raise DomainError("case_id or store_id is required")
+        if case_id:
+            guard.ensure_store(request, uc._case(c.cases, case_id).store_id)
+        if store_id:
+            guard.ensure_store(request, store_id)
         return jsonable_encoder(uc.GetAgentTrace(c.cases, c.core, c.trace).execute(case_id, store_id))
 
-    return r
+    root.include_router(open_r)
+    root.include_router(r)
+    return root

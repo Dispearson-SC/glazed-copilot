@@ -132,6 +132,7 @@ class Proposal:
     reason_category: str | None = None  # Jev label of a rejection reason
     reason_confidence: float | None = None
     idempotency_key: str | None = None  # client retry key, unique per case
+    decided_by: str | None = None  # user_id of the authenticated decider, when known
 
     @classmethod
     def new(cls, case_id: str, store_id: str, issue_id: str, action_type: str,
@@ -143,9 +144,10 @@ class Proposal:
         return cls(new_id(), case_id, store_id, issue_id, action_type, dict(params), tier,
                    rationale, agent_id=agent_id)
 
-    def decide(self, approved: bool, reason: str) -> None:
+    def decide(self, approved: bool, reason: str, decided_by: str | None = None) -> None:
         if self.status != "pending":
             raise DomainError(f"proposal already {self.status}")
+        self.decided_by = decided_by or self.decided_by
         if not approved and not reason.strip():
             raise DomainError("a reason is required to reject a proposal")
         self.status = "approved" if approved else "rejected"

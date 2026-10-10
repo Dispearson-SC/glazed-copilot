@@ -6,7 +6,7 @@ from typing import Any, Protocol
 
 from ..metrics.types import SkuSeries
 from ..domain import (Alert, AlertState, BacktestRun, Case, DecisionMemory, Execution, Experience, Outcome, Proposal, TraceEvent,
-                      TurnRecord)
+                      TurnRecord, User)
 
 
 class MetricsPort(Protocol):
@@ -133,6 +133,13 @@ class OutcomeRepository(Protocol):
     def add(self, outcome: Outcome) -> None: ...  # upsert by decision_id
     def get(self, decision_id: str) -> Outcome | None: ...
     def list(self, case_id: str | None = None) -> list[Outcome]: ...
+
+
+class UserRepository(Protocol):
+    def add(self, user: "User") -> None: ...  # upsert by user_id; email is unique
+    def get(self, user_id: str) -> "User | None": ...
+    def get_by_email(self, email: str) -> "User | None": ...  # email is stored lowercase
+    def list(self) -> list["User"]: ...
 
 
 class TracePort(Protocol):

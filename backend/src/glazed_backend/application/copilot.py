@@ -173,7 +173,7 @@ class RecordDecision:
         return out
 
     def execute(self, case_id: str, issue_id: str, option_id: str, approved: bool, reason: str = "",
-                idempotency_key: str | None = None) -> tuple[dict[str, Any], bool]:
+                idempotency_key: str | None = None, decided_by: str | None = None) -> tuple[dict[str, Any], bool]:
         from . import DecideProposal, ProposeOption, _case
         from ..domain import InvalidTransition
         case = _case(self.cases, case_id)
@@ -196,7 +196,7 @@ class RecordDecision:
                 case.case_id, issue_id, option_id, "Decided by the manager", idempotency_key=idempotency_key)
         DecideProposal(self.cases, self.proposals, self.executions, self.alerts, self.memory, self.classifier,
                        self.decision_memories, self.clock).execute(
-            proposal.proposal_id, approved, reason, issue.get("product_name") or issue.get("sku"))
+            proposal.proposal_id, approved, reason, issue.get("product_name") or issue.get("sku"), decided_by)
         return self._out(self.proposals.get(proposal.proposal_id), False), True
 
 

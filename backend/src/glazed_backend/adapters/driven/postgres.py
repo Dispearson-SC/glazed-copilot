@@ -9,9 +9,9 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from ...domain import Alert, AlertState, BacktestRun, Case, DecisionMemory, Execution, Outcome, Proposal, TraceEvent, TurnRecord
+from ...domain import Alert, AlertState, BacktestRun, Case, DecisionMemory, Execution, Outcome, Proposal, TraceEvent, TurnRecord, User
 
-_TABLES = ("outcomes", "decision_memories", "turns", "store_assistants", "trace_events", "backtests", "executions", "proposals", "alerts", "cases")
+_TABLES = ("users", "outcomes", "decision_memories", "turns", "store_assistants", "trace_events", "backtests", "executions", "proposals", "alerts", "cases")
 
 
 class PostgresStore:
@@ -28,6 +28,7 @@ class PostgresStore:
         self.turns = _Turns(self)
         self.memories = _DecisionMemories(self)
         self.outcomes = _Outcomes(self)
+        self.users = _Users(self)
 
     def migrate(self) -> None:
         files = sorted(f for f in resources.files("glazed_backend.migrations").iterdir() if f.name.endswith(".sql"))
@@ -120,12 +121,12 @@ class _Alerts(_Repo):
 
 class _Proposals(_Repo):
     def add(self, p: Proposal) -> None:
-        self.s.q("INSERT INTO glazed.proposals VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+        self.s.q("INSERT INTO glazed.proposals VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
                  " ON CONFLICT (proposal_id) DO UPDATE SET status=EXCLUDED.status, reason=EXCLUDED.reason,"
                  " params=EXCLUDED.params, reason_category=EXCLUDED.reason_category,"
-                 " reason_confidence=EXCLUDED.reason_confidence",
+                 " reason_confidence=EXCLUDED.reason_confidence, decided_by=EXCLUDED.decided_by",
                  [p.proposal_id, p.case_id, p.store_id, p.issue_id, p.action_type, Jsonb(p.params), p.tier, p.rationale,
-                  p.status, p.reason, p.agent_id, p.created_at, p.reason_category, p.reason_confidence, p.idempotency_key])
+                  p.status, p.reason, p.agent_id, p.created_at, p.reason_category, p.reason_confidence, p.idempotency_key, p.decided_by])
 
     update = add
 
@@ -133,7 +134,7 @@ class _Proposals(_Repo):
     def _row(r: dict | None) -> Proposal | None:
         return Proposal(r["proposal_id"], r["case_id"], r["store_id"], r["issue_id"], r["action_type"], r["params"],
                         r["tier"], r["rationale"], r["status"], r["reason"], r["agent_id"], r["created_at"],
-                        r["reason_category"], r["reason_confidence"], r["idempotency_key"]) if r else None
+                        r["reason_category"], r["reason_confidence"], r["idempotency_key"], r["decided_by"]) if r else None
 
     def get(self, proposal_id: str) -> Proposal | None:
         return self._row(self._one("SELECT * FROM glazed.proposals WHERE proposal_id=%s", (proposal_id,)))
@@ -259,3 +260,27 @@ class _Outcomes(_Repo):
     def list(self, case_id: str | None = None) -> list[Outcome]:
         return [self._row(r) for r in self.s.q(  # type: ignore[misc]
             "SELECT * FROM glazed.outcomes WHERE (%s::text IS NULL OR case_id=%s) ORDER BY created_at", (case_id, case_id))]
+
+
+class _Users(_Repo):
+    _COLS = ("user_id", "email", "name", "role", "store_ids", "password_hash", "active", "created_at")
+
+    def add(self, u: User) -> None:
+        sets = ", ".join(f"{k}=EXCLUDED.{k}" for k in self._COLS[1:])
+        self.s.q(f"INSERT INTO glazed.users ({', '.join(self._COLS)}) VALUES ({', '.join(['%s'] * len(self._COLS))})"
+                 f" ON CONFLICT (user_id) DO UPDATE SET {sets}",
+                 [u.user_id, u.email, u.name, u.role, Jsonb(u.store_ids), u.password_hash, u.active, u.created_at])
+
+    @staticmethod
+    def _row(r: dict | None) -> User | None:
+        return User(r["user_id"], r["email"], r["name"], r["role"], list(r["store_ids"]), r["password_hash"],
+                    r["active"], r["created_at"]) if r else None
+
+    def get(self, user_id: str) -> User | None:
+        return self._row(self._one("SELECT * FROM glazed.users WHERE user_id=%s", (user_id,)))
+
+    def get_by_email(self, email: str) -> User | None:
+        return self._row(self._one("SELECT * FROM glazed.users WHERE email=%s", (email.strip().lower(),)))
+
+    def list(self) -> list[User]:
+        return [self._row(r) for r in self.s.q("SELECT * FROM glazed.users ORDER BY email")]  # type: ignore[misc]

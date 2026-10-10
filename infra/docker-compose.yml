@@ -51,6 +51,12 @@ services:
       GLAZED_CORS_ORIGINS: ${GLAZED_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       BACKBOARD_API_KEY: ${BACKBOARD_API_KEY:-}
       MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
+      # Login. Values come from the git-ignored .env; GLAZED_AUTH_REQUIRED=false keeps /api/v1 open until the UI integrates.
+      GLAZED_AUTH_REQUIRED: ${GLAZED_AUTH_REQUIRED:-false}
+      GLAZED_COOKIE_SECURE: ${GLAZED_COOKIE_SECURE:-false}
+      GLAZED_SESSION_SECRET: ${GLAZED_SESSION_SECRET:-}
+      GLAZED_ADMIN_EMAIL: ${GLAZED_ADMIN_EMAIL:-}
+      GLAZED_ADMIN_PASSWORD: ${GLAZED_ADMIN_PASSWORD:-}
       # Holdout forecast (Parquet) produced by the separate forecast job. Absent file -> baseline forecast.
       GLAZED_FORECAST_PATH: ${GLAZED_FORECAST_PATH:-/forecast/forecast.parquet}
     volumes:
