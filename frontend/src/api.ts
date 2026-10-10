@@ -1,4 +1,4 @@
-import type { AdvanceResult, AgentsStatusResponse, AlertRecord, Case, CaseDecisionBody, CaseDecisionResult, InboxCounts, IssueAnalysis, MemoryRecord, MessageContext, PendingResponse, CaseMode, DaySummary, DeliveriesResponse, ExpiringResponse, InventoryResponse, Outlook, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, TraceEvent, Turn, TurnRecord } from "./types";
+import type { NoteBody, NoteResult, AdvanceResult, AgentsStatusResponse, AlertRecord, Case, CaseDecisionBody, CaseDecisionResult, InboxCounts, IssueAnalysis, MemoryRecord, MessageContext, PendingResponse, CaseMode, DaySummary, DeliveriesResponse, ExpiringResponse, InventoryResponse, Outlook, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, TraceEvent, Turn, TurnRecord } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -92,6 +92,7 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
         ...(opts.idempotencyKey ? { headers: { "Idempotency-Key": opts.idempotencyKey } } : {}),
       }),
     getMemories: (caseId: string, q: { category?: string; q?: string } = {}) => request<MemoryRecord[]>(`/cases/${caseId}/memories`, {}, q),
+    addNote: (caseId: string, b: NoteBody) => request<NoteResult>(`/cases/${caseId}/notes`, send("POST", b)),
     getAgentsStatus: () => request<AgentsStatusResponse>("/agents/status"),
     getInboxCounts: (caseId: string) => request<InboxCounts>(`/cases/${caseId}/inbox-counts`),
     getForecast: (caseId: string, q: { sku?: string; from?: string; to?: string; level?: "sku" | "store"; metric?: string } = {}) =>

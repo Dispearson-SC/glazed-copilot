@@ -529,3 +529,16 @@ export interface InboxCounts {
   technical: number;
   alerts: number;
 }
+
+/** POST /cases/{id}/notes: a manager note that becomes a memory (category eventos|demanda|proveedores|preferencias). */
+export interface NoteBody {
+  text: string;
+  category: "eventos" | "demanda" | "proveedores" | "preferencias";
+  date_from?: string;
+  date_to?: string;
+  impact?: string;
+}
+export interface NoteResult {
+  saved: boolean;
+  memory_id: string;
+}

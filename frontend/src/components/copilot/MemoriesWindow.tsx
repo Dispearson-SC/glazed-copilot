@@ -1,3 +1,4 @@
+import NoteSheet from "./NoteSheet";
 import { MemoriesSkeleton } from "./Skeleton";
 import { useEffect, useState } from "react";
 import { filterMemories, SOON_TEXT, type Memory } from "../../data/copilot";
@@ -36,21 +37,35 @@ export default function MemoriesWindow({
   filter,
   onFilter,
   state,
+  caseId = "",
+  onNoteSaved,
 }: {
   storeCode: string;
   memories: Memory[];
   filter: string;
   onFilter: (f: string) => void;
   state: MemoryState;
+  caseId?: string;
+  /** The note was saved: the page toasts and refetches /memories. */
+  onNoteSaved?: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [noting, setNoting] = useState(false);
   useEffect(() => setQuery(""), [storeCode]);
   const shown = filterMemories(memories, filter, query);
   return (
     <main className="mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 pb-28 pt-[104px]">
       <header className="flex flex-col gap-1 pt-3">
         <span className="font-label-md text-label-md uppercase tracking-[0.05em] text-on-tertiary-container">Poco a poco · {storeCode}</span>
-        <h1 className="m-0 font-headline-lg text-headline-lg tracking-tight text-primary">Memorias técnicas</h1>
+        <div className="flex items-start justify-between gap-2">
+          <h1 className="m-0 font-headline-lg text-headline-lg tracking-tight text-primary">Memorias técnicas</h1>
+          {caseId && (
+            <button type="button" onClick={() => setNoting(true)} className="inline-flex min-h-[44px] flex-shrink-0 items-center gap-1 rounded-full border border-partition/60 bg-white px-3.5 font-label-md text-label-md font-semibold normal-case tracking-normal text-secondary shadow-card">
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">edit_note</span>
+              Anotar
+            </button>
+          )}
+        </div>
         <p className="m-0 font-body-md text-body-md text-on-surface-variant">Lo que el copiloto sabe de tu sucursal. Cada cifra se verifica contra el registro de decisiones.</p>
       </header>
       <label className="flex items-center gap-2 rounded-full border border-surface-container-high bg-white px-4 py-3">
@@ -80,6 +95,16 @@ export default function MemoriesWindow({
         {state !== "loading" && shown.length === 0 && <p className="m-0 py-6 text-center text-[13px] text-on-surface-variant">{state === "soon" ? SOON_TEXT : state === "error" ? "No se pudieron cargar las memorias." : memories.length === 0 ? "Aún no hay memorias. Se irán sumando con tus decisiones." : "Sin memorias que coincidan"}</p>}
       </div>
       <p className="m-0 text-[12px] leading-[18px] text-on-surface-variant">Las memorias se escriben solo después de una decisión o de un resultado medido. Con un solo caso, el copiloto lo dice y la confianza queda baja.</p>
+      {noting && (
+        <NoteSheet
+          caseId={caseId}
+          onClose={() => setNoting(false)}
+          onSaved={() => {
+            setNoting(false);
+            onNoteSaved?.();
+          }}
+        />
+      )}
     </main>
   );
 }

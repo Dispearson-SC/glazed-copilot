@@ -144,6 +144,11 @@ function CopilotShell() {
       {state.tab === "memorias" && (
         <MemoriesWindow
           storeCode={storeId}
+          caseId={caseId}
+          onNoteSaved={() => {
+            showToast("Nota guardada");
+            void memoryData.refresh();
+          }}
           memories={memories}
           filter={state.memFilter}
           onFilter={(value) => dispatch({ type: "memFilter", value })}
