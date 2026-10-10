@@ -1,7 +1,10 @@
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import AlertsPage from "./pages/AlertsPage";
 import CasesPage from "./pages/CasesPage";
 import HomePage from "./pages/HomePage";
+import LoginPage from "./pages/LoginPage";
+import BottomNav from "./shell/BottomNav";
+import TopBar from "./shell/TopBar";
 import PurchasesPage from "./pages/PurchasesPage";
 import SimControl from "./SimControl";
 import { useSession } from "./SessionContext";
@@ -17,19 +20,12 @@ function StoreRedirect({ to }: { to: "trace" | "purchases" }) {
 
 export default function App() {
   return (
-    <div className="app">
-      <header>
-        <h1>Glazed Copilot</h1>
-        <nav>
-          <NavLink to="/" end>Inicio</NavLink>
-          <NavLink to="/purchases">Compras</NavLink>
-          <NavLink to="/alerts">Alertas</NavLink>
-          <NavLink to="/cases">Casos</NavLink>
-          <NavLink to="/trace">Inspector</NavLink>
-        </nav>
-        <SimControl />
-      </header>
-      <main>
+    <div className="app min-h-screen bg-surface text-on-surface">
+      <TopBar />
+      <main className="pt-20 pb-24 px-margin max-w-3xl mx-auto flex flex-col gap-space-md">
+        <div className="bg-surface-container rounded-[16px] px-space-md py-space-sm text-body-md">
+          <SimControl />
+        </div>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/purchases" element={<StoreRedirect to="purchases" />} />
@@ -38,9 +34,11 @@ export default function App() {
           <Route path="/cases" element={<CasesPage />} />
           <Route path="/trace" element={<StoreRedirect to="trace" />} />
           <Route path="/stores/:storeId/trace" element={<TracePage />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="*" element={<p>Página no encontrada</p>} />
         </Routes>
       </main>
+      <BottomNav />
     </div>
   );
 }
