@@ -62,3 +62,12 @@ def test_transfer_issue_is_pending_and_labelled_in_spanish():
     assert item["recommendation"]["action_type"] == "transfer_stock" and "Trasladar 8 unidades de Prod A a Near" in item["recommendation"]["label"]
     an = client.get(f"/api/v1/cases/{cid}/issues/{item['issue_id']}/analysis").json()
     assert an["title"].startswith("Oportunidad de traslado")
+
+
+def test_transfer_issue_becomes_a_spanish_labelled_liaison_alert():
+    from glazed_backend import application as uc
+    client, cid, h = env()
+    c = client.container
+    uc.AdvanceSimClock(c.cases, c.alerts, c.metrics).detect(cid)
+    (a,) = [x for x in client.get("/api/v1/alerts", params={"store_id": SID}).json() if x["issue"]["kind"] == "transfer_opportunity"]
+    assert a["kind_label_es"] == "Oportunidad de traslado" and a["title_es"] == "Oportunidad de traslado: Prod A" and a["agent_id"] == "liaison"

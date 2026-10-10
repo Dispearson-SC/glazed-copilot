@@ -235,6 +235,7 @@ class ListMemories:
             rows.append(self._row(f"dec-{p.proposal_id}", category_of(p.action_type, None, parts[1] if len(parts) > 2 else None),
                                   approved_text(p.action_type, product, p.params.get("decision_as_of")), "decision_log", True,
                                   day, p.created_at, (p.action_type, sku or p.params.get("supplier_id")), p.case_id))
+        note_texts: list[str] = []
         for m in self.decision_memories.list(store):
             if not in_scope(case, m.case_id, owners):
                 continue
@@ -245,6 +246,7 @@ class ListMemories:
                 continue
             outcome, note = m.memory_id.startswith("out-"), m.memory_id.startswith("note-")
             if note:  # a manager note: his own words, verified by definition
+                note_texts.append(m.text)
                 rows.append(self._row(m.memory_id, m.category, m.text, "gerente", True, day, m.created_at,
                                       ("nota", m.text), m.case_id))
                 continue
@@ -254,7 +256,8 @@ class ListMemories:
         for e in self._experiences(store):
             if e.kind == "outcome" and e.text in own_outcomes:
                 continue  # the same fact as the verified outcome memory
-            if e.kind == "note" and (e.ref or "").startswith("note-"):
+            if (e.kind == "note" and (e.ref or "").startswith("note-")) or \
+                    (e.text.startswith("Nota del gerente (") and any(e.text.endswith(t) for t in note_texts)):
                 continue  # the local manager-note row is the scope-aware copy of this fact
             if not experience_visible(case, e, self.proposals, owners):
                 continue

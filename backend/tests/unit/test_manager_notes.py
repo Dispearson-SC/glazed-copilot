@@ -61,3 +61,13 @@ def test_validation_and_resilience():
     assert ok.status_code == 201 and ok.json()["category"] == "demanda"  # Backboard down: still saved locally
     assert [m["text"] for m in client.get(f"/api/v1/cases/{cid}/memories", params={"category": "demanda"}).json()] == ["Llueve"]
     assert client.get("/internal/v1/experiences", headers=h).json()[0]["kind"] == "note"
+
+
+def test_backboard_copy_without_metadata_is_not_listed_twice():
+    mem = InMemoryExperienceMemory()
+    client, cid, h = env(mem)
+    client.post("/internal/v1/notes", json={"text": "Llueve fuerte"}, headers=h)
+    (exp,) = mem.recall("S030", "")
+    from glazed_backend.domain import Experience
+    mem._d["S030"] = [Experience(exp.text, "memory", "S030")]  # what Backboard returns: kind and ref are lost
+    assert [m["text"] for m in client.get(f"/api/v1/cases/{cid}/memories").json()] == ["Llueve fuerte"]
