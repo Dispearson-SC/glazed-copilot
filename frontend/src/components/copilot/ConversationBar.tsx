@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { dateLabel } from "../../format";
 import { useSession } from "../../SessionContext";
 import { useCopilot } from "../../state/copilotStore";
@@ -56,10 +57,11 @@ export default function ConversationBar({ storeId, children, className = "" }: {
         </button>
       </div>
       {error && <p role="alert" className="m-0 text-center font-label-sm text-label-sm text-on-error-container">{error}</p>}
-      {open && (
-        <div className="fixed inset-0 z-[60]">
-          <div data-testid="conversations-backdrop" className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
-          <div role="dialog" aria-label="Conversaciones anteriores" className="absolute inset-x-0 bottom-0 mx-auto flex max-h-[75vh] max-w-[640px] flex-col rounded-t-[24px] border border-partition/60 bg-elevation p-4 shadow-card">
+      {/* Portal to <body>: the top bar uses backdrop-blur, which makes `fixed` children position against the bar instead of the viewport. */}
+      {open && createPortal(
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div data-testid="conversations-backdrop" className="absolute inset-0 bg-primary-container/40" onClick={() => setOpen(false)} />
+          <div role="dialog" aria-modal="true" aria-label="Conversaciones anteriores" className="relative flex max-h-[80dvh] w-full max-w-[480px] flex-col rounded-[24px] border border-partition/60 bg-elevation p-4 shadow-hero">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="m-0 font-headline-sm text-headline-sm text-primary" style={{ fontFamily: "Inter, 'Playfair Display', serif" }}>Conversaciones</h2>
               <button type="button" aria-label="Cerrar conversaciones" onClick={() => setOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-full bg-transparent p-0 text-on-surface-variant">
@@ -89,7 +91,8 @@ export default function ConversationBar({ storeId, children, className = "" }: {
               ))}
             </ul>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
