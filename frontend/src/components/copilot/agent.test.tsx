@@ -74,7 +74,7 @@ describe("AnalysisCard", () => {
 
 type Chat = ReturnType<typeof useChat>;
 const chatOf = (over: Partial<Chat> = {}): Chat => ({
-  messages: [], status: "idle", stillRunning: false, proposals: [], decisionError: null,
+  messages: [], status: "idle", stillRunning: false, progress: [], proposals: [], decisionError: null,
   send: vi.fn(async () => {}), retry: vi.fn(async () => {}), decide: vi.fn(async () => {}), ...over,
 }) as Chat;
 
@@ -98,6 +98,23 @@ describe("AgentWindow", () => {
     render(<AgentWindow chat={chatOf({ status: "working" })} {...props} />, { wrapper: wrap });
     expect(screen.getByText("Pensando…")).toBeInTheDocument();
     expect(screen.getByText("Esperando respuesta…")).toBeInTheDocument();
+  });
+
+  it("names the agents being consulted while the turn is pending", () => {
+    const progress = [
+      { agent_id: "supply", display_name_es: "Analista de abastecimiento", state: "consulting" as const },
+      { agent_id: "past", display_name_es: "Analista histórico", state: "consulting" as const },
+      { agent_id: "present", display_name_es: "Analista del presente", state: "done" as const },
+    ];
+    render(<AgentWindow chat={chatOf({ status: "working", progress })} {...props} />, { wrapper: wrap });
+    expect(screen.getByText("Consultando a Analista de abastecimiento y Analista histórico…")).toBeInTheDocument();
+    expect(screen.queryByText("Esperando respuesta…")).toBeNull();
+  });
+
+  it("joins three agents with commas and 'y'", () => {
+    const progress = ["A", "B", "C"].map((n) => ({ agent_id: n, display_name_es: n, state: "consulting" as const }));
+    render(<AgentWindow chat={chatOf({ status: "working", progress })} {...props} />, { wrapper: wrap });
+    expect(screen.getByText("Consultando a A, B y C…")).toBeInTheDocument();
   });
 
   it("renders user and assistant bubbles (markdown) with their time", () => {

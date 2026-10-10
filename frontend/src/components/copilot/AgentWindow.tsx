@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useApi } from "../../ApiContext";
 import Markdown from "../../chat/Markdown";
 import { ProposalCard, SUGGESTIONS } from "../../chat/ChatView";
-import { fetchIssueAnalysis, type AnalysisRef, type AnalysisState, type DecisionItem } from "../../data/copilot";
+import { consultingText, fetchIssueAnalysis, type AnalysisRef, type AnalysisState, type DecisionItem } from "../../data/copilot";
 import { clockTime } from "../../format";
 import { useCopilot } from "../../state/copilotStore";
 import type { ChatMessage } from "../../chatHistory";
@@ -155,7 +155,7 @@ export default function AgentWindow({
               <div className="flex items-center gap-2">
                 <AgentOrb size={28} />
                 <span role="status" className="rounded-full border border-surface-container-high bg-white px-3.5 py-2 font-label-md text-label-md normal-case tracking-normal text-on-surface-variant">
-                  {chat.stillRunning ? "El copiloto sigue trabajando…" : "Esperando respuesta…"}
+                  {consultingText(chat.progress) ?? (chat.stillRunning ? "El copiloto sigue trabajando…" : "Esperando respuesta…")}
                 </span>
               </div>
             )}

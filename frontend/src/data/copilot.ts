@@ -2,7 +2,7 @@ import { isUnavailable, type Api } from "../api";
 import { avgTicket, dayMonth, longDate, shiftDate, signedPct, usd, usdWhole, weekdayDay } from "../format";
 import type {
   AlertRecord, DaySummary, DeliveriesResponse, ExpiringResponse, ForecastResponse, InventoryResponse, Issue, IssueAnalysis, Kpis, OrderPlan,
-  DecisionLogEntry, HistoryResponse, Outlook, OutlookDay, PendingResponse, Range3, SupplierPerformance,
+  DecisionLogEntry, HistoryResponse, Outlook, OutlookDay, PendingResponse, Range3, SupplierPerformance, TurnProgress,
 } from "../types";
 
 /**
@@ -159,6 +159,14 @@ export function buildPendingItems(pending: PendingResponse | null, simToday: str
     };
   });
   return [...techs, ...approvals];
+}
+
+/** "Consultando a A y B…" from the turn progress; null when nobody is being consulted. */
+export function consultingText(progress: readonly TurnProgress[]): string | null {
+  const names = progress.filter((p) => p.state === "consulting").map((p) => p.display_name_es);
+  if (names.length === 0) return null;
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} y ${names[names.length - 1]}`;
+  return `Consultando a ${list}…`;
 }
 
 export type AnalysisState =

@@ -371,3 +371,25 @@ describe("useChat message context", () => {
     expect(vi.mocked(api.sendMessage).mock.calls.map((c) => c[2])).toEqual([ctx, ctx]);
   });
 });
+
+describe("useChat turn progress", () => {
+  const consulting = [{ agent_id: "supply", display_name_es: "Analista de abastecimiento", state: "consulting" as const }, { agent_id: "past", display_name_es: "Analista histórico", state: "done" as const }];
+
+  it("exposes the agents being consulted while the turn is pending and clears them when it is done", async () => {
+    const getTurn = vi
+      .fn()
+      .mockResolvedValueOnce({ turn_id: "t1", status: "pending", progress: consulting })
+      .mockResolvedValue({ turn_id: "t1", status: "done", reply: "listo", progress: [] });
+    const { result } = setup(fakeApi({ getTurn }));
+    await act(async () => { void result.current.send("hola"); });
+    await waitFor(() => expect(result.current.progress).toEqual(consulting));
+    await waitFor(() => expect(result.current.status).toBe("idle"));
+    expect(result.current.progress).toEqual([]);
+  });
+
+  it("has no progress when the backend does not send it", async () => {
+    const { result } = setup(fakeApi());
+    await act(async () => { await result.current.send("hola"); });
+    expect(result.current.progress).toEqual([]);
+  });
+});

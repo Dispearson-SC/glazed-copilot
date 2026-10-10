@@ -4,7 +4,7 @@ import { ApiError } from "./api";
 import { buildHistory, buildTurnHistory, type ChatMessage } from "./chatHistory";
 import { parseTraceMessage } from "./parseTraceMessage";
 import { sanitizeReply } from "./sanitize";
-import type { MessageContext, Proposal, TurnRecord } from "./types";
+import type { MessageContext, Proposal, TurnProgress, TurnRecord } from "./types";
 
 export type ChatStatus = "idle" | "working" | "waiting_approval";
 
@@ -58,6 +58,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
   const [local, setLocal] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<ChatStatus>("idle");
   const [stillRunning, setStillRunning] = useState(false);
+  const [progress, setProgress] = useState<TurnProgress[]>([]);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [decisionError, setDecisionError] = useState<Error | null>(null);
   const run = useRef(0); // bumped to cancel any in-flight polling loop
@@ -81,6 +82,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
     setLocal([]);
     setStatus("idle");
     setStillRunning(false);
+    setProgress([]);
     setProposals([]);
     if (!enabled || !caseId) return;
     let alive = true;
@@ -92,11 +94,13 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
       const userText = parseTraceMessage(turn.user_text ?? "").text;
       const fail = (msg: string) => {
         setStillRunning(false);
+        setProgress([]);
         patch(id, { id: `s-${turn.turn_id}-e`, role: "error", text: msg, retryText: userText });
       };
       // Exhausted retries: the turn may still be running, so no resend is offered.
       const unconfirmed = () => {
         setStillRunning(false);
+        setProgress([]);
         patch(id, { id: `s-${turn.turn_id}-e`, role: "error", text: UNCONFIRMED_TEXT });
       };
       const budget = errorBudget(pollMs, errorWindowMs);
@@ -108,8 +112,10 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
           budget.reset();
           if (t.status === "pending") {
             setStillRunning(Boolean(t.still_running));
+            setProgress(t.progress ?? []);
           } else {
             setStillRunning(false);
+            setProgress([]);
             if (t.status === "failed") return fail(t.error || "El copiloto no pudo responder.");
             const raw = t.reply?.trim();
             if (raw && raw !== "None") {
@@ -162,6 +168,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
         addLocal({ role: "error", text: msg, retryText: text });
         setStatus("idle");
         setStillRunning(false);
+        setProgress([]);
       };
       // Exhausted retries: the turn may still be running, so no resend is offered.
       const unconfirmed = () => {
@@ -178,8 +185,10 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
           budget.reset();
           if (t.status === "pending") {
             setStillRunning(Boolean(t.still_running));
+            setProgress(t.progress ?? []);
           } else {
             setStillRunning(false);
+            setProgress([]);
             if (t.status === "failed") return fail(t.error || "El copiloto no pudo responder.");
             if (t.reply) addLocal({ role: "assistant", text: sanitizeReply(t.reply), turnId, meta: t.reply_meta });
             setStatus(t.status === "waiting_approval" ? "waiting_approval" : "idle");
@@ -249,6 +258,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
     messages: [...history, ...local],
     status,
     stillRunning,
+    progress,
     proposals,
     decisionError,
     send,
