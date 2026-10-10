@@ -14,10 +14,11 @@ const Ctx = createContext<Auth>({ user: null, logout: async () => {} });
 
 export const useAuth = () => useContext(Ctx);
 
-/** Managers with a store list only see those stores; admins (and no auth) see all. */
+/** Admins (any store_ids, [] = all) and no-auth see every store; a manager sees only their stores, and none when unassigned. */
 export function scopeStores(stores: Store[], user: AuthUser | null): Store[] {
-  if (!user || user.role !== "manager" || !Array.isArray(user.store_ids) || user.store_ids.length === 0) return stores;
-  return stores.filter((s) => user.store_ids.includes(s.store_id));
+  if (!user || user.role !== "manager") return stores;
+  const allowed = Array.isArray(user.store_ids) ? user.store_ids : [];
+  return stores.filter((s) => allowed.includes(s.store_id));
 }
 
 /** True when the user is pinned to one store: the selector is read-only. */

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ApiProvider } from "./ApiContext";
-import { AuthGate } from "./AuthContext";
+import { AuthGate, scopeStores } from "./AuthContext";
 import App from "./App";
 import { ApiError, type AuthUser } from "./api";
 import { SessionProvider } from "./SessionContext";
@@ -176,5 +176,18 @@ describe("store scoping", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Cambiar sucursal" }));
     const dlg = await screen.findByRole("dialog", { name: "Elegir sucursal" });
     await waitFor(() => expect(dlg.querySelectorAll("li button").length).toBe(2));
+  });
+});
+
+describe("scopeStores fails closed for managers", () => {
+  const stores = [{ store_id: "S001" }, { store_id: "S002" }] as Parameters<typeof scopeStores>[0];
+  it("a manager with no assigned stores sees none", () => {
+    expect(scopeStores(stores, { user_id: "u", email: "m@x", name: "M", role: "manager", store_ids: [] })).toEqual([]);
+  });
+  it("an admin with an empty list sees all stores", () => {
+    expect(scopeStores(stores, { user_id: "a", email: "a@x", name: "A", role: "admin", store_ids: [] })).toHaveLength(2);
+  });
+  it("a manager sees only the assigned stores", () => {
+    expect(scopeStores(stores, { user_id: "u", email: "m@x", name: "M", role: "manager", store_ids: ["S002"] }).map((s) => s.store_id)).toEqual(["S002"]);
   });
 });
