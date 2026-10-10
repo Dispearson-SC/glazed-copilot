@@ -1,6 +1,7 @@
 .PHONY: deps test backend-test cli-test frontend-test api up down load-data seed-memory cli
 PY ?= python3
-COMPOSE = docker compose -f infra/docker-compose.yml $(if $(wildcard .env),--env-file .env,)
+# Always an absolute --env-file: compose reads .env from infra/ otherwise and MINIMAX_API ends up empty.
+COMPOSE = docker compose -f $(CURDIR)/infra/docker-compose.yml $(if $(wildcard $(CURDIR)/.env),--env-file $(CURDIR)/.env,$(warning .env missing: secrets will be empty))
 API_URL ?= http://localhost:8100
 
 deps:
@@ -21,7 +22,7 @@ api:
 
 # Whole stack: Postgres, backend, Agent-Core and its peer worker. Needs .env (see .env.example).
 up:
-	$(COMPOSE) up -d --build
+	$(COMPOSE) up -d --build $(SERVICES)
 down:
 	$(COMPOSE) down
 
