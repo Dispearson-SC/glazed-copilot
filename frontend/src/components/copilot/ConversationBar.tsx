@@ -36,7 +36,7 @@ export default function ConversationBar({ storeId, simToday, caseId }: { storeId
           <div data-testid="conversations-backdrop" className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
           <div role="dialog" aria-label="Conversaciones anteriores" className="absolute inset-x-0 bottom-0 mx-auto flex max-h-[75vh] max-w-[640px] flex-col rounded-t-[24px] border border-partition/60 bg-elevation p-4 shadow-card">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="m-0 font-headline-sm text-headline-sm text-primary" style={{ fontFamily: "'Playfair Display', serif" }}>Conversaciones</h2>
+              <h2 className="m-0 font-headline-sm text-headline-sm text-primary" style={{ fontFamily: "Inter, 'Playfair Display', serif" }}>Conversaciones</h2>
               <button type="button" aria-label="Cerrar conversaciones" onClick={() => setOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-full bg-transparent p-0 text-on-surface-variant">
                 <span aria-hidden="true" className="material-symbols-outlined text-[22px]">close</span>
               </button>

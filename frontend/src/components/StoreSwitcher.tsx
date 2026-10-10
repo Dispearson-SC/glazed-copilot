@@ -82,7 +82,7 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
             aria-label="Elegir sucursal"
             className="absolute inset-x-4 top-[calc(4rem+env(safe-area-inset-top))] mx-auto flex max-h-[70vh] max-w-[480px] flex-col rounded-[20px] border border-partition/60 bg-elevation p-3 shadow-card"
           >
-            <h2 className="mb-2 px-1 font-headline-sm text-headline-sm text-primary" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <h2 className="mb-2 px-1 font-headline-sm text-headline-sm text-primary" style={{ fontFamily: "Inter, 'Playfair Display', serif" }}>
               Sucursales
             </h2>
             <input
