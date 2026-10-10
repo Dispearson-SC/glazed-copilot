@@ -272,6 +272,10 @@ def build_public_router(c: Any) -> APIRouter:
     def case_issues(case_id: str, limit: int = 5, kind: str | None = None, category: str | None = None):
         return uc_manager.select_issues(c.metrics, names, c.served, case_of(case_id), limit, kind, category)
 
+    @r.get("/cases/{case_id}/issues/{issue_id}/analysis")
+    def issue_analysis(case_id: str, issue_id: str):
+        return uc_copilot.IssueAnalysis(c.cases, c.alerts, c.metrics, c.served, names).execute(case_of(case_id), issue_id)
+
     @r.get("/cases/{case_id}/inventory/projection")
     def inventory_projection(case_id: str, sku: str, horizon: int = 7):
         return uc_manager.inventory_projection(c.metrics, case_of(case_id), sku, horizon)

@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from ..domain import Case, DomainError, NotFound
+from ..metrics.analysis import build_analysis, usd  # noqa: F401  (usd is re-exported for the templates' callers)
 
 MODES = ("analizar", "dialogo")
 _INSTRUCTION = {"analizar": "Analyze this issue for the manager.",
@@ -57,3 +58,16 @@ def validate_context(issue: dict[str, Any], option_id: str | None, mode: str) ->
         raise DomainError(f"mode must be one of {', '.join(MODES)}")
     if option_id and not any(o.get("option_id") == option_id for o in issue.get("options", [])):
         raise DomainError(f"unknown option {option_id!r} for issue {issue['issue_id']!r}")
+
+
+ANALYSIS_SOURCE = "issues+options (glazed_metrics_v1)"
+
+
+class IssueAnalysis:
+    def __init__(self, cases: Any, alerts: Any, metrics: Any, served: dict, names: Any) -> None:
+        self.cases, self.alerts, self.metrics, self.served, self.names = cases, alerts, metrics, served, names
+
+    def execute(self, case: Case, issue_id: str) -> dict[str, Any]:
+        issue = require_issue(self.alerts, self.metrics, self.served, case, issue_id)
+        return {"as_of": case.sim_today.isoformat(), "store_id": case.store_id,
+                "store_display_name": self.names.of(case.store_id), "source": ANALYSIS_SOURCE, **build_analysis(issue)}

@@ -11,7 +11,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
-from ...application import forecast as uc_forecast, manager as uc_manager, sentinel
+from ...application import copilot as uc_copilot, forecast as uc_forecast, manager as uc_manager, sentinel
 from .store_names import StoreNames
 from ...domain import Case, DomainError, canonical_agent_id, case_id_from_session
 
@@ -106,6 +106,11 @@ def build_internal_router(c: Any) -> APIRouter:
         `category=integrity` returns integrity issues only; `category=all` returns both, ranked by
         severity_usd (operational) / exposure_usd (integrity)."""
         return uc_manager.select_issues(c.metrics, names, c.served, case, limit, kind, category)
+
+    @r.get("/issues/{issue_id}/analysis")
+    def issue_analysis(case: Ctx, issue_id: str):
+        """Deterministic Spanish analysis of one issue; the same use case as the public route."""
+        return uc_copilot.IssueAnalysis(c.cases, c.alerts, c.metrics, c.served, names).execute(case, issue_id)
 
     def own_case(case: Case, store_id: str | None, as_of: date | None) -> None:
         """store_id and as_of are accepted only as assertions: they may never move the read away from the case."""
