@@ -235,8 +235,9 @@ def test_demo_endpoints_are_404_when_flag_off():
 
 def test_demo_users_lists_active_users_without_secrets():
     c, client = demo()
-    c.users.get_by_email("m01@glazed.demo").active = False
-    c.users.add(c.users.get_by_email("m01@glazed.demo"))
+    u = c.users.get_by_email("m01@glazed.demo")
+    u.active = False
+    c.users.add(u)
     r = client.get("/api/v1/auth/demo-users")
     assert r.status_code == 200 and client.get("/api/v1/health").json()["demo_login"] is True
     rows = r.json()
