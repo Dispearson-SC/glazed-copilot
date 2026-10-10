@@ -5,7 +5,13 @@ export interface Store {
   format: string;
   site_id: string;
   region: string;
+  site_name?: string;
+  site_type?: string;
+  display_name?: string;
 }
+
+/** What users see: site and store, never the code. */
+export const storeLabel = (s: Pick<Store, "name" | "display_name">): string => s.display_name || s.name;
 
 export type CaseMode = "live" | "sandbox" | "backtest";
 

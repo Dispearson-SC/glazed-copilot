@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useApi } from "./ApiContext";
+import { storeLabel } from "./types";
 import type { Store } from "./types";
 
 export function ErrorBox({ error }: { error: Error | null }) {
@@ -36,7 +37,7 @@ export function StoreSelect(props: { stores: Store[]; value: string; onChange: (
       <select value={props.value} onChange={(e) => props.onChange(e.target.value)}>
         {props.stores.map((s) => (
           <option key={s.store_id} value={s.store_id}>
-            {s.store_id} - {s.name}
+            {storeLabel(s)}
           </option>
         ))}
       </select>

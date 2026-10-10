@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useApi } from "../ApiContext";
-import { ErrorBox } from "../components";
+import { ErrorBox, useStores } from "../components";
 import { AGENTS, groupByLane, sortByTs, summarizePayload } from "../trace";
+import { storeLabel } from "../types";
 import type { Case, TraceEvent, TurnStatus } from "../types";
 import { usePolling } from "../usePolling";
 
@@ -48,6 +49,9 @@ function Lanes({ events }: { events: TraceEvent[] }) {
 export default function TracePage() {
   const api = useApi();
   const { storeId = "" } = useParams();
+  const { stores } = useStores();
+  const found = stores.find((s) => s.store_id === storeId);
+  const storeName = found ? storeLabel(found) : "…";
   const [params, setParams] = useSearchParams();
   const turnId = params.get("turn");
   const [cases, setCases] = useState<Case[]>([]);
@@ -97,7 +101,7 @@ export default function TracePage() {
 
   return (
     <section>
-      <h2>Inspector de agentes - {storeId}</h2>
+      <h2>Inspector de agentes - {storeName}</h2>
       <label>
         Caso{" "}
         <select

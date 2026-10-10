@@ -20,6 +20,13 @@ describe("AlertsPage", () => {
     expect(api.listAlerts).toHaveBeenCalledWith({ store_id: "S030" });
   });
 
+  it("offers stores by display name, not by code", async () => {
+    open();
+    await screen.findByTestId("alert-a1");
+    expect(screen.getByRole("option", { name: "Aeropuerto Norte · Glazed Centro" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /S030/ })).toBeNull();
+  });
+
   it("reloads alerts when the store changes", async () => {
     const api = fakeApi();
     open(api);

@@ -5,8 +5,10 @@ import { ApiProvider } from "../ApiContext";
 import type { Api } from "../api";
 import type { Alert, Case, Proposal, Store, TraceEvent } from "../types";
 
-export const store: Store = { store_id: "S030", name: "Glazed Centro", format: "mall", site_id: "X", region: "N" };
-export const store2: Store = { store_id: "S031", name: "Glazed Norte", format: "street", site_id: "Y", region: "N" };
+export const store: Store = { store_id: "S030", name: "Glazed Centro", format: "mall", site_id: "X", region: "N",
+  site_name: "Aeropuerto Norte", site_type: "Airport", display_name: "Aeropuerto Norte · Glazed Centro" };
+export const store2: Store = { store_id: "S031", name: "Glazed Norte", format: "street", site_id: "Y", region: "N",
+  site_name: "Plaza Sur", site_type: "Mall", display_name: "Plaza Sur · Glazed Norte" };
 
 export const caseA: Case = {
   case_id: "c1", store_id: "S030", sim_today: "2026-03-01", mode: "live",

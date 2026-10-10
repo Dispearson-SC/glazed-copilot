@@ -16,6 +16,12 @@ const open = (api = fakeApi({ getTrace: vi.fn(async () => events) }), search = "
 describe("TracePage", () => {
   afterEach(() => vi.useRealTimers());
 
+  it("shows the store by its display name, not its code", async () => {
+    open();
+    expect(await screen.findByRole("heading", { name: /Aeropuerto Norte · Glazed Centro/ })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /S030/ })).toBeNull();
+  });
+
   it("lists the store's cases and loads the trace of the first", async () => {
     const api = fakeApi({ getTrace: vi.fn(async () => events) });
     open(api);
