@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
 import type { ChatMessage } from "../chatHistory";
 import type { Proposal } from "../types";
 import type { useChat } from "../useChat";
@@ -26,13 +25,13 @@ function MetaChip({ meta }: { meta: NonNullable<ChatMessage["meta"]> }) {
   );
 }
 
-function Bubble({ m, traceBase, onRetry }: { m: ChatMessage; traceBase: string; onRetry: () => void }) {
+function Bubble({ m, onRetry }: { m: ChatMessage; onRetry: () => void }) {
   if (m.role === "user") {
     return (
       <div className="flex justify-end">
         <div className="max-w-[85%] rounded-[16px] rounded-br-[6px] bg-secondary text-surface-container-lowest px-4 py-2.5">
           <p className="font-body-md text-body-md whitespace-pre-wrap">{m.text}</p>
-          {m.truncated && <p className="font-label-sm text-label-sm opacity-70">…(recortado, ver razonamiento)</p>}
+          {m.truncated && <p className="font-label-sm text-label-sm opacity-70">…(recortado)</p>}
         </div>
       </div>
     );
@@ -45,7 +44,6 @@ function Bubble({ m, traceBase, onRetry }: { m: ChatMessage; traceBase: string; 
       </div>
     );
   }
-  const href = m.turnId ? `${traceBase}&turn=${m.turnId}` : traceBase;
   return (
     <div className="flex justify-start gap-2">
       <div className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-secondary flex-shrink-0 mt-1">
@@ -54,7 +52,7 @@ function Bubble({ m, traceBase, onRetry }: { m: ChatMessage; traceBase: string; 
       <div className="max-w-[85%] rounded-[16px] rounded-bl-[6px] bg-surface border border-surface-container px-4 py-2.5">
         <p className="font-body-md text-body-md text-on-surface whitespace-pre-wrap">{m.text}</p>
         {m.truncated && (
-          <p className="font-label-sm text-label-sm text-on-surface-variant">…(recortado, ver razonamiento)</p>
+          <p className="font-label-sm text-label-sm text-on-surface-variant">…(recortado)</p>
         )}
         {m.steps && m.steps.length > 0 && (
           <details className="mt-1 font-label-sm text-label-sm text-on-surface-variant">
@@ -65,7 +63,6 @@ function Bubble({ m, traceBase, onRetry }: { m: ChatMessage; traceBase: string; 
           </details>
         )}
         {m.meta && <MetaChip meta={m.meta} />}
-        <Link to={href} className="font-label-sm text-label-sm text-secondary underline">Ver razonamiento</Link>
       </div>
     </div>
   );
@@ -116,7 +113,7 @@ function ProposalCard({ p, onDecide }: { p: Proposal; onDecide: Chat["decide"] }
 }
 
 /** Conversation, suggestions and composer shared by the full page and the floating panel. */
-export default function ChatView({ chat, traceBase, compact = false }: { chat: Chat; traceBase: string; compact?: boolean }) {
+export default function ChatView({ chat, compact = false }: { chat: Chat; compact?: boolean }) {
   const [draft, setDraft] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
   const busy = chat.status === "working";
@@ -140,10 +137,10 @@ export default function ChatView({ chat, traceBase, compact = false }: { chat: C
         className={`flex flex-col gap-space-sm ${compact ? "p-space-md overflow-y-auto" : "bg-surface-container-lowest rounded-[18px] p-space-md shadow-sm shadow-primary/5 border border-surface-container min-h-[320px]"}`}
       >
         {chat.messages.map((m) => (
-          <Bubble key={m.id} m={m} traceBase={traceBase} onRetry={() => void chat.retry(m.retryText)} />
+          <Bubble key={m.id} m={m} onRetry={() => void chat.retry(m.retryText)} />
         ))}
         {chat.proposals.map((p) => <ProposalCard key={p.proposal_id} p={p} onDecide={chat.decide} />)}
-        {chat.decisionError && <div role="alert" className="error">{chat.decisionError.message}</div>}
+        {chat.decisionError && <div role="alert" className="rounded-[14px] bg-error-container text-on-error-container px-4 py-2.5 font-body-md text-body-md">{chat.decisionError.message}</div>}
         {busy && (
           <p role="status" className="font-label-sm text-label-sm text-on-surface-variant">
             {chat.stillRunning ? "El copiloto sigue trabajando…" : "Esperando respuesta…"}

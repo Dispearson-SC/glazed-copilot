@@ -47,7 +47,7 @@ const errorBudget = (pollMs: number, windowMs: number) => {
 /** A finished turn is never pending, whatever its reply: only the backend status says it is still running. */
 const isPendingTurn = (t: TurnRecord) => t.status === "pending";
 
-const NO_TEXT_REPLY = "El copiloto terminó sin respuesta de texto. Revisa el razonamiento.";
+const NO_TEXT_REPLY = "El copiloto terminó sin respuesta de texto.";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

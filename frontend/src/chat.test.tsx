@@ -22,7 +22,7 @@ const open = (path: string, api = fakeApi()) =>
 describe("chat route and nav", () => {
   it("adds a Chat entry to the bottom nav", async () => {
     open("/");
-    expect(await screen.findByRole("link", { name: "Chat" })).toHaveAttribute("href", "/chat");
+    expect(await screen.findByRole("link", { name: /Chat/ })).toHaveAttribute("href", "/chat");
   });
 
   it("serves the full chat at /chat with store name, sim date and suggestion chips", async () => {
@@ -34,7 +34,7 @@ describe("chat route and nav", () => {
     expect(screen.getByRole("button", { name: "¿Qué alertas son urgentes?" })).toBeInTheDocument();
   });
 
-  it("sends a chip question, shows the reply with a fast chip and a reasoning link", async () => {
+  it("sends a chip question and shows the reply with a fast chip, without a reasoning link", async () => {
     const api = fakeApi({
       getTurn: vi.fn(async () => ({
         turn_id: "t1", status: "done", reply: "Pide 40", reply_meta: { source: "fast", elapsed_ms: 1500 },
@@ -47,9 +47,7 @@ describe("chat route and nav", () => {
     expect(api.sendMessage).toHaveBeenCalledWith("c1", "¿Qué tengo que pedir hoy?");
     expect(screen.getByText("Respuesta rápida")).toBeInTheDocument();
     expect(screen.getByText(/1\.5 s/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Ver razonamiento" })).toHaveAttribute(
-      "href", "/stores/S030/trace?case=c1&turn=t1",
-    );
+    expect(screen.queryByRole("link", { name: /razonamiento/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "¿Qué tengo que pedir hoy?" })).not.toBeInTheDocument();
   });
 
@@ -72,7 +70,7 @@ describe("chat route and nav", () => {
     open("/chat", api);
     expect(await screen.findByText("¿cómo vamos?")).toBeInTheDocument();
     expect(screen.getByText("Bien")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Ver razonamiento" })).toHaveAttribute("href", "/stores/S030/trace?case=c1");
+    expect(screen.queryByRole("link", { name: /razonamiento/i })).not.toBeInTheDocument();
     expect(screen.queryByText("oculto")).not.toBeInTheDocument();
   });
 
@@ -86,7 +84,7 @@ describe("chat route and nav", () => {
     });
     open("/chat", api);
     expect(await screen.findByText("Pide 40 y además")).toBeInTheDocument();
-    expect(screen.getByText("…(recortado, ver razonamiento)")).toBeInTheDocument();
+    expect(screen.getByText("…(recortado)")).toBeInTheDocument();
     expect(screen.getByText(/pasos intermedios/i)).toBeInTheDocument();
   });
 

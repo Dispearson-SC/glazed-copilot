@@ -94,7 +94,7 @@ export default function LoginPage() {
             className="w-full py-3.5 px-space-md bg-secondary text-surface-container-lowest font-body-md text-body-md font-semibold rounded-full flex items-center justify-center gap-2 shadow-md shadow-secondary/20 hover:bg-primary transition-all active:scale-[0.98] disabled:opacity-60"
           >
             <span aria-hidden="true" className="material-symbols-outlined text-[20px]">login</span>
-            Entrar
+            Entrar al resumen
           </button>
         </form>
       </section>

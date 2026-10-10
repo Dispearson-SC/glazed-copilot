@@ -30,9 +30,9 @@ export default function ChatPage() {
         </div>
       </div>
       {!currentCase ? (
-        <p className="muted">{loading ? "Cargando caso…" : "Sin caso activo para esta sucursal"}</p>
+        <p className="text-on-surface-variant font-body-md text-body-md">{loading ? "Cargando caso…" : "Sin caso activo para esta sucursal"}</p>
       ) : (
-        <ChatView chat={chat} traceBase={`/stores/${storeId}/trace?case=${caseId}`} />
+        <ChatView chat={chat} />
       )}
     </section>
   );

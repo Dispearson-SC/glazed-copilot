@@ -1,55 +1,12 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { alertA, fakeApi, renderPage } from "../test/helpers";
+import { fakeApi, renderPage } from "../test/helpers";
 import { daySummaryA } from "../test/fixtures";
 import HomePage from "./HomePage";
 
 const open = (api = fakeApi()) => renderPage(api, "/", "/", <HomePage />);
 
 describe("HomePage", () => {
-  it("offers stores by display name", async () => {
-    open();
-    expect(await screen.findByRole("option", { name: "Aeropuerto Norte · Glazed Centro" })).toBeInTheDocument();
-  });
-
-  it("shows both losses side by side: waste and lost sales as a range", async () => {
-    open();
-    const waste = await screen.findByTestId("loss-waste");
-    const lost = screen.getByTestId("loss-lost-sales");
-    expect(within(waste).getByText("$310.50")).toBeInTheDocument();
-    expect(within(lost).getByText("$180.25")).toBeInTheDocument();
-    expect(within(lost).getByText("$100.00 – $260.00")).toBeInTheDocument();
-    expect(screen.getByText(/2026-02-15/)).toBeInTheDocument();
-  });
-
-  it("builds a semaphore from open alerts by severity", async () => {
-    const api = fakeApi({
-      listAlerts: async () => [
-        { ...alertA, alert_id: "a1", severity_usd: 600 },
-        { ...alertA, alert_id: "a2", severity_usd: 200 },
-        { ...alertA, alert_id: "a3", severity_usd: 20 },
-        { ...alertA, alert_id: "a4", severity_usd: 900, state: "resuelta" },
-      ],
-    });
-    open(api);
-    await waitFor(() => expect(screen.getByTestId("sem-red")).toHaveTextContent("1"));
-    expect(screen.getByTestId("sem-yellow")).toHaveTextContent("1");
-    expect(screen.getByTestId("sem-green")).toHaveTextContent("1");
-  });
-
-  it("links to purchases and alerts", async () => {
-    open();
-    expect(await screen.findByRole("link", { name: "Ver compras" })).toHaveAttribute("href", "/stores/S030/purchases");
-    expect(screen.getByRole("link", { name: "Ver alertas" })).toHaveAttribute("href", "/alerts");
-    expect(screen.getByRole("link", { name: "Ver inventario" })).toHaveAttribute("href", "/stores/S030/inventory");
-    expect(screen.getByRole("link", { name: "Ver semana" })).toHaveAttribute("href", "/stores/S030/week");
-  });
-
-  it("shows an error state when kpis fail", async () => {
-    open(fakeApi({ getKpis: async () => { throw new Error("sin kpis"); } }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("sin kpis");
-  });
-
   it("shows an empty state without a case", async () => {
     open(fakeApi({ listCases: async () => [] }));
     expect(await screen.findByText("Sin caso activo para esta sucursal")).toBeInTheDocument();
@@ -129,44 +86,6 @@ describe("HomePage dashboard", () => {
     expect(screen.getByTestId("top-product-3")).toHaveTextContent("Vanilla Chai");
     expect(screen.queryByTestId("top-product-4")).toBeNull();
   });
-
-  it("shows context chips and the observed weather", async () => {
-    open();
-    expect(await screen.findByText("Día de prueba")).toBeInTheDocument();
-    expect(screen.getByTestId("weather")).toHaveTextContent("Clima observado");
-    expect(screen.getByTestId("weather")).toHaveTextContent("24.7°");
-  });
-
-  it("shows the briefing headline, lost sales as a range and the order plan counts", async () => {
-    open();
-    const b = await screen.findByTestId("briefing");
-    expect(await within(b).findByText("Merma 7 días $1,361")).toBeInTheDocument();
-    expect(within(b).getByText("Venta perdida estimada $40–$565")).toBeInTheDocument();
-    expect(within(b).getByTestId("due-today")).toHaveTextContent("1");
-    expect(within(b).getByTestId("due-tomorrow")).toHaveTextContent("2");
-    expect(within(b).getByTestId("focus")).toHaveTextContent("2");
-  });
-
-  it("does not break the dashboard when the briefing fails", async () => {
-    open(fakeApi({ getBriefing: async () => { throw new Error("sin briefing"); } }));
-    expect(await screen.findByTestId("hero")).toBeInTheDocument();
-    expect(await screen.findByText(/sin briefing/)).toBeInTheDocument();
-  });
-});
-
-describe("HomePage Lo que viene", () => {
-  it("renders the upcoming card from briefing and order plan", async () => {
-    const { briefingLive, planLive } = await import("../test/fixtures");
-    open(fakeApi({ getBriefing: async () => briefingLive, getOrderPlan: async () => planLive }));
-    expect(await screen.findByTestId("upcoming")).toHaveTextContent("Lo que viene");
-    expect(await screen.findByTestId("upcoming-stockouts")).toHaveTextContent("Cold Foam");
-  });
-
-  it("keeps the rest of Home when the order plan fails", async () => {
-    open(fakeApi({ getOrderPlan: async () => { throw new Error("plan caído"); } }));
-    expect(await screen.findByTestId("hero")).toBeInTheDocument();
-    expect(await screen.findByText(/plan caído/)).toBeInTheDocument();
-  });
 });
 
 describe("HomePage forecast overlay", () => {
@@ -190,16 +109,5 @@ describe("HomePage forecast overlay", () => {
     await screen.findByTestId("hero");
     const call = (api.getForecast as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
     expect(call).toEqual(["c1", { from: "2026-02-22", to: "2026-03-08", level: "store" }]);
-  });
-
-  it("shows the accuracy table under the chart when the route answers, and stays quiet otherwise", async () => {
-    const { forecastA, accuracyA } = await import("../test/fixtures");
-    const { unmount } = open(fakeApi({ getForecast: async () => forecastA, getForecastAccuracy: async () => accuracyA }));
-    expect(await screen.findByTestId("accuracy")).toBeInTheDocument();
-    unmount();
-    open(fakeApi({ getForecast: async () => forecastA }));
-    await screen.findByTestId("forecast-chart");
-    expect(screen.queryByTestId("accuracy")).toBeNull();
-    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

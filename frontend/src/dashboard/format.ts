@@ -1,4 +1,6 @@
-import { usd } from "../issues";
+
+/** US dollars with two decimals (the backend reports USD). */
+export const usd = (n: number): string => `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`;
 
 const DAY_MS = 86_400_000;
 

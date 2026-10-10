@@ -31,7 +31,7 @@ export default function FloatingChat({ storeId, caseId, storeName, simToday }: {
             </button>
           </div>
           <div className="flex flex-col gap-space-xs overflow-y-auto p-space-sm">
-            <ChatView chat={chat} compact traceBase={`/stores/${storeId}/trace?case=${caseId}`} />
+            <ChatView chat={chat} compact />
             <Link to="/chat" className="flex items-center justify-center gap-1 font-label-sm text-label-sm text-secondary">
               <span aria-hidden="true" className="material-symbols-outlined text-[14px]">open_in_full</span>
               Abrir chat completo

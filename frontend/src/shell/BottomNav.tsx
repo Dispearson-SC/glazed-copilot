@@ -1,13 +1,9 @@
 import { NavLink } from "react-router-dom";
 
 const ITEMS = [
-  { to: "/", label: "Inicio", icon: "home", end: true },
-  { to: "/purchases", label: "Compras", icon: "shopping_cart", end: false },
-  { to: "/decisions", label: "Decisiones", icon: "fact_check", end: false },
-  { to: "/alerts", label: "Alertas", icon: "notifications_active", end: false },
-  { to: "/cases", label: "Casos", icon: "forum", end: false },
-  { to: "/chat", label: "Chat", icon: "smart_toy", end: false },
-  { to: "/trace", label: "Inspector", icon: "account_tree", end: false },
+  { to: "/", label: "Resumen", icon: "dashboard", end: true },
+  { to: "/chat", label: "Chat", icon: "chat", end: false },
+  { to: "/login", label: "Sucursal", icon: "storefront", end: false },
 ];
 
 export default function BottomNav() {

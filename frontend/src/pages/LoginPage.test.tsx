@@ -58,7 +58,7 @@ describe("LoginPage (store and case picker)", () => {
   it("stores the choice in the session and goes home", async () => {
     open();
     await screen.findByRole("option", { name: "Caso uno" });
-    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+    await userEvent.click(screen.getByRole("button", { name: "Entrar al resumen" }));
     expect(await screen.findByTestId("home")).toHaveTextContent("home:S030:c1");
   });
 

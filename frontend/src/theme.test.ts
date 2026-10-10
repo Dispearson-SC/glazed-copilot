@@ -34,13 +34,12 @@ describe("Artisanal Roast theme", () => {
   });
 });
 
-describe("legacy pages restyle", () => {
-  it("uses theme tokens instead of the old hard-coded palette", () => {
+describe("legacy css layer", () => {
+  it("is gone: only the design base and utilities remain", () => {
     const css = readFileSync("src/index.css", "utf8");
     expect(css).not.toContain("#c2185b");
-    expect(css).toMatch(/\.card[\s\S]*@apply[^;]*bg-surface-container-lowest/);
-    expect(css).toMatch(/\.badge[\s\S]*@apply/);
-    expect(css).toMatch(/button[\s\S]*@apply[^;]*rounded-full/);
-    expect(() => readFileSync("src/legacy.css")).toThrow();
+    expect(css).not.toMatch(/\.card|\.badge|main button/);
+    expect(css).toContain(".pb-safe");
+    expect(css).toContain(".pt-safe");
   });
 });
