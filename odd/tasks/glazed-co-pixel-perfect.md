@@ -51,3 +51,4 @@ Strict. Runner: `cd frontend && npm test -- --run`; plus `npm run build`.
 - T2 commit c3be50f.
 - T3 commit 2e04877.
 - T4 commit 30607e5.
+- T5 commit 88a0d22 (also holds the chart actuals fix, tests and README).
