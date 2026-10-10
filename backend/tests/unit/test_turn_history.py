@@ -46,7 +46,7 @@ def test_turns_come_back_ordered_by_ts_with_the_full_reply_not_clipped(env):
     assert [t["turn_id"] for t in out] == [t1, t2]
     assert out[0]["user_text"] == "primera" and out[0]["reply"] == long_reply and len(out[0]["reply"]) > 2000
     assert out[0]["status"] == "done" and out[0]["ts"] < out[1]["ts"]
-    assert "reply_meta" not in out[0]
+    assert out[0]["reply_meta"] == {"sanitized": True}  # every final reply is marked as sanitized
 
 
 def test_reply_goes_through_the_reply_sanitizer(env):
@@ -121,7 +121,8 @@ def test_turns_that_only_exist_in_the_core_transcript_are_backfilled(env):
                          {"entry_id": "e2", "turn_id": "old1", "kind": "agent_message",
                           "at": "2026-03-09T10:00:05+00:00", "payload": {"content": "borrador"}}]
     (turn,) = client.get(f"/api/v1/cases/{cid}/turns").json()
-    assert turn == {"turn_id": "old1", "ts": turn["ts"], "user_text": "pregunta vieja", "reply": "vieja", "status": "done"}
+    assert turn == {"turn_id": "old1", "ts": turn["ts"], "user_text": "pregunta vieja", "reply": "vieja", "status": "done",
+                    "reply_meta": {"sanitized": True}}
     assert turn["ts"].startswith("2026-03-09T10:00:00")
 
 

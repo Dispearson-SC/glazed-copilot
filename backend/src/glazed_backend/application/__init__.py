@@ -108,6 +108,10 @@ class AskAgent:
         return turn_id
 
 
+REWRITE_PROMPT = ("Rewrite your previous answer as one clean final answer for the manager, no drafts, no internal names. "
+                  "Reescribe tu respuesta anterior como una sola respuesta final limpia para el gerente, en español, "
+                  "sin borradores y sin nombres internos.")
+REWRITE_TIMEOUT_S = 300.0
 _LIVE_STATUSES = ("running", "waiting", "started", "pending", "queued")
 
 
@@ -130,20 +134,93 @@ class GetTurn:
         return (self.clock.now() - started).total_seconds() if started else None
 
     def execute(self, case_id: str, turn_id: str) -> dict[str, Any]:
-        out = self._poll(_case(self.cases, case_id), turn_id)
-        self._persist(turn_id, out)
+        case = _case(self.cases, case_id)
+        rec = self.turns.get(turn_id) if self.turns is not None else None
+        if rec is not None and rec.status == "done" and rec.reply is not None and rec.reply_meta:
+            return self._stored(turn_id, rec)  # final and already judged: stable, never rewritten again
+        meta: dict[str, Any] = {}
+        out = self._poll(case, turn_id, meta)
+        self._persist(turn_id, out, meta)
         return out
 
-    def _persist(self, turn_id: str, out: dict[str, Any]) -> None:
+    @staticmethod
+    def _stored(turn_id: str, rec: TurnRecord) -> dict[str, Any]:
+        out: dict[str, Any] = {"turn_id": turn_id, "status": "done", "reply": rec.reply}
+        if rec.reply_meta and rec.reply_meta.get("rewritten"):
+            out["reply_meta"] = {"rewritten": True, "sanitized": True}
+        return out
+
+    def _persist(self, turn_id: str, out: dict[str, Any], meta: dict[str, Any]) -> None:
         """Keep the final status and the FULL sanitized reply (history reads it from here, not from /trace)."""
-        if self.turns is None or out.get("status") not in ("done", "failed"):
+        if self.turns is None:
             return
         rec = self.turns.get(turn_id)
-        if rec is not None and not rec.final:
+        if rec is None or rec.final:
+            return
+        if out.get("status") in ("done", "failed"):
             rec.status, rec.reply, rec.error = out["status"], out.get("reply"), out.get("error")
+            if out["status"] == "done" and meta:
+                rec.reply_meta = {**(rec.reply_meta or {}), **meta}
+                rec.reply_meta.pop("rewrite_turn_id", None)
+            self.turns.add(rec)
+        elif meta.get("rewrite_turn_id"):
+            rec.reply_meta = {**(rec.reply_meta or {}), **meta}
             self.turns.add(rec)
 
-    def _poll(self, case: Case, turn_id: str) -> dict[str, Any]:
+    def _finish(self, case: Case, turn_id: str, text: str, meta: dict[str, Any]) -> dict[str, Any]:
+        """The turn finished: sanitize; if the reply still looks contaminated ask the Core for ONE rewrite in the same
+        conversation and keep the cleaner of the two. The rewrite id lives in the stored turn, which is the guard."""
+        out: dict[str, Any] = {"turn_id": turn_id, "status": "done"}
+        cleaning = clean_reply(text)
+        rec = self.turns.get(turn_id) if self.turns is not None else None
+        rewrite_id = (rec.reply_meta or {}).get("rewrite_turn_id") if rec is not None else None
+        rewritten = None
+        if rec is not None and rewrite_id is None and cleaning.contaminated and case.core_conversation_id and self.clock:
+            try:
+                new_id_ = self.core.send_turn(case.core_conversation_id, case.store_id, REWRITE_PROMPT)
+            except Exception:  # noqa: BLE001 - cannot ask: deliver what we have
+                new_id_ = None
+            if new_id_:
+                if self.tracker:
+                    self.tracker.started(new_id_, self.clock.now())
+                meta["rewrite_turn_id"] = new_id_
+                return {"turn_id": turn_id, "status": "pending", "rewriting": True}
+        if rewrite_id is not None:
+            second = self._rewrite_result(case, str(rewrite_id))
+            if second is None:
+                return {"turn_id": turn_id, "status": "pending", "rewriting": True}
+            alt = clean_reply(second) if second else None
+            rewritten = False
+            if alt is not None and alt.text.strip() and alt.score < cleaning.score:
+                cleaning, rewritten = alt, True
+        out["reply"] = cleaning.text
+        if cleaning.removed:  # auditable: what was dropped from the model's reply
+            out["sanitized"], out["sanitized_fragments"] = True, cleaning.removed
+        meta["sanitized"] = True
+        if rewritten is not None:
+            meta["rewritten"] = rewritten
+        if cleaning.contaminated:
+            meta["contaminated"] = True
+        if rewritten:
+            out["reply_meta"] = {"rewritten": True, "sanitized": True}
+        return out
+
+    def _rewrite_result(self, case: Case, rewrite_id: str) -> str | None:
+        """Text of the rewrite turn, "" when it failed or took too long (keep the original), None while it runs."""
+        age = self._age(rewrite_id)
+        try:
+            raw = self.core.get_turn(rewrite_id, case.store_id)
+        except Exception:  # noqa: BLE001 - 404 while queued, or Core down
+            return None if age is not None and age < self.grace_s else ""
+        status = str(raw.get("status", "")).lower()
+        if status == "finished":
+            text = raw.get("reply", raw.get("text"))
+            return text if isinstance(text, str) else ""
+        if status in ("failed", "error") or (age is not None and age > REWRITE_TIMEOUT_S):
+            return ""
+        return None
+
+    def _poll(self, case: Case, turn_id: str, meta: dict[str, Any]) -> dict[str, Any]:
         age = self._age(turn_id)
         try:
             raw = self.core.get_turn(turn_id, case.store_id)
@@ -155,13 +232,9 @@ class GetTurn:
         core_status = str(raw.get("status", "")).lower()
         text = raw.get("reply", raw.get("text"))
         if core_status == "finished":
-            out["status"] = "done"
-            if text is not None:
-                reply, removed = sanitize_reply(text) if isinstance(text, str) else (text, [])
-                out["reply"] = reply
-                if removed:  # auditable: what was dropped from the model's reply
-                    out["sanitized"], out["sanitized_fragments"] = True, removed
-            return out
+            if not isinstance(text, str):
+                return {**out, "status": "done", **({"reply": text} if text is not None else {})}
+            return self._finish(case, turn_id, text, meta)
         if core_status in ("failed", "error"):
             return {**out, "status": "failed", "error": raw.get("error") or text or "Agent-Core reported a failed turn"}
         overdue = age is not None and age > self.timeout_s
@@ -228,6 +301,8 @@ class ListTurns:
             tid = str(e.get("turn_id") or "")
             if e.get("kind") != "user_message" or not tid or self.turns.get(tid) is not None:
                 continue
+            if _message_text(dict(e.get("payload") or {})).startswith(REWRITE_PROMPT[:40]):
+                continue  # our own rewrite request is not a manager message
             self.turns.add(TurnRecord(tid, case.case_id, case.store_id, datetime.fromisoformat(str(e["at"])),
                                       _message_text(dict(e.get("payload") or {}))))
 
