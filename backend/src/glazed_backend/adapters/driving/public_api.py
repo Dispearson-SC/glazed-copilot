@@ -8,7 +8,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
-from ...application import copilot as uc_copilot, decisions as uc_decisions, outcomes as uc_outcomes, forecast as uc_forecast, manager as uc_manager, notes as uc_notes, sentinel
+from ...application import copilot as uc_copilot, decisions as uc_decisions, outcomes as uc_outcomes, forecast as uc_forecast, manager as uc_manager, notes as uc_notes, sentinel, transfers as uc_transfers
 from ...domain import AlertState, DomainError, NotFound
 from ...domain.models import alert_agent, alert_category
 from .store_names import StoreNames
@@ -375,6 +375,10 @@ def build_public_router(c: Any) -> APIRouter:
     def memories(case_id: str, category: str | None = None, q: str | None = None):
         return uc_copilot.ListMemories(c.cases, c.proposals, c.metrics, c.memory, c.decision_memories, c.clock).execute(
             case_of(case_id), category, q)
+
+    @r.get("/cases/{case_id}/transfers/options")
+    def transfer_options(case_id: str, sku: str | None = None, limit: int | None = None):
+        return jsonable_encoder(uc_transfers.TransferOptions(c.metrics).execute(case_of(case_id), sku, limit))
 
     @r.post("/cases/{case_id}/notes", status_code=201)
     def post_note(case_id: str, b: NoteBody):

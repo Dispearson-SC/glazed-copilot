@@ -21,7 +21,8 @@ _TITLES = {"stockout_risk": "Riesgo de desabasto", "overstock_waste": "Sobreinve
            "staffing": "Personal", "misleading_promo": "Promoción engañosa", "promo": "Promoción",
            "calendar_uplift": "Efecto de calendario", "supplier_variability": "Proveedor variable",
            "short_shipment": "Entrega incompleta", "sku_key_mismatch": "Inconsistencia de SKU", "orphan_sku": "SKU huérfano",
-           "compliance_deviation": "Desviación de cumplimiento"}
+           "compliance_deviation": "Desviación de cumplimiento",
+           "transfer_opportunity": "Oportunidad de traslado"}
 _RISKS = [
     (re.compile(r"Supplier late on (\d+%) of orders\."), r"El proveedor se retrasa en \1 de los pedidos."),
     (re.compile(r"May leave ~\$([\d,.]+) of waste\."), r"Puede dejar ~$\1 de merma."),
@@ -59,7 +60,8 @@ def label(o: dict[str, Any], issue: dict[str, Any]) -> str:
         return f"Rebajar {name} {p.get('discount_pct', '')}% al cierre ({p.get('units', '?')} unidades)".replace("  ", " ")
     if at == "do_nothing":
         return "No hacer nada"
-    return {"run_promo": f"Lanzar promoción en {name}", "transfer_stock": f"Transferir inventario de {name}",
+    return {"run_promo": f"Lanzar promoción en {name}", "transfer_stock": (f"Trasladar {int(qty)} unidades de {name} a {p.get('to_store_name') or p['to_store']}" if qty is not None and p.get("to_store")
+                                      else f"Transferir inventario de {name}"),
             "shift_staff_hours": "Mover horas de personal", "data_fix_task": "Corregir el dato en el sistema"}.get(at, at)
 
 
@@ -84,6 +86,9 @@ def problem_text(issue: dict[str, Any]) -> str:
         return f"El pedido de {name} ({_ev(issue, 'ordered_qty')} unidades) es mayor al necesario: {target}; el costo esperado es {sev}."
     if kind == "late_delivery":
         return f"Hay {_ev(issue, 'overdue_lines')} líneas vencidas de {name}, con hasta {_ev(issue, 'max_days_late')} días de retraso; exposición {sev}."
+    if kind == "transfer_opportunity":
+        top = next((o for o in issue.get("options") or [] if o.get("action_type") == "transfer_stock"), None)
+        return (top or {}).get("rationale_es") or f"Hay unidades de {name} que se perderían y otra tienda las necesita; valen {sev}."
     return f"{_TITLES.get(kind, str(kind).replace('_', ' '))}: {name}. Impacto estimado {sev}."
 
 

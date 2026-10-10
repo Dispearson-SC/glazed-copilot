@@ -61,6 +61,17 @@ class FakeMetrics:
     promos: list = []  # promotions rows
     staff: list = []  # {store_id, date, transactions, staff_hours}
     projections: dict = {}  # sku -> inventory_projection override
+    transfers: dict | None = None  # served by transfer_options (filtered by sku, cut by limit)
+
+    def transfer_options(self, store_id, as_of, sku=None, limit=5):
+        self.calls.append(("transfer_options", store_id, as_of, sku))
+        base = self.transfers or {"options": [], "do_nothing": {"expected_waste_usd": {"low": 0.0, "mid": 0.0, "high": 0.0}},
+                                  "assumptions": {}, "reason": "no_surplus", "reason_es": "sin sobrante"}
+        opts = [dict(o) for o in base["options"] if sku in (None, o["sku"])]
+        out = {**base, "as_of": as_of.isoformat(), "store_id": store_id, "options": opts[:limit]}
+        if opts:
+            out.pop("reason", None), out.pop("reason_es", None)
+        return out
 
     def store_profile(self, store_id):
         return dict(self.profile)

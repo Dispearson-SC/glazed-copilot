@@ -11,7 +11,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
-from ...application import copilot as uc_copilot, forecast as uc_forecast, manager as uc_manager, notes as uc_notes, sentinel
+from ...application import copilot as uc_copilot, forecast as uc_forecast, manager as uc_manager, notes as uc_notes, sentinel, transfers as uc_transfers
 from .store_names import StoreNames
 from ...domain import Case, DomainError, canonical_agent_id, case_id_from_session
 
@@ -48,6 +48,11 @@ class EventBody(BaseModel):
     date_from: str | None = None
     date_to: str | None = None
     note: str = ""
+
+
+class TransferProposalBody(BaseModel):
+    option_id: str
+    rationale: str = ""
 
 
 class NoteBody(BaseModel):
@@ -276,6 +281,21 @@ def build_internal_router(c: Any) -> APIRouter:
             idempotency_key)
         if not created:
             response.status_code = 200  # replay of an earlier request: the original proposal
+        return jsonable_encoder(proposal)
+
+    @r.get("/transfers/options")
+    def transfer_options(case: Ctx, sku: str | None = None, limit: int | None = None):
+        """Surplus here against same-region deficits, computed by code from data up to the case date."""
+        return jsonable_encoder(uc_transfers.TransferOptions(c.metrics).execute(case, sku, limit))
+
+    @r.post("/transfers/proposals", status_code=201)
+    def post_transfer_proposal(case: Ctx, b: TransferProposalBody, response: Response,
+                               x_glazed_agent: Annotated[str | None, Header()] = None,
+                               idempotency_key: Annotated[str | None, Header()] = None):
+        proposal, created = uc_transfers.ProposeTransfer(c.cases, c.proposals, c.alerts, c.metrics, c.served).execute(
+            case, b.option_id, b.rationale, canonical_agent_id(x_glazed_agent or ""), idempotency_key)
+        if not created:
+            response.status_code = 200
         return jsonable_encoder(proposal)
 
     @r.post("/notes", status_code=201)

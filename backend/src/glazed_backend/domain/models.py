@@ -37,7 +37,7 @@ _KIND_TO_ALERT_TYPE = {
     "expiring": 1, "overstock_waste": 1, "stockout_risk": 2, "staffing": 3,
     "min_order": 5, "inflated_order": 5, "misleading_promo": 7, "calendar_uplift": 19,
     "sku_key_mismatch": 9, "orphan_sku": 9, "compliance_deviation": 21, "short_shipment": 8, "promo": 7,
-    "late_delivery": 20, "supplier_variability": 20,
+    "late_delivery": 20, "supplier_variability": 20, "transfer_opportunity": 1,
 }
 
 
@@ -46,7 +46,7 @@ _AGENT_BY_KIND = {"sku_key_mismatch": "auditor", "orphan_sku": "auditor", "compl
                   "stockout_risk": "supply", "late_delivery": "supply", "supplier_variability": "supply",
                   "short_shipment": "supply", "min_order": "supply", "inflated_order": "supply",
                   "overstock_waste": "present", "expiring": "present", "calendar_uplift": "present", "staffing": "present",
-                  "misleading_promo": "strategist", "promo": "strategist"}
+                  "misleading_promo": "strategist", "promo": "strategist", "transfer_opportunity": "liaison"}
 
 
 def alert_category(kind: str | None, issue_category: str | None = None) -> str:

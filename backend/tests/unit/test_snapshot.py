@@ -7,7 +7,7 @@ def test_snapshot_has_the_contract_shape_and_a_seven_day_window(env):
     client, _, _ = env
     s = snap(client, mkcase(client))
     assert set(s) == {"store_id", "store_display_name", "as_of", "window", "kpis", "top_issues", "integrity",
-                      "order_plan", "suppliers", "pending_proposals", "other_cases_pending_count", "recent_decisions", "generated_at", "cache_age_s",
+                      "order_plan", "suppliers", "manager_notes", "pending_proposals", "other_cases_pending_count", "recent_decisions", "generated_at", "cache_age_s",
                       "calendar", "as_of_weekday_es"}
     assert s["as_of"] == "2026-03-10" and s["window"] == {"from": "2026-03-04", "to": "2026-03-10"}
     assert set(s["kpis"]) == {"net_sales", "transactions", "waste_usd", "lost_sales_usd", "tx_per_staff_hour"}

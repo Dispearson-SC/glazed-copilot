@@ -17,7 +17,7 @@ import duckdb
 from ...domain import FutureDate, NotFound
 from ...metrics.backtest import backtest_sku
 from ...metrics.integrity import integrity_issues, scan_sales
-from ...metrics.issues import detect_issues, merge_same_action
+from ...metrics.issues import detect_issues, finalize_options, merge_same_action
 from ...metrics.replay import calibrate
 from ...metrics.losses import lost_sales_window
 from ...metrics.confidence import line_confidence, realized_add_net, realized_reduce_net
@@ -30,6 +30,7 @@ from ...metrics.plan import apply_min_order, plan_line
 from ...metrics.promo_audit import BASELINE, PromoRef, audit_promo, promo_issue
 from ...metrics.deliveries import LATE_LOOKBACK_DAYS
 from ...metrics.schedule import next_delivery_after, parse_delivery_days
+from ...metrics import transfers as xfer
 from ...metrics.snapshot import StoreSnapshot
 from ...metrics.types import Config, DayRow, Product, PurchaseOrder, SkuSeries, StoreInfo
 
@@ -47,6 +48,14 @@ def _delivery_days(spec: str | None) -> set[int]:
     return days or {1, 2, 3, 4, 5, 6, 7}
 
 
+def _issue_dict(store_id: str, iid: str, as_of: date, ref: date, severity: float, evidence: list, options: list, rec: str,
+                sku: str, name: str, supplier_id: str | None) -> dict[str, Any]:
+    from ...metrics.issues import _issue
+    return _issue(store_id, "transfer_opportunity", sku, as_of, ref, severity, evidence,
+                  ["Transfer cost and lead time are assumptions; confidence is uncalibrated (no transfer backtest)."], options, rec,
+                  sku=sku, product_name=name, supplier_id=supplier_id)
+
+
 def _f(x: Any, nd: int = 2) -> float | None:
     return None if x is None else round(float(x), nd)
 
@@ -61,6 +70,7 @@ class DuckDBMetrics:
         self._snaps: dict[tuple[str, date], StoreSnapshot] = {}
         self._calib: dict[tuple[str, date], Any] = {}
         self._issues: dict[tuple[str, date], list[dict[str, Any]]] = {}
+        self._xfers: dict[tuple[str, date], dict[str, Any]] = {}
         self._fmt_days: dict[str, list[dict[str, Any]]] = {}
         self.config = Config()
 
@@ -192,7 +202,7 @@ class DuckDBMetrics:
             ref = self._ref_date(store_id, as_of)
             self._issues[key] = detect_issues(self._snapshot(store_id, as_of), store_id, as_of, ref, self.config,
                                               self._calibration(store_id, as_of), limit=10_000)
-            self._issues[key] += self._promo_issues(store_id, as_of, ref) + self._calendar_issues(store_id, as_of, ref) \
+            self._issues[key] += self._transfer_issues(store_id, as_of, ref) + self._promo_issues(store_id, as_of, ref) + self._calendar_issues(store_id, as_of, ref) \
                 + self._integrity_issues(store_id, as_of, ref)
             self._issues[key] = merge_same_action(self._issues[key])
             self._issues[key].sort(key=lambda i: (-i["severity_usd"], i["issue_id"]))
@@ -328,6 +338,103 @@ class DuckDBMetrics:
                 out.append(iss)
         return out
 
+    # -- Transfers ---------------------------------------------------------------
+    def _transfer_stores(self, store_id: str, as_of: date) -> list[dict[str, Any]]:
+        """Other stores of the same region that are open on as_of (opened, not closed, no closure in the calendar)."""
+        return self._rows(
+            "SELECT s.store_id, s.site_id, coalesce(si.site_name || ' · ', '') || s.store_name AS display_name"
+            " FROM stores s LEFT JOIN sites si ON si.site_id=s.site_id"
+            " WHERE s.store_id<>? AND si.region=(SELECT si2.region FROM stores s2 LEFT JOIN sites si2 ON si2.site_id=s2.site_id"
+            " WHERE s2.store_id=?) AND s.opened_date<=? AND (s.closed_date IS NULL OR s.closed_date>?)"
+            " AND NOT EXISTS (SELECT 1 FROM store_calendar c WHERE c.store_id=s.store_id AND c.date=? AND c.status<>'open')"
+            " ORDER BY s.store_id", [store_id, store_id, as_of, as_of, as_of])
+
+    def _transfer_data(self, store_id: str, as_of: date) -> dict[str, Any]:
+        key = (store_id, as_of)
+        if key in self._xfers:
+            return self._xfers[key]
+        snap, ref = self._snapshot(store_id, as_of), self._ref_date(store_id, as_of)
+        me = next((x for x in self.stores() if x["store_id"] == store_id), {})
+        name = me.get("display_name") or store_id
+        senders = {}
+        for sku in snap.products:
+            st = snap.state_at(sku, ref)
+            if st is not None and st.product.shelf_life_days is not None:
+                senders[sku] = st
+        others = []
+        if any(xfer.sender_surplus(st, 1) for st in senders.values()):  # region snapshots only when something is left over
+            for o in self._transfer_stores(store_id, as_of):
+                osnap = self._snapshot(o["store_id"], as_of)
+                if self._ref_date(o["store_id"], as_of) == ref:
+                    others.append((o, osnap))
+        receivers: dict[str, list[xfer.Receiver]] = {}
+        for sku in senders:
+            for o, osnap in others:
+                st = osnap.state_at(sku, ref)
+                if st is not None and sum(r.sold for r in st.rows if r.date > ref - timedelta(days=28)) > 0:
+                    receivers.setdefault(sku, []).append(xfer.Receiver(
+                        o["store_id"], o["display_name"] or o["store_id"], o["site_id"] == me.get("site_id"), st))
+        out = xfer.compute(senders, store_id, name, receivers, as_of)
+        out["region_candidates"] = len(others)
+        if len(self._xfers) >= 16:
+            self._xfers.pop(next(iter(self._xfers)))
+        self._xfers[key] = out
+        return out
+
+    def transfer_options(self, store_id: str, as_of: date, sku: str | None = None, limit: int = 5) -> dict[str, Any]:
+        """Surplus here (unsold before expiry) against the region's forecast deficits, with the transfer cost assumption."""
+        data = self._transfer_data(store_id, as_of)
+        opts = [o for o in data["options"] if sku in (None, o["sku"])]
+        if sku is not None:
+            waste = data["waste"].get(sku)
+        else:
+            skus = {o["sku"] for o in opts} or set(data["waste"])  # none offered: what the store stands to lose anyway
+            waste = None
+            for s in skus:
+                w = data["waste"].get(s)
+                waste = w if waste is None else {k: round(waste[k] + w[k], 2) for k in waste}
+        reason = None
+        if not opts:
+            if sku is not None:
+                reason = data["reasons"].get(sku, "no_surplus_sku")
+            elif not data["waste"]:
+                reason = "no_surplus"
+            else:
+                reason = "no_receiver_deficit" if "no_receiver_deficit" in data["reasons"].values() else \
+                    ("not_profitable" if "not_profitable" in data["reasons"].values() else "no_candidates")
+        out = {"as_of": as_of.isoformat(), "store_id": store_id,
+               "options": [{k: v for k, v in o.items() if k not in ("same_site", "lead_days", "all_waste_usd")}
+                           for o in opts[:max(1, limit)]],
+               "do_nothing": {"expected_waste_usd": waste or {"low": 0.0, "mid": 0.0, "high": 0.0}},
+               "assumptions": {**xfer.assumptions(), "region_candidate_stores": data["region_candidates"]}}
+        if reason:
+            out["reason"] = reason
+            out["reason_es"] = xfer.REASONS_ES[reason]
+        return out
+
+    def _transfer_issues(self, store_id: str, as_of: date, ref: date) -> list[dict[str, Any]]:
+        data = self._transfer_data(store_id, as_of)
+        by_sku: dict[str, list[dict[str, Any]]] = {}
+        for o in data["options"]:
+            by_sku.setdefault(o["sku"], []).append(o)
+        out = []
+        prods = self.product_catalog(store_id) if by_sku else {}
+        for sku, opts in by_sku.items():
+            iid = f"{store_id}|transfer_opportunity|{sku}"
+            waste = data["waste"][sku]
+            options = xfer.transfer_issue_options(iid, opts, as_of, waste["mid"])
+            rec = finalize_options(options, "transfer_opportunity", self._calibration(store_id, as_of), self.config)
+            best = opts[0]
+            ev = [{"metric": "surplus_units", "value": best["surplus_units"], "unit": "units", "period": "until expiry",
+                   "source": "inventory projection (weekday demand)"},
+                  {"metric": "expected_waste_usd", "value": waste["mid"], "unit": "USD", "period": "until expiry",
+                   "source": "inventory projection x unit_cost"},
+                  {"metric": "receiver_deficit_units", "value": best["deficit_units"], "unit": "units",
+                   "period": "until the receiver's next delivery", "source": "receiver inventory projection"}]
+            out.append(_issue_dict(store_id, iid, as_of, ref, waste["mid"], ev, options, rec, sku,
+                                   (prods.get(sku) or {}).get("product_name") or sku, (prods.get(sku) or {}).get("supplier_id")))
+        return out
+
     def issues(self, store_id: str, as_of: date, limit: int = 5) -> list[dict[str, Any]]:
         return copy.deepcopy(self._all_issues(store_id, as_of)[:limit])
 
@@ -401,7 +508,7 @@ class DuckDBMetrics:
             {s["supplier_id"]: (parse_delivery_days(s["delivery_days"]), int(s["standard_lead_time_days"] or 1),
                                 float(s["min_order_value"] or 0)) for s in sups},
             {s["supplier_id"]: s["supplier_name"] for s in sups})
-        if len(self._snaps) >= 16:
+        if len(self._snaps) >= 48:
             self._snaps.pop(next(iter(self._snaps)))
         self._snaps[key] = snap
         return snap

@@ -60,6 +60,10 @@ class MetricsPort(Protocol):
     def staffing_history(self, store_id: str, as_of: date, start: date) -> dict[str, Any]:
         """{format, rows[{store_id, date, transactions, staff_hours}]} for every store of the store's format, dates start..as_of."""
         ...
+    def transfer_options(self, store_id: str, as_of: date, sku: str | None = None, limit: int = 5) -> dict[str, Any]:
+        """Units this store would lose to expiry that a same-region store will be short of, as transfer options with
+        cost, USD ranges and confidence, plus do_nothing and the assumptions; an empty list carries a `reason`."""
+        ...
     def backtest_day(self, store_id: str, day: date, policy: str) -> dict[str, Any]:
         """Replay one day: {current: {waste_usd, lost_sales_usd}, policy: {...}} using only data <= day
         for decisions and the following day for outcomes."""
