@@ -1,0 +1,9 @@
+concepto,A_real,B_sistema,dif_usd,dif_pct
+Ventas,3332204.5,3786954.0,454749.51,13.65
+Ventas perdidas (demanda no atendida x precio),691165.39,286317.96,-404847.44,-58.57
+Merma (unidades caducadas x costo),267724.4,375046.54,107322.15,40.09
+Compras (unidades recibidas x costo),1125856.15,1387209.22,261353.07,23.21
+Costo de traslados,0.0,54277.7,54277.7,
+Margen bruto (ventas - costo de lo vendido),2473490.2,2793976.66,320486.46,12.96
+Margen neto (margen bruto - merma - traslados),2205765.8,2364652.42,158886.61,7.2
+Flujo de caja (ventas - compras - traslados),2206348.35,2345467.08,139118.73,6.31

@@ -1,0 +1,7 @@
+variante,dif_neto_usd,dif_merma_usd,dif_perdidas_usd,dif_compras_usd,dif_efectivo_usd
+replay_all,-164860.72,21221.49,168219.2,31071.33,-199269.53
+replay_reduce,-274471.79,-215376.95,657771.17,-386884.32,-270886.85
+replay_add,78093.94,247826.15,-457722.05,417406.11,40315.93
+replay_calendar,263.55,320.3,-821.7,625.86,195.84
+replay_markdown,8772.55,-3427.97,0.0,0.0,8772.55
+replay_transfer,655.68,-3109.32,-9925.02,0.0,590.22

@@ -1,0 +1,13 @@
+tipo_accion,nivel,recomendaciones
+skip_order,N2,28804
+place_order,N2,14988
+adjust_order_qty,N2,4690
+markdown_end_of_day,N2,3497
+data_fix_task,N2,2661
+transfer_stock,N3,2575
+adjust_order_qty,N3,1272
+place_order,N3,794
+skip_order,N3,148
+markdown_end_of_day,N3,114
+adjust_order_qty,N1,96
+place_order,N1,49
