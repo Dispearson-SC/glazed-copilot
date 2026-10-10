@@ -147,6 +147,13 @@ def build_internal_router(c: Any) -> APIRouter:
         own_case(case, store_id, as_of)
         return uc_manager.InventoryView(c.metrics, names).execute(case, sort, limit)
 
+    @r.get("/expiring")
+    def expiring(case: Ctx, days: int | None = None, limit: int | None = None, store_id: str | None = None,
+                 as_of: date | None = None):
+        """Lots about to expire (inferred ages) with waste as a USD range; the same use case as the public route."""
+        own_case(case, store_id, as_of)
+        return uc_manager.ExpiringView(c.metrics, names).execute(case, days, limit)
+
     @r.get("/inventory/projection")
     def projection(case: Ctx, sku: str, horizon: int = 7):
         return c.metrics.inventory_projection(case.store_id, case.sim_today, sku, max(1, min(horizon, 30)))

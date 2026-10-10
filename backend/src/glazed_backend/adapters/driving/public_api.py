@@ -252,6 +252,10 @@ def build_public_router(c: Any) -> APIRouter:
     def inventory(case_id: str, sort: str | None = None, limit: int | None = None):
         return uc_manager.InventoryView(c.metrics, names).execute(case_of(case_id), sort, limit)
 
+    @r.get("/cases/{case_id}/expiring")
+    def expiring(case_id: str, days: int | None = None, limit: int | None = None):
+        return uc_manager.ExpiringView(c.metrics, names).execute(case_of(case_id), days, limit)
+
     @r.get("/cases/{case_id}/executions")
     def executions(case_id: str):
         uc.ResumeCase(c.cases).execute(case_id)

@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from typing import Any
 
 from ..domain import Case, DomainError
+from ..metrics.expiry import MAX_SHELF_LIFE_DAYS, expiring_items, summarize_expiry
 from ..metrics.inventory_view import SORTS, inventory_item, sort_items
 
 DEFAULT_LIMIT, MAX_LIMIT = 50, 500
@@ -54,3 +55,26 @@ class InventoryView(_View):
             it["projected_stockout_date"], it["projected"] = stock, stock is not None
         return self.envelope(case, coverage={"skus_with_inventory": len(items), "skus_selling": len(selling)},
                              sort=sort, projection_horizon_days=PROJECTION_HORIZON, items=shown)
+
+
+class ExpiringView(_View):
+    SOURCE = "inventory_daily+products (lots inferred)"
+    MAX_DAYS = 30
+
+    def execute(self, case: Case, days: int | None = None, limit: int | None = None) -> dict[str, Any]:
+        days = 7 if days is None else days
+        if not 1 <= days <= self.MAX_DAYS:
+            raise DomainError(f"days must be between 1 and {self.MAX_DAYS}")
+        as_of, store = case.sim_today, case.store_id
+        profile, catalog = self.metrics.store_profile(store), self.metrics.product_catalog(store)
+        history = self.metrics.demand_history(store, as_of, None, as_of - timedelta(days=MAX_SHELF_LIFE_DAYS))
+        items: list[dict[str, Any]] = []
+        for s in history:
+            product = catalog.get(s.sku)
+            if product is not None:
+                items += expiring_items(s.sku, product, [r for r in s.rows if r.date <= as_of], as_of, days,
+                                        float(profile.get("open_hours") or 12.0))
+        items.sort(key=lambda i: (-i["waste_usd"]["mid"], -i["waste_usd"]["high"], i["expiry_date"], i["sku"]))
+        by_day, total = summarize_expiry(items)
+        return self.envelope(case, days=days, total_items=len(items), items=items[:clamp_limit(limit)], by_day=by_day,
+                             total_waste_usd=total)

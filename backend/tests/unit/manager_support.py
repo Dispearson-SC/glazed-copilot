@@ -33,6 +33,8 @@ def dates_after(payload, as_of=AS_OF, path=""):
     """Every ISO date string in `payload` later than as_of, with its path (to assert nothing is unflagged)."""
     found = []
     if isinstance(payload, dict):
+        if payload.get("projected") is True:  # a flagged projection may be dated after as_of
+            return found
         for k, v in payload.items():
             found += dates_after(v, as_of, f"{path}.{k}")
     elif isinstance(payload, list):
