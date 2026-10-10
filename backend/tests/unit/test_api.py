@@ -387,9 +387,21 @@ def test_internal_issues_can_be_filtered_by_kind_or_integrity_category(env):
     c.metrics.issues_by_date[date(2026, 3, 11)] = [ISSUE, {**ISSUE, "issue_id": "S030|sku_key_mismatch|X", "kind": "sku_key_mismatch",
                                                           "category": "integrity", "integrity": True}]
     h = {"X-Glazed-Case": case["case_id"]}
-    assert len(client.get("/internal/v1/issues", headers=h).json()) == 2
+    assert [i["kind"] for i in client.get("/internal/v1/issues", headers=h).json()] == [ISSUE["kind"]]  # default: operational only
     assert [i["kind"] for i in client.get("/internal/v1/issues", headers=h, params={"kind": "sku_key_mismatch"}).json()] == ["sku_key_mismatch"]
     assert [i["kind"] for i in client.get("/internal/v1/issues", headers=h, params={"category": "integrity"}).json()] == ["sku_key_mismatch"]
+
+
+def test_internal_issues_category_all_returns_both_ranked_by_exposure(env):
+    client, c = env
+    case = mkcase(client, sim_today="2026-03-11")
+    integ = {**ISSUE, "issue_id": "S030|sku_key_mismatch|X", "kind": "sku_key_mismatch", "category": "integrity",
+             "integrity": True, "severity_usd": 0, "exposure_usd": ISSUE["severity_usd"] + 1000}
+    c.metrics.issues_by_date[date(2026, 3, 11)] = [ISSUE, integ]
+    h = {"X-Glazed-Case": case["case_id"]}
+    got = client.get("/internal/v1/issues", headers=h, params={"category": "all"}).json()
+    assert [i["kind"] for i in got] == ["sku_key_mismatch", ISSUE["kind"]]  # integrity ranked by exposure_usd
+    assert len(client.get("/internal/v1/issues", headers=h, params={"category": "all", "limit": 1}).json()) == 1
 
 
 def test_experiences_expose_ref_and_how_to_re_verify_it(env):

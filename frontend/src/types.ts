@@ -73,6 +73,9 @@ export interface Turn {
   status: TurnStatus;
   reply?: string | null;
   error?: string | null;
+  still_running?: boolean;
+  sanitized?: boolean;
+  sanitized_fragments?: string[];
 }
 
 export type TraceKind = "message" | "tool_call" | "tool_result" | "escalation";

@@ -92,13 +92,21 @@ def build_internal_router(c: Any) -> APIRouter:
 
     @r.get("/issues")
     def issues(case: Ctx, limit: int = 5, kind: str | None = None, category: str | None = None):
-        """kind / category=integrity filter before the limit (the Auditor asks for integrity issues only)."""
-        if kind or category:
-            pool = [i for i in c.metrics.issues(case.store_id, case.sim_today, 10_000)
-                    if (not kind or i.get("kind") == kind) and (not category or i.get("category") == category)]
-            found = names.tag(pool[:max(1, min(limit, 20))], case.store_id)
-        else:
-            found = names.tag(c.metrics.issues(case.store_id, case.sim_today, max(1, min(limit, 20))), case.store_id)
+        """Default: operational issues only (integrity never crowds out alerts). `kind=` filters by kind;
+        `category=integrity` returns integrity issues only; `category=all` returns both, ranked by
+        severity_usd (operational) / exposure_usd (integrity)."""
+        cap = max(1, min(limit, 20))
+        pool = c.metrics.issues(case.store_id, case.sim_today, 10_000)
+        if kind:
+            pool = [i for i in pool if i.get("kind") == kind]
+        if category == "all":
+            pool = sorted(pool, key=lambda i: -float(i.get("exposure_usd") or 0) if i.get("category") == "integrity"
+                          else -float(i.get("severity_usd") or 0))
+        elif category:
+            pool = [i for i in pool if i.get("category") == category]
+        elif not kind:
+            pool = [i for i in pool if i.get("category") != "integrity"]
+        found = names.tag(pool[:cap], case.store_id)
         for issue in found:
             c.served[(case.case_id, issue["issue_id"])] = issue
         return found
