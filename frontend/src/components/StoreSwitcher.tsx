@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useApi } from "../ApiContext";
 import { DEFAULT_SIM_TODAY } from "../config";
 import { useSession } from "../SessionContext";
@@ -6,7 +6,7 @@ import { storeLabel, type Store } from "../types";
 
 /** True when the store is closed (or not yet open) on the simulated date. Absent dates mean selectable. */
 export const storeClosedReason = (s: Store, simToday: string = DEFAULT_SIM_TODAY): boolean =>
-  Boolean((s.closed_on && s.closed_on <= simToday) || (s.opened_on && s.opened_on > simToday));
+  Boolean((s.closed_on && s.closed_on.slice(0, 10) <= simToday) || (s.opened_on && s.opened_on.slice(0, 10) > simToday));
 
 /** Tappable header area: opens a searchable store sheet and switches the whole session to the chosen store. */
 export default function StoreSwitcher({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -16,6 +16,9 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
   const [stores, setStores] = useState<Store[]>([]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // The stores request resolves later: it must judge the store chosen by then, not the one at first render.
+  const storeIdRef = useRef(storeId);
+  storeIdRef.current = storeId;
 
   useEffect(() => {
     let alive = true;
@@ -24,8 +27,12 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
       .then((s) => {
         if (!alive) return;
         setStores(s);
-        // A persisted choice that is no longer in /stores is ignored.
-        if (storeId && s.length > 0 && !s.some((x) => x.store_id === storeId)) setStoreId("");
+        // A persisted choice that is gone, closed or not yet open falls back to the first open store.
+        const cur = storeIdRef.current;
+        if (cur && s.length > 0) {
+          const found = s.find((x) => x.store_id === cur);
+          if (!found || storeClosedReason(found)) setStoreId(s.find((x) => !storeClosedReason(x))?.store_id ?? "");
+        }
       })
       .catch(() => {});
     return () => {
