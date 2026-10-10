@@ -10,6 +10,12 @@ export interface Rejection {
   text: string;
 }
 
+/** An alternative picked from the analysis card instead of the recommendation. */
+export interface Choice {
+  optionId: string;
+  label: string;
+}
+
 /** A 4xx answer settles the intent; network errors and 5xx may have reached the backend, so the same key is replayed. */
 const isDefinitive = (e: unknown): boolean => e instanceof ApiError && e.status >= 400 && e.status < 500;
 
@@ -27,7 +33,7 @@ export function useDecide(caseId: string, refresh: () => Promise<void> | void) {
   const inflight = useRef(new Map<string, Promise<boolean>>());
 
   const run = useCallback(
-    async (item: DecisionItem, approved: boolean, intent: string, rejection?: Rejection): Promise<boolean> => {
+    async (item: DecisionItem, approved: boolean, intent: string, rejection?: Rejection, choice?: Choice): Promise<boolean> => {
       const label = rejection?.label || "Otro";
       const reason = approved ? undefined : [rejection?.label, rejection?.text].filter(Boolean).join(": ");
       const idempotencyKey = keys.current.get(intent) ?? crypto.randomUUID();
@@ -35,7 +41,7 @@ export function useDecide(caseId: string, refresh: () => Promise<void> | void) {
       setBusy(item.id);
       try {
         try {
-          await api.recordDecision(caseId, { issue_id: item.issueId, option_id: item.optionId, approved, ...(approved ? {} : { reason }) }, { idempotencyKey });
+          await api.recordDecision(caseId, { issue_id: item.issueId, option_id: choice?.optionId ?? item.optionId, approved, ...(approved ? {} : { reason }) }, { idempotencyKey });
           keys.current.delete(intent);
         } catch (e) {
           if (isDefinitive(e)) keys.current.delete(intent);
@@ -52,7 +58,9 @@ export function useDecide(caseId: string, refresh: () => Promise<void> | void) {
         setBusy(null);
       }
       dispatch({ type: "handled", id: item.id, accepted: approved && item.kind === "tech" });
-      if (approved) {
+      if (approved && choice) {
+        showToast(`Opción elegida: ${choice.label}`);
+      } else if (approved) {
         showToast(`${item.kind === "approval" ? "Aprobada" : "Aceptada"}: ${item.title}. Quedó registrada.`);
       } else {
         showToast(`Motivo registrado como «${label}». El copiloto aprenderá de esto.`); // the backend creates the memory; the page refetches /memories
@@ -64,14 +72,15 @@ export function useDecide(caseId: string, refresh: () => Promise<void> | void) {
   );
 
   const decide = useCallback(
-    (item: DecisionItem, approved: boolean, rejection?: Rejection): Promise<boolean> => {
+    (item: DecisionItem, approved: boolean, rejection?: Rejection, choice?: Choice): Promise<boolean> => {
       if (item.readOnly || !caseId) return Promise.resolve(false);
       // A rejection is only ever sent with a reason (the RejectSheet collects it); never fall through to anything else.
       if (!approved && !(rejection?.label || rejection?.text?.trim())) return Promise.resolve(false);
-      const intent = `${item.id}:${approved ? "approve" : "reject"}`;
+      // The option is part of the intent: choosing alternative A and approving the recommendation B are separate decisions.
+      const intent = `${item.id}:${approved ? "approve" : "reject"}:${choice?.optionId ?? item.optionId}`;
       const running = inflight.current.get(intent);
       if (running) return running;
-      const p = run(item, approved, intent, rejection).finally(() => inflight.current.delete(intent));
+      const p = run(item, approved, intent, rejection, choice).finally(() => inflight.current.delete(intent));
       inflight.current.set(intent, p);
       return p;
     },

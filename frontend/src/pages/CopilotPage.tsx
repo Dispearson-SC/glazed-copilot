@@ -110,6 +110,7 @@ function CopilotShell() {
           pendingLine={data.items.length || !data.loading ? pendingLine : ""}
           onApprove={(i) => void decide(i, true)}
           onReject={openReject}
+          onChoose={(i, c) => void decide(i, true, undefined, c)}
         />
       )}
       {state.tab === "decisiones" && (

@@ -106,3 +106,16 @@ describe("useDecide reject hardening", () => {
     await act(async () => { await Promise.all([a, r]); });
   });
 });
+
+describe("useDecide choosing an alternative", () => {
+  it("posts the chosen option_id, toasts its label and keeps a separate intent from the recommendation", async () => {
+    const recordDecision = vi.fn().mockResolvedValue({ decision_id: "d", proposal_id: "d", status: "approved" });
+    const { api, hook } = setup({ recordDecision });
+    await act(async () => { await hook.result.current.decide(approval, true, undefined, { optionId: "alt-1", label: "No hacer nada" }); });
+    const body = vi.mocked(api.recordDecision).mock.calls[0][1] as { option_id: string; approved: boolean };
+    expect(body).toMatchObject({ issue_id: approval.issueId, option_id: "alt-1", approved: true });
+    expect(body.option_id).not.toBe(approval.optionId);
+    await act(async () => { await hook.result.current.decide(approval, true); });
+    expect(keyOf(api, 0)).not.toBe(keyOf(api, 1));
+  });
+});

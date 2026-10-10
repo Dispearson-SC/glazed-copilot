@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { Choice } from "../../useDecide";
 import { AnalysisSkeleton } from "./Skeleton";
 import { analysisSections, SOON_TEXT, type AnalysisState, type DecisionItem } from "../../data/copilot";
 
@@ -11,6 +12,7 @@ export default function AnalysisCard({
   busy = false,
   onApprove,
   onReject,
+  onChoose,
   extra,
 }: {
   item: DecisionItem;
@@ -23,6 +25,8 @@ export default function AnalysisCard({
   busy?: boolean;
   onApprove: (item: DecisionItem) => void;
   onReject: (item: DecisionItem) => void;
+  /** Approves an alternative option of the issue instead of the recommendation. */
+  onChoose?: (item: DecisionItem, choice: Choice) => void;
   /** Extra section under the analysis (e.g. transfer options). */
   extra?: ReactNode;
 }) {
@@ -64,9 +68,28 @@ export default function AnalysisCard({
               <span aria-hidden="true" className="material-symbols-outlined text-[16px]">{s.icon}</span>
               {s.label}
             </span>
-            {s.items.map((t, i) => (
-              <p key={i} className="m-0 pl-[22px] text-[13px] leading-[19px] text-on-surface">• {t}</p>
-            ))}
+            {s.alternatives?.length
+              ? s.alternatives.map((alt, k) => (
+                  <div key={k} className="flex flex-col gap-1">
+                    {alt.lines.map((t, i) => (
+                      <p key={i} className="m-0 pl-[22px] text-[13px] leading-[19px] text-on-surface">• {t}</p>
+                    ))}
+                    {open && onChoose && alt.optionId && !item.readOnly && (
+                      <button
+                        type="button"
+                        aria-label={`Elegir ${alt.label}`}
+                        disabled={busy || analysis.status === "loading"}
+                        onClick={() => onChoose(item, { optionId: alt.optionId, label: alt.label })}
+                        className="ml-[22px] flex min-h-[44px] items-center justify-center self-start rounded-full bg-surface-container-high px-4 font-body-md text-body-md font-medium text-primary disabled:opacity-40"
+                      >
+                        Elegir esta
+                      </button>
+                    )}
+                  </div>
+                ))
+              : s.items.map((t, i) => (
+                  <p key={i} className="m-0 pl-[22px] text-[13px] leading-[19px] text-on-surface">• {t}</p>
+                ))}
           </div>
         ))}
         {extra}
