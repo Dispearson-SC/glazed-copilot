@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { StrictMode, useEffect, useState, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ApiProvider } from "./ApiContext";
@@ -39,7 +40,7 @@ function Prefer({ id, children }: { id: string; children: ReactNode }) {
   const { setCaseId } = useSession();
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    setCaseId(id);
+    setCaseId(id, "S030");
     setReady(true);
   }, [id, setCaseId]);
   return ready ? <>{children}</> : null;
@@ -106,5 +107,45 @@ describe("useCurrentCase default simulation date", () => {
     const api = fakeApi({ createCase: vi.fn(async () => { throw new Error("boom"); }) });
     mount(api);
     await waitFor(() => expect(screen.getByTestId("out")).toHaveTextContent("c1"));
+  });
+});
+
+describe("useCurrentCase per-store choice", () => {
+  const a1 = mk("a1", { store_id: "S030", sim_today: D, created_at: "2026-07-19T08:00:00Z" });
+  const a2 = mk("a2", { store_id: "S030", sim_today: D, created_at: "2026-07-19T09:00:00Z" });
+  const b1 = mk("b1", { store_id: "S031", sim_today: D, created_at: "2026-07-19T08:00:00Z" });
+  const b2 = mk("b2", { store_id: "S031", sim_today: D, created_at: "2026-07-19T09:00:00Z" });
+
+  function Harness() {
+    const [store, setStore] = useState("S030");
+    const { setCaseId } = useSession();
+    const { currentCase } = useCurrentCase(store);
+    return (
+      <>
+        <p data-testid="out">{currentCase?.case_id ?? "none"}</p>
+        <button onClick={() => setCaseId("a2", "S030")}>choose a2</button>
+        <button onClick={() => setStore("S031")}>to B</button>
+        <button onClick={() => setStore("S030")}>to A</button>
+      </>
+    );
+  }
+
+  it("a case chosen in store A does not hide the remembered case of store B, and A's choice comes back", async () => {
+    localStorage.setItem("glazed.caseId.S031", "b2");
+    const api = fakeApi({ listCases: vi.fn(async (q: { store_id: string }) => (q.store_id === "S030" ? [a1, a2] : [b1, b2])) });
+    render(
+      <ApiProvider api={api}>
+        <SessionProvider>
+          <Harness />
+        </SessionProvider>
+      </ApiProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("out")).toHaveTextContent("a1"));
+    await userEvent.click(screen.getByText("choose a2"));
+    await waitFor(() => expect(screen.getByTestId("out")).toHaveTextContent("a2"));
+    await userEvent.click(screen.getByText("to B"));
+    await waitFor(() => expect(screen.getByTestId("out")).toHaveTextContent("b2"));
+    await userEvent.click(screen.getByText("to A"));
+    await waitFor(() => expect(screen.getByTestId("out")).toHaveTextContent("a2"));
   });
 });

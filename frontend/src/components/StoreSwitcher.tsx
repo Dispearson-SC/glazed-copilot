@@ -12,7 +12,7 @@ export const storeClosedReason = (s: Store, simToday: string = DEFAULT_SIM_TODAY
 export default function StoreSwitcher({ children, className = "" }: { children: ReactNode; className?: string }) {
   const api = useApi();
   const session = useSession();
-  const { storeId, setStoreId, setCaseId, bump } = session;
+  const { storeId, setStoreId, bump } = session;
   const [stores, setStores] = useState<Store[]>([]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -57,7 +57,6 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
     setQuery("");
     if (id === current && id === storeId) return;
     setStoreId(id);
-    setCaseId("");
     bump();
   };
 
