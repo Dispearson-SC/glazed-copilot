@@ -71,3 +71,47 @@ class IssueAnalysis:
         issue = require_issue(self.alerts, self.metrics, self.served, case, issue_id)
         return {"as_of": case.sim_today.isoformat(), "store_id": case.store_id,
                 "store_display_name": self.names.of(case.store_id), "source": ANALYSIS_SOURCE, **build_analysis(issue)}
+
+
+class PendingDecisions:
+    """The manager inbox of one case: approvals (N2/N3) and technical items, minus what was already decided here."""
+
+    SOURCE = "issues+order_plan+decisions (glazed_metrics_v1)"
+
+    def __init__(self, metrics: Any, proposals: Any, served: dict, names: Any) -> None:
+        self.metrics, self.proposals, self.served, self.names = metrics, proposals, served, names
+
+    def items(self, case: Case) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        from ..metrics.pending import approval_item, technical_from_issue, technical_from_line
+        decided = {p.issue_id for p in self.proposals.list(case_id=case.case_id) if p.status in ("approved", "rejected")}
+        plan = self.metrics.order_plan(case.store_id, case.sim_today)
+        technical, in_plan = [], set()
+        for line in plan.get("lines", []):
+            issue = line.get("issue") if isinstance(line.get("issue"), dict) else None
+            if issue:
+                self.served[(case.case_id, issue["issue_id"])] = issue
+                in_plan.add(issue["issue_id"])
+                if issue["issue_id"] in decided:
+                    continue
+            technical.append(technical_from_line(line, issue))
+        approvals = []
+        for issue in self.metrics.issues(case.store_id, case.sim_today, 10_000):
+            iid = issue["issue_id"]
+            if issue.get("category") == "integrity" or iid in decided or iid in in_plan:
+                continue
+            self.served[(case.case_id, iid)] = issue
+            item = approval_item(issue)
+            if item is not None:
+                approvals.append(item)
+                continue
+            tech = technical_from_issue(issue)
+            if tech is not None:
+                technical.append(tech)
+        approvals.sort(key=lambda a: (-a["impact_usd"]["mid"], a["issue_id"]))
+        return approvals, technical
+
+    def execute(self, case: Case) -> dict[str, Any]:
+        approvals, technical = self.items(case)
+        return {"as_of": case.sim_today.isoformat(), "store_id": case.store_id,
+                "store_display_name": self.names.of(case.store_id), "source": self.SOURCE,
+                "approvals": approvals, "technical": technical}

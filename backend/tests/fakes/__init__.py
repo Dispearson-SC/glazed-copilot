@@ -110,8 +110,10 @@ class FakeMetrics:
         return self.projections.get(sku, {"sku": sku, "as_of": str(as_of), "horizon": horizon,
                                           "projected_stockout_date": None})
 
+    plan: dict | None = None  # order_plan override (lines/suppliers)
+
     def order_plan(self, store_id, as_of):
-        return {"store_id": store_id, "as_of": str(as_of), "method": "simple_v0", "lines": []}
+        return self.plan or {"store_id": store_id, "as_of": str(as_of), "method": "simple_v0", "lines": []}
 
     def supplier_performance(self, store_id, as_of):
         self.calls.append(("supplier_performance", store_id, as_of))

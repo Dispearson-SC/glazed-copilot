@@ -36,3 +36,13 @@ def with_issues(*issues, configure=None):
         if configure:
             configure(m)
     return build(conf)
+
+
+def plan_line(sku, issue, qty=20, cost=30.0, status="ok", deadline="2026-07-19", warn=None, supplier="SUP01", delivery="2026-07-21"):
+    return {"sku": sku, "name": f"Prod {sku}", "product_name": f"Prod {sku}", "supplier_id": supplier,
+            "supplier_name": "Northfield Bakery", "method": "order_up_to", "qty": qty, "qty_range": {"low": qty - 5, "high": qty + 5},
+            "est_cost_usd": cost, "expected_delivery": delivery, "days_to_next_delivery": 2, "usable_stock": 0.0,
+            "projected_stockout_date": "2026-07-20", "order_deadline": deadline if status == "ok" else None,
+            "order_deadline_status": status, "stockout_risk_without_order": 0.8,
+            "expected_waste_usd": {"low": 1.0, "mid": 2.0, "high": 3.0},
+            "expected_lost_sales_usd": {"low": 5.0, "mid": 9.0, "high": 20.0}, "min_order_warning": warn, "issue": issue}

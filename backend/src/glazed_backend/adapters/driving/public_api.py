@@ -100,6 +100,9 @@ def build_public_router(c: Any) -> APIRouter:
     def checker() -> sentinel.CheckCompliance:
         return sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace)
 
+    def case_of(case_id: str) -> Any:
+        return uc._case(c.cases, case_id)
+
     @r.get("/health")
     def health() -> dict[str, Any]:
         return {"status": "ok", "storage": c.storage, "core": c.core_status}
@@ -247,6 +250,10 @@ def build_public_router(c: Any) -> APIRouter:
                   date_to: Annotated[date | None, Query(alias="to")] = None):
         return uc_decisions.ListDecisions(c.cases, c.proposals, c.executions, checker()).execute(case_id, date_from, date_to)
 
+    @r.get("/cases/{case_id}/decisions/pending")
+    def decisions_pending(case_id: str):
+        return uc_copilot.PendingDecisions(c.metrics, c.proposals, c.served, names).execute(case_of(case_id))
+
     @r.get("/cases/{case_id}/forecast")
     def forecast(case_id: str, sku: str | None = None, date_from: Annotated[date | None, Query(alias="from")] = None,
                  date_to: Annotated[date | None, Query(alias="to")] = None, level: str | None = None):
@@ -256,9 +263,6 @@ def build_public_router(c: Any) -> APIRouter:
     def forecast_accuracy(case_id: str, by: str | None = None, date_from: Annotated[date | None, Query(alias="from")] = None,
                           date_to: Annotated[date | None, Query(alias="to")] = None):
         return uc_forecast.ForecastAccuracy(c.cases, c.metrics, c.forecasters).execute(case_id, by, date_from, date_to)
-
-    def case_of(case_id: str) -> Any:
-        return uc._case(c.cases, case_id)
 
     @r.get("/cases/{case_id}/inventory")
     def inventory(case_id: str, sort: str | None = None, limit: int | None = None):
