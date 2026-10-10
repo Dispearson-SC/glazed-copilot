@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Protocol
 
-from ..domain import Alert, AlertState, BacktestRun, Case, Execution, Experience, Proposal, TraceEvent
+from ..domain import Alert, AlertState, BacktestRun, Case, Execution, Experience, Proposal, TraceEvent, TurnRecord
 
 
 class MetricsPort(Protocol):
@@ -73,6 +73,12 @@ class BacktestRepository(Protocol):
     def add(self, run: BacktestRun) -> None: ...
     def get(self, run_id: str) -> BacktestRun | None: ...
     def list(self, case_id: str | None = None) -> list[BacktestRun]: ...
+
+
+class TurnRepository(Protocol):
+    def add(self, turn: TurnRecord) -> None: ...  # upsert by turn_id
+    def get(self, turn_id: str) -> TurnRecord | None: ...
+    def list(self, case_id: str) -> list[TurnRecord]: ...  # ordered by ts
 
 
 class TracePort(Protocol):

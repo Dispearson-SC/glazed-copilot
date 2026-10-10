@@ -7,9 +7,10 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from ..domain import (Alert, AlertState, BacktestRun, Case, DomainError, Execution, Experience, FutureDate, InvalidTransition, NotFound,
-                      Proposal, TraceEvent, alert_type_for_kind, canonical_agent_id, case_id_from_session, new_id)
+                      Proposal, TraceEvent, TurnRecord, alert_type_for_kind, canonical_agent_id, case_id_from_session, new_id)
 from ..ports import (AlertRepository, BacktestRepository, CaseRepository, Clock, CorePort,
-                     ExecutionRepository, ExperienceMemoryPort, MetricsPort, ProposalRepository, TracePort)
+                     ExecutionRepository, ExperienceMemoryPort, MetricsPort, ProposalRepository, TracePort,
+                     TurnRepository)
 
 
 def _case(cases: CaseRepository, case_id: str) -> Case:
@@ -75,6 +76,7 @@ class TurnTracker:
 
     def __init__(self) -> None:
         self._started: dict[str, datetime] = {}
+        self.backfilled: set[str] = set()  # cases whose Core transcript was already read for turn history
 
     def started(self, turn_id: str, at: datetime) -> None:
         self._started[turn_id] = at
@@ -87,8 +89,8 @@ class AskAgent:
     """Send a manager message to the orchestrator through the case's Core conversation."""
 
     def __init__(self, cases: CaseRepository, core: CorePort, tracker: TurnTracker | None = None,
-                 clock: Clock | None = None) -> None:
-        self.cases, self.core, self.tracker, self.clock = cases, core, tracker, clock
+                 clock: Clock | None = None, turns: TurnRepository | None = None) -> None:
+        self.cases, self.core, self.tracker, self.clock, self.turns = cases, core, tracker, clock, turns
 
     def execute(self, case_id: str, text: str) -> str:
         if not text.strip():
@@ -100,6 +102,8 @@ class AskAgent:
         turn_id = self.core.send_turn(case.core_conversation_id, case.store_id, text)
         if self.tracker and self.clock:
             self.tracker.started(turn_id, self.clock.now())
+        if self.turns is not None and self.clock:
+            self.turns.add(TurnRecord(turn_id, case.case_id, case.store_id, self.clock.now(), text))
         return turn_id
 
 
@@ -130,16 +134,30 @@ class GetTurn:
       (real multi-peer turns take 4-7 min); only a Core failure or an unknown status fails it."""
 
     def __init__(self, cases: CaseRepository, core: CorePort, tracker: TurnTracker | None = None,
-                 clock: Clock | None = None, timeout_s: float = 600.0, grace_s: float = 120.0) -> None:
+                 clock: Clock | None = None, timeout_s: float = 600.0, grace_s: float = 120.0,
+                 turns: TurnRepository | None = None) -> None:
         self.cases, self.core, self.tracker, self.clock = cases, core, tracker, clock
-        self.timeout_s, self.grace_s = timeout_s, grace_s
+        self.timeout_s, self.grace_s, self.turns = timeout_s, grace_s, turns
 
     def _age(self, turn_id: str) -> float | None:
         started = self.tracker.started_at(turn_id) if self.tracker and self.clock else None
         return (self.clock.now() - started).total_seconds() if started else None
 
     def execute(self, case_id: str, turn_id: str) -> dict[str, Any]:
-        case = _case(self.cases, case_id)
+        out = self._poll(_case(self.cases, case_id), turn_id)
+        self._persist(turn_id, out)
+        return out
+
+    def _persist(self, turn_id: str, out: dict[str, Any]) -> None:
+        """Keep the final status and the FULL sanitized reply (history reads it from here, not from /trace)."""
+        if self.turns is None or out.get("status") not in ("done", "failed"):
+            return
+        rec = self.turns.get(turn_id)
+        if rec is not None and not rec.final:
+            rec.status, rec.reply, rec.error = out["status"], out.get("reply"), out.get("error")
+            self.turns.add(rec)
+
+    def _poll(self, case: Case, turn_id: str) -> dict[str, Any]:
         age = self._age(turn_id)
         try:
             raw = self.core.get_turn(turn_id, case.store_id)
@@ -176,6 +194,56 @@ class GetTurn:
             return False
         return any(e.get("kind") == "pending_request" and str(e.get("turn_id")) == turn_id
                    and not (e.get("payload") or {}).get("answered_at") for e in entries)
+
+
+class ListTurns:
+    """The conversation history of a case: [{turn_id, ts, user_text, reply, status, ...}] ordered by ts.
+    The reply is the stored FULL final reply. Turns still in flight are resolved on read (like a poll); turns that
+    exist only in the Core transcript (sent before turns were stored) are back-filled once per case and process."""
+
+    def __init__(self, cases: CaseRepository, core: CorePort, turns: TurnRepository, getter: GetTurn,
+                 tracker: TurnTracker | None = None) -> None:
+        self.cases, self.core, self.turns, self.getter, self.tracker = cases, core, turns, getter, tracker
+
+    def execute(self, case_id: str) -> list[dict[str, Any]]:
+        case = _case(self.cases, case_id)
+        self._backfill(case)
+        out = []
+        for rec in self.turns.list(case.case_id):
+            live: dict[str, Any] = {}
+            if not rec.final:
+                try:
+                    live = self.getter.execute(case.case_id, rec.turn_id)
+                except Exception:  # noqa: BLE001 - Core cannot tell right now: the turn stays pending
+                    live = {}
+                rec = self.turns.get(rec.turn_id) or rec
+            item: dict[str, Any] = {"turn_id": rec.turn_id, "ts": rec.ts.isoformat(), "user_text": rec.user_text,
+                                    "reply": rec.reply if rec.final else None,
+                                    "status": rec.status if rec.final else live.get("status", "pending")}
+            if rec.error:
+                item["error"] = rec.error
+            if live.get("still_running") and not rec.final:
+                item["still_running"] = True
+            if rec.reply_meta:
+                item["reply_meta"] = rec.reply_meta
+            out.append(item)
+        return out
+
+    def _backfill(self, case: Case) -> None:
+        if not case.core_conversation_id or (self.tracker is not None and case.case_id in self.tracker.backfilled):
+            return
+        try:
+            entries = self.core.list_transcript(case.core_conversation_id, case.store_id)
+        except Exception:  # noqa: BLE001 - try again on the next read
+            return
+        if self.tracker is not None:
+            self.tracker.backfilled.add(case.case_id)
+        for e in entries:
+            tid = str(e.get("turn_id") or "")
+            if e.get("kind") != "user_message" or not tid or self.turns.get(tid) is not None:
+                continue
+            self.turns.add(TurnRecord(tid, case.case_id, case.store_id, datetime.fromisoformat(str(e["at"])),
+                                      _message_text(dict(e.get("payload") or {}))))
 
 
 class GetDaySummary:
@@ -476,9 +544,10 @@ def _events_from_entry(case: Case, entry: dict[str, Any]) -> list[TraceEvent]:
     payload = dict(entry.get("payload") or {})
     ts = datetime.fromisoformat(str(entry["at"]))
     eid = str(entry.get("entry_id") or new_id())
+    turn = {"turn_id": str(entry["turn_id"])} if entry.get("turn_id") else {}
     mk = lambda frm, to, body, suffix="": TraceEvent(  # noqa: E731
         case.case_id, case.store_id, ts, canonical_agent_id(frm), canonical_agent_id(to), kind,
-        {"core_kind": raw, **body}, event_id=eid + suffix)
+        {"core_kind": raw, **turn, **body}, event_id=eid + suffix)
 
     if raw == "peer_exchange":
         target = str(payload.get("target_agent_id") or "agent")
@@ -487,7 +556,7 @@ def _events_from_entry(case: Case, entry: dict[str, Any]) -> list[TraceEvent]:
         if payload.get("answer"):
             out.append(TraceEvent(case.case_id, case.store_id, ts + timedelta(milliseconds=1),
                                   canonical_agent_id(target), "orchestrator", "message",
-                                  {"core_kind": raw, "text": _clip(payload["answer"], 2000)}, event_id=eid + ":a"))
+                                  {"core_kind": raw, **turn, "text": _clip(payload["answer"], 2000)}, event_id=eid + ":a"))
         return out
     if raw in ("tool_call", "policy_denial", "tool_result"):
         tool = str(payload.get("tool") or payload.get("tool_name") or "")

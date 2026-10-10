@@ -107,3 +107,17 @@ def test_assistant_repository_roundtrip():
         assert repo.get("S030") is None
         repo.set("S030", "a1"); repo.set("S030", "a2")
         assert repo.get("S030") == "a2"
+
+
+def test_turns_roundtrip_upsert_and_order():
+    from glazed_backend.adapters.driven.memory import InMemoryTurns
+    from glazed_backend.domain import TurnRecord
+    for repo in (InMemoryTurns(), _pg().turns):
+        t2 = TurnRecord("t2", "c1", "S030", datetime(2026, 3, 2, tzinfo=timezone.utc), "second")
+        t1 = TurnRecord("t1", "c1", "S030", datetime(2026, 3, 1, tzinfo=timezone.utc), "first")
+        repo.add(t2); repo.add(t1); repo.add(TurnRecord("t3", "c2", "S030", datetime(2026, 3, 3, tzinfo=timezone.utc), "x"))
+        assert [t.turn_id for t in repo.list("c1")] == ["t1", "t2"] and repo.get("zz") is None
+        t1.status, t1.reply = "done", "full reply"
+        repo.add(t1)
+        got = repo.get("t1")
+        assert got == t1 and got.final and got.reply_meta is None

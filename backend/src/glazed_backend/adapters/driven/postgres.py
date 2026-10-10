@@ -9,9 +9,9 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from ...domain import Alert, AlertState, BacktestRun, Case, Execution, Proposal, TraceEvent
+from ...domain import Alert, AlertState, BacktestRun, Case, Execution, Proposal, TraceEvent, TurnRecord
 
-_TABLES = ("store_assistants", "trace_events", "backtests", "executions", "proposals", "alerts", "cases")
+_TABLES = ("turns", "store_assistants", "trace_events", "backtests", "executions", "proposals", "alerts", "cases")
 
 
 class PostgresStore:
@@ -25,6 +25,7 @@ class PostgresStore:
         self.proposals, self.executions = _Proposals(self), _Executions(self)
         self.backtests, self.trace = _Backtests(self), _Trace(self)
         self.assistants = _Assistants(self)
+        self.turns = _Turns(self)
 
     def migrate(self) -> None:
         files = sorted(f for f in resources.files("glazed_backend.migrations").iterdir() if f.name.endswith(".sql"))
@@ -196,3 +197,23 @@ class _Assistants(_Repo):
     def set(self, store_id: str, assistant_id: str) -> None:
         self.s.q("INSERT INTO glazed.store_assistants VALUES (%s,%s) ON CONFLICT (store_id) DO UPDATE"
                  " SET assistant_id=EXCLUDED.assistant_id", [store_id, assistant_id])
+
+
+class _Turns(_Repo):
+    def add(self, t: TurnRecord) -> None:
+        self.s.q("INSERT INTO glazed.turns (turn_id, case_id, store_id, ts, user_text, status, reply, error, reply_meta)"
+                 " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (turn_id) DO UPDATE SET status=EXCLUDED.status,"
+                 " reply=EXCLUDED.reply, error=EXCLUDED.error, reply_meta=EXCLUDED.reply_meta",
+                 [t.turn_id, t.case_id, t.store_id, t.ts, t.user_text, t.status, t.reply, t.error,
+                  Jsonb(t.reply_meta) if t.reply_meta is not None else None])
+
+    @staticmethod
+    def _row(r: dict | None) -> TurnRecord | None:
+        return TurnRecord(r["turn_id"], r["case_id"], r["store_id"], r["ts"], r["user_text"], r["status"], r["reply"],
+                          r["error"], r["reply_meta"]) if r else None
+
+    def get(self, turn_id: str) -> TurnRecord | None:
+        return self._row(self._one("SELECT * FROM glazed.turns WHERE turn_id=%s", (turn_id,)))
+
+    def list(self, case_id: str) -> list[TurnRecord]:
+        return [self._row(r) for r in self.s.q("SELECT * FROM glazed.turns WHERE case_id=%s ORDER BY ts", (case_id,))]  # type: ignore[misc]

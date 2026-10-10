@@ -215,6 +215,25 @@ class Alert:
 
 
 @dataclass
+class TurnRecord:
+    """One manager message and, once Core finished it, the FULL final (sanitized) reply. Drafts and tool or peer
+    results are never stored here. `status` is the last public status seen: pending until it is final."""
+    turn_id: str
+    case_id: str
+    store_id: str
+    ts: datetime
+    user_text: str
+    status: str = "pending"  # pending | done | failed
+    reply: str | None = None
+    error: str | None = None
+    reply_meta: dict[str, Any] | None = None  # future {source, template, elapsed_ms}
+
+    @property
+    def final(self) -> bool:
+        return self.status in ("done", "failed")
+
+
+@dataclass
 class BacktestRun:
     run_id: str
     case_id: str

@@ -121,11 +121,18 @@ def build_public_router(c: Any) -> APIRouter:
 
     @r.post("/cases/{case_id}/messages", status_code=202)
     def ask(case_id: str, b: AskBody):
-        return {"turn_id": uc.AskAgent(c.cases, c.core, c.turn_tracker, c.clock).execute(case_id, b.text)}
+        return {"turn_id": uc.AskAgent(c.cases, c.core, c.turn_tracker, c.clock, c.turns).execute(case_id, b.text)}
+
+    def turn_getter() -> uc.GetTurn:
+        return uc.GetTurn(c.cases, c.core, c.turn_tracker, c.clock, c.turn_timeout_s, turns=c.turns)
+
+    @r.get("/cases/{case_id}/turns")
+    def turn_history(case_id: str):
+        return uc.ListTurns(c.cases, c.core, c.turns, turn_getter(), c.turn_tracker).execute(case_id)
 
     @r.get("/cases/{case_id}/turns/{turn_id}")
     def turn(case_id: str, turn_id: str):
-        return uc.GetTurn(c.cases, c.core, c.turn_tracker, c.clock, c.turn_timeout_s).execute(case_id, turn_id)
+        return turn_getter().execute(case_id, turn_id)
 
     @r.get("/cases/{case_id}/day-summary")
     def day_summary(case_id: str, date: date | None = None):

@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from ...application import TurnTracker
+from ..driven.memory import InMemoryTurns
 from ...domain import DomainError, FutureDate, InvalidTransition, NotFound
 from ...domain.models import CoreError
 from .internal_api import build_internal_router
@@ -37,6 +38,7 @@ class Container:
     served: dict = field(default_factory=dict)  # (case_id, issue_id) -> issue as served, for option lookup
     warm_on_startup: bool = False  # production only: precompute recent briefings and init clients in the background
     briefings: Any = None  # BriefingService; built from the other ports when not given
+    turns: Any = field(default_factory=InMemoryTurns)  # TurnRepository: stored replies for the conversation history
 
 
 DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -112,7 +114,7 @@ def build_container(env: dict[str, str] | None = None) -> Container:
                          store.backtests, store.trace, SystemClock(),
                          BackboardMemory(key, store.assistants, display_name=StoreNames(metrics).of), "postgres",
                          "configured" if core_url else "missing", cors,
-                         float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier, warm_on_startup=True)
+                         float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier, warm_on_startup=True, turns=store.turns)
     classifier = build_classifier(env, None)
     return Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
                      InMemoryBacktests(), InMemoryTrace(), SystemClock(),
