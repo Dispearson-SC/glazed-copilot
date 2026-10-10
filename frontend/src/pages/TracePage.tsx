@@ -1,5 +1,5 @@
 import CentinelaPanel from "../CentinelaPanel";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useApi } from "../ApiContext";
 import { ErrorBox, useStores } from "../components";
@@ -59,13 +59,16 @@ export default function TracePage() {
   const [casesError, setCasesError] = useState<Error | null>(null);
   const [caseId, setCaseId] = useState(params.get("case") ?? "");
   const [turnStatus, setTurnStatus] = useState<TurnStatus | null>(null);
+  const [live, setLive] = useState(true);
+  const rootRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     api
       .listCases({ store_id: storeId })
       .then((cs) => {
-        setCases(cs);
-        setCaseId((cur) => cur || cs[0]?.case_id || "");
+        const newest = [...cs].sort((a, b) => b.created_at.localeCompare(a.created_at));
+        setCases(newest);
+        setCaseId((cur) => cur || newest[0]?.case_id || "");
       })
       .catch(setCasesError);
   }, [api, storeId]);
@@ -87,7 +90,7 @@ export default function TracePage() {
   const trace = usePolling(
     () => (caseId ? api.getTrace(storeId, caseId) : Promise.resolve([])),
     POLL_MS,
-    turnPending,
+    live || turnPending,
     [storeId, caseId],
   );
 
@@ -98,10 +101,17 @@ export default function TracePage() {
   }, [turnStatus, refresh]);
 
   const events = sortByTs(trace.data ?? []);
+
+  // Follow the conversation: keep the newest event in view in the timeline and in every lane.
+  useEffect(() => {
+    if (!live || !rootRef.current) return;
+    rootRef.current.querySelector(".timeline > li:last-child")?.scrollIntoView?.({ block: "nearest" });
+    rootRef.current.querySelectorAll<HTMLElement>(".lane").forEach((l) => { l.scrollTop = l.scrollHeight; });
+  }, [live, events.length]);
   const error = casesError ?? trace.error;
 
   return (
-    <section>
+    <section ref={rootRef}>
       <h2>Inspector de agentes - {storeName}</h2>
       <label>
         Caso{" "}
@@ -120,7 +130,11 @@ export default function TracePage() {
           ))}
         </select>
       </label>{" "}
-      <button onClick={() => void trace.refresh()}>Actualizar</button>
+      <button onClick={() => void trace.refresh()}>Actualizar</button>{" "}
+      <label>
+        <input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} />
+        En vivo
+      </label>
       {turnId && (
         <span className="muted">
           {" "}

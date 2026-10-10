@@ -20,7 +20,7 @@ pre { background: #f3f3f3; padding: 8px; overflow: auto; font-size: 12px; }
 .bubble.escalation { background: #fff3e0; }
 .bubble.tool_call, .bubble.tool_result { background: #f1f8ff; }
 .lanes { display: grid; grid-template-columns: repeat(8, minmax(120px, 1fr)); gap: 8px; overflow-x: auto; }
-.lane { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 6px; min-height: 80px; }
+.lane { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 6px; min-height: 80px; max-height: 70vh; overflow-y: auto; }
 .lane h4 { margin: 0 0 6px; text-transform: capitalize; }
 .lane.orchestrator { border: 2px solid #c2185b; background: #fce4ec; }
 .lane-item { border-top: 1px solid #eee; padding: 4px 0; font-size: 12px; }

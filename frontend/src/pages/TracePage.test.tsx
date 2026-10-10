@@ -71,6 +71,7 @@ describe("TracePage", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
     await waitFor(() => expect(getTurn).toHaveBeenCalledTimes(2));
     await screen.findByText(/Turno terminado/);
+    await userEvent.click(screen.getByRole("checkbox", { name: "En vivo" }));
     const after = getTrace.mock.calls.length;
     await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
     expect(getTrace.mock.calls.length).toBe(after);
@@ -97,5 +98,37 @@ describe("TracePage", () => {
     });
     open(api, "?case=c9");
     await waitFor(() => expect(api.getTrace).toHaveBeenCalledWith("S030", "c9"));
+  });
+
+  it("live toggle is ON by default and polls the trace every 3s until switched off", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const getTrace = vi.fn(async () => events);
+    open(fakeApi({ getTrace }));
+    await screen.findByTestId("bubble-0");
+    const toggle = screen.getByRole("checkbox", { name: "En vivo" });
+    expect(toggle).toBeChecked();
+    const n = getTrace.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(3100); });
+    expect(getTrace.mock.calls.length).toBeGreaterThan(n);
+    await userEvent.click(toggle);
+    const m = getTrace.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(9000); });
+    expect(getTrace.mock.calls.length).toBe(m);
+  });
+
+  it("lists the newest cases first", async () => {
+    const base = (await fakeApi().listCases({}))[0];
+    const api = fakeApi({
+      listCases: vi.fn(async () => [
+        { ...base, case_id: "old", title: "stress-old", created_at: "2026-03-01T08:00:00Z" },
+        { ...base, case_id: "new", title: "stress-new", created_at: "2026-03-02T08:00:00Z" },
+      ]),
+      getTrace: vi.fn(async () => events),
+    });
+    open(api);
+    await waitFor(() => expect(api.getTrace).toHaveBeenCalledWith("S030", "new"));
+    const opts = screen.getAllByRole("option").map((o) => o.textContent ?? "");
+    expect(opts[0]).toContain("stress-new");
+    expect(opts[1]).toContain("stress-old");
   });
 });
