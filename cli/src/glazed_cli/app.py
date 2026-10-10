@@ -176,7 +176,7 @@ def ask(ctx: typer.Context, question: str,
         new: bool = typer.Option(False, "--new", help="Start an isolated case first (needs --store and --date)."),
         store: Optional[str] = typer.Option(None, "--store"),
         date: Optional[str] = typer.Option(None, "--date"),
-        timeout: float = typer.Option(120.0, "--timeout", help="Seconds to wait for the answer.")) -> None:
+        timeout: float = typer.Option(300.0, "--timeout", help="Seconds to wait for the answer.")) -> None:
     """Ask the copilot a question in the current case."""
     c: Ctx = ctx.obj
     if new:
@@ -193,7 +193,8 @@ def ask(ctx: typer.Context, question: str,
         c.out(turn, lambda _: None)
     else:
         with out.status("Thinking..."):
-            turn = turns.ask(c.api, case_id, question, timeout)
+            turn = turns.ask(c.api, case_id, question, timeout,
+                             on_progress=lambda: out.print("[dim]el equipo de agentes sigue trabajando…[/dim]"))
     if turn["status"] == "failed":
         raise CliError(f"The turn failed: {turn.get('error') or 'unknown error'}")
     if c.as_json:

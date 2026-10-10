@@ -143,3 +143,67 @@ def test_advance_rejects_both_days_and_to(api, run):
     State(current_case="c1").save()
     r = run("advance", "--days", "2", "--to", "2026-04-01")
     assert r.exit_code == 1 and not api.calls
+
+
+def test_ask_treats_404_as_pending_until_the_turn_exists(monkeypatch):
+    from glazed_cli import turns
+    from glazed_cli.client import ApiError
+
+    monkeypatch.setattr(turns.time, "sleep", lambda s: None)
+    seq = [ApiError("404: Agent-Core: /turns/t not found"), ApiError("404: gone"), {"status": "done", "reply": "ok"}]
+
+    class A:
+        def post(self, *a, **k):
+            return {"turn_id": "t"}
+
+        def get(self, *a, **k):
+            item = seq.pop(0)
+            if isinstance(item, Exception):
+                raise item
+            return item
+
+    assert turns.ask(A(), "c", "q", 300)["reply"] == "ok"
+
+
+def test_ask_still_aborts_on_other_errors(monkeypatch):
+    import pytest
+
+    from glazed_cli import turns
+    from glazed_cli.client import ApiError
+
+    class A:
+        def post(self, *a, **k):
+            return {"turn_id": "t"}
+
+        def get(self, *a, **k):
+            raise ApiError("500: boom")
+
+    with pytest.raises(ApiError):
+        turns.ask(A(), "c", "q", 300)
+
+
+def test_ask_default_timeout_is_300s():
+    import inspect
+
+    from glazed_cli.app import ask
+    assert inspect.signature(ask).parameters["timeout"].default.default == 300.0
+
+
+def test_ask_reports_progress_while_waiting(monkeypatch):
+    from glazed_cli import turns
+
+    ticks = iter([0.0, 5.0, 16.0, 31.0])  # start, then one reading per pending poll
+    monkeypatch.setattr(turns.time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(turns.time, "sleep", lambda s: None)
+    seq = [{"status": "pending"}] * 3 + [{"status": "done", "reply": "x"}]
+
+    class A:
+        def post(self, *a, **k):
+            return {"turn_id": "t"}
+
+        def get(self, *a, **k):
+            return seq.pop(0)
+
+    beats = []
+    turns.ask(A(), "c", "q", 300, on_progress=lambda: beats.append(1), progress_every=15)
+    assert len(beats) == 2
