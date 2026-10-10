@@ -42,7 +42,7 @@ export default function TechDecisionCard({
           <span aria-hidden="true" className="material-symbols-outlined text-[14px]">schedule</span>
           {item.deadline}
         </span>
-        <span className="inline-flex items-center rounded-full bg-surface-container px-2.5 py-[3px] font-label-sm text-label-sm text-on-surface-variant">Confianza {item.confPct}</span>
+        <span className="inline-flex items-center rounded-full bg-surface-container px-2.5 py-[3px] font-label-sm text-label-sm text-on-surface-variant">{item.confLabel} {item.confPct}</span>
       </div>
       {item.warn && (
         <p className="m-0 flex gap-1.5 rounded-xl bg-surface-container px-3 py-2 text-[12px] leading-4 text-on-surface-variant">

@@ -1,4 +1,9 @@
+import { BranchSkeleton } from "./Skeleton";
+import { useEffect, useState } from "react";
 import { isPlaceholder, type DayKey, type DayView, type InventoryRow, type ScheduledRow } from "../../data/copilot";
+
+/** Rows shown before "Ver todo"; the backend already sorts critical first. */
+const INVENTORY_TOP = 10;
 
 const EMPTY = "text-[13px] font-medium leading-[18px] text-on-surface-variant";
 
@@ -42,15 +47,17 @@ export default function BranchWindow({
   pendingBuy: number;
   onGoDecisiones: () => void;
 }) {
+  const [showAll, setShowAll] = useState(false);
+  useEffect(() => setShowAll(false), [storeCode]);
   if (!view) {
     return (
-      <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-20">
-        <p className="m-0 font-body-md text-body-md text-on-surface-variant">Cargando sucursal…</p>
+      <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-[112px]">
+        <BranchSkeleton />
       </main>
     );
   }
   return (
-    <main className="mx-auto flex w-full max-w-[640px] flex-col gap-5 px-4 pb-28 pt-[68px]">
+    <main className="mx-auto flex w-full max-w-[640px] flex-col gap-5 px-4 pb-28 pt-[104px]">
       <header className="flex flex-col gap-3 pt-3">
         <div>
           <span className="font-label-md text-label-md uppercase tracking-[0.05em] text-on-tertiary-container">Sucursal {storeCode}</span>
@@ -141,12 +148,13 @@ export default function BranchWindow({
           <span className="flex-shrink-0 rounded-full bg-surface-container px-2.5 py-0.5 font-label-sm text-label-sm font-semibold text-secondary">Proyección desde hoy</span>
         </div>
         {inventoryFailed && <p className="m-0 text-[13px] text-on-surface-variant">Sin datos de inventario</p>}
-        {inventory.map((r) => (
+        {(showAll ? inventory : inventory.slice(0, INVENTORY_TOP)).map((r) => (
           <div key={r.sku} data-row className="flex flex-col gap-1.5 border-b border-partition/70 pb-3">
             <div className="flex items-center justify-between gap-2">
               <span className="font-body-md text-body-md font-semibold text-primary">{r.name}</span>
               <span title={r.reason || undefined} className={`flex-shrink-0 rounded-full px-2 py-0.5 font-label-sm text-label-sm font-semibold ${r.status === "critical" ? "bg-error-container text-on-error-container" : r.status === "watch" ? "bg-[rgba(185,133,86,.18)] text-on-tertiary-fixed-variant" : "bg-surface-container-high text-on-surface-variant"}`}>{r.statusLabel || r.cover}</span>
             </div>
+            {r.display && <p className="m-0 font-label-sm text-label-sm font-normal text-on-surface-variant">{r.display}</p>}
             <div className="h-1.5 overflow-hidden rounded-full bg-surface-container">
               <div className="h-full rounded-full bg-on-tertiary-container" style={{ width: `${r.fill}%` }} />
             </div>
@@ -157,6 +165,15 @@ export default function BranchWindow({
             </div>
           </div>
         ))}
+        {inventory.length > INVENTORY_TOP && (
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="min-h-[44px] self-center rounded-full border border-partition/60 bg-elevation px-4 font-label-md text-label-md font-semibold text-secondary"
+          >
+            {showAll ? "Ver menos" : `Ver todo (${inventory.length})`}
+          </button>
+        )}
         {!inventoryFailed && inventory.length === 0 && <p className="m-0 text-[13px] text-on-surface-variant">Sin datos</p>}
       </section>
 

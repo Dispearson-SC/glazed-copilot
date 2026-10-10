@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import { AnalysisSkeleton } from "./Skeleton";
 import { analysisSections, SOON_TEXT, type AnalysisState, type DecisionItem } from "../../data/copilot";
 
 /** Espresso-header card with the analysis (approvals) or the dialogue (technical decisions) of one decision. */
@@ -9,6 +11,7 @@ export default function AnalysisCard({
   busy = false,
   onApprove,
   onReject,
+  extra,
 }: {
   item: DecisionItem;
   /** The backend analysis of the issue (GET /issues/{id}/analysis). */
@@ -20,6 +23,8 @@ export default function AnalysisCard({
   busy?: boolean;
   onApprove: (item: DecisionItem) => void;
   onReject: (item: DecisionItem) => void;
+  /** Extra section under the analysis (e.g. transfer options). */
+  extra?: ReactNode;
 }) {
   const isAnalysis = mode === "analizar";
   const sections = analysis.status === "ok" ? analysisSections(mode, analysis.data) : [];
@@ -38,7 +43,7 @@ export default function AnalysisCard({
           {(
             [
               ["Impacto", item.value || "Sin datos", "text-tertiary-fixed-dim"],
-              ["Confianza", item.confPct, ""],
+              [item.confLabel, item.confPct, ""],
               ["Límite", item.deadline, ""],
             ] as const
           ).map(([label, value, tone]) => (
@@ -50,7 +55,7 @@ export default function AnalysisCard({
         </div>
       </div>
       <div className="flex flex-col gap-3 px-4 py-3.5">
-        {analysis.status === "loading" && <p className="m-0 text-[13px] leading-[19px] text-on-surface-variant">Cargando análisis…</p>}
+        {analysis.status === "loading" && <AnalysisSkeleton />}
         {analysis.status === "soon" && <p className="m-0 text-[13px] leading-[19px] text-on-surface-variant">{SOON_TEXT}</p>}
         {analysis.status === "error" && <p className="m-0 text-[13px] leading-[19px] text-on-surface-variant">No se pudo cargar el análisis: {analysis.message}</p>}
         {sections.map((s) => (
@@ -64,6 +69,7 @@ export default function AnalysisCard({
             ))}
           </div>
         ))}
+        {extra}
       </div>
       {open && (
         <div className="flex gap-2 px-4 pb-4">

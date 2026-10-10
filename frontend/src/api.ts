@@ -1,4 +1,4 @@
-import type { AgentsStatusResponse, AlertRecord, Case, CaseDecisionBody, CaseDecisionResult, InboxCounts, IssueAnalysis, MemoryRecord, MessageContext, PendingResponse, CaseMode, DaySummary, DeliveriesResponse, ExpiringResponse, HistoryResponse, InventoryResponse, Kpis, Outlook, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, SupplierPerformance, TraceEvent, Turn, TurnRecord } from "./types";
+import type { TransferOptionsResponse, NoteBody, NoteResult, AdvanceResult, AgentsStatusResponse, AlertRecord, Case, CaseDecisionBody, CaseDecisionResult, InboxCounts, IssueAnalysis, MemoryRecord, MessageContext, PendingResponse, CaseMode, DaySummary, DeliveriesResponse, ExpiringResponse, InventoryResponse, Outlook, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, TraceEvent, Turn, TurnRecord } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -55,6 +55,7 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
     listCases: (query: { store_id?: string }) => request<Case[]>("/cases", {}, query),
     createCase: (b: { store_id: string; sim_today: string; mode?: CaseMode; title?: string }) =>
       request<Case>("/cases", send("POST", b)),
+    advanceCase: (caseId: string, b: { days: number }) => request<AdvanceResult>(`/cases/${caseId}/advance`, send("POST", b)),
     sendMessage: (caseId: string, text: string, context?: MessageContext) =>
       request<{ turn_id: string }>(`/cases/${caseId}/messages`, send("POST", context ? { text, context } : { text })),
     listTurns: (caseId: string) => request<TurnRecord[]>(`/cases/${caseId}/turns`),
@@ -68,13 +69,10 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
       }),
     listIssues: (caseId: string, q: { limit?: string; category?: string; kind?: string } = {}) =>
       request<Issue[]>(`/cases/${caseId}/issues`, {}, q),
-    getKpis: (caseId: string) => request<Kpis>(`/cases/${caseId}/kpis`),
     getExpiring: (caseId: string, q: { days?: string } = {}) => request<ExpiringResponse>(`/cases/${caseId}/expiring`, {}, q),
     getInventory: (caseId: string, q: { sort?: string; limit?: string } = {}) => request<InventoryResponse>(`/cases/${caseId}/inventory`, {}, q),
     getDeliveries: (caseId: string, q: { days?: string } = {}) => request<DeliveriesResponse>(`/cases/${caseId}/deliveries`, {}, q),
     getOutlook: (caseId: string, q: { days?: string } = {}) => request<Outlook>(`/cases/${caseId}/outlook`, {}, q),
-    getHistory: (caseId: string) => request<HistoryResponse>(`/cases/${caseId}/history`),
-    getSupplierPerformance: (caseId: string) => request<SupplierPerformance[]>(`/cases/${caseId}/suppliers/performance`),
     getOrderPlan: (caseId: string) => request<OrderPlan>(`/cases/${caseId}/order-plan`),
     listAlerts: (q: { store_id?: string; state?: string }) => request<AlertRecord[]>("/alerts", {}, q),
     /** Step 1 of a decision: turns (issue, option) into a pending proposal. Repeating the key returns the same proposal. */
@@ -94,6 +92,8 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
         ...(opts.idempotencyKey ? { headers: { "Idempotency-Key": opts.idempotencyKey } } : {}),
       }),
     getMemories: (caseId: string, q: { category?: string; q?: string } = {}) => request<MemoryRecord[]>(`/cases/${caseId}/memories`, {}, q),
+    addNote: (caseId: string, b: NoteBody) => request<NoteResult>(`/cases/${caseId}/notes`, send("POST", b)),
+    getTransferOptions: (caseId: string) => request<TransferOptionsResponse>(`/cases/${caseId}/transfers/options`),
     getAgentsStatus: () => request<AgentsStatusResponse>("/agents/status"),
     getInboxCounts: (caseId: string) => request<InboxCounts>(`/cases/${caseId}/inbox-counts`),
     getForecast: (caseId: string, q: { sku?: string; from?: string; to?: string; level?: "sku" | "store"; metric?: string } = {}) =>

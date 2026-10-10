@@ -13,9 +13,6 @@ export function shiftDate(iso: string, days: number): string {
   return new Date(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
 }
 
-/** The 7 days ending at `end` (inclusive), oldest first. */
-export const lastSevenDays = (end: string): string[] => Array.from({ length: 7 }, (_, i) => shiftDate(end, i - 6));
-
 export const weekdayShort = (iso: string): string =>
   new Intl.DateTimeFormat("es-MX", { weekday: "short", timeZone: "UTC" }).format(new Date(`${iso.slice(0, 10)}T00:00:00Z`));
 

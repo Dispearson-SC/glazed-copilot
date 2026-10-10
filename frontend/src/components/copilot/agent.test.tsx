@@ -23,7 +23,7 @@ describe("AnalysisCard", () => {
     expect(screen.getByRole("heading", { name: approval.title })).toBeInTheDocument();
     expect(screen.getByText("Impacto").nextSibling).toHaveTextContent("+$58.92");
     expect(screen.getByText(/Reduce la merma en \$58.92/)).toBeInTheDocument();
-    expect(screen.getByText("Confianza").nextSibling).toHaveTextContent("74%");
+    expect(screen.getByText("Confianza calibrada").nextSibling).toHaveTextContent("74%");
     expect(screen.getByText("Límite").nextSibling).toHaveTextContent("Hoy");
     for (const l of ["Problema", "Recomendación", "Pros", "Contras", "Requiere tu aprobación"]) expect(screen.getByText(l)).toBeInTheDocument();
   });
@@ -52,7 +52,7 @@ describe("AnalysisCard", () => {
 
   it("says it is loading, 'Disponible pronto' on a 404 and the error otherwise, instead of empty sections", () => {
     const { rerender } = render(<AnalysisCard item={approval} analysis={{ status: "loading" }} mode="analizar" open onApprove={() => {}} onReject={() => {}} />);
-    expect(screen.getByText("Cargando análisis…")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: /Cargando análisis/ })).toBeInTheDocument();
     rerender(<AnalysisCard item={approval} analysis={{ status: "soon" }} mode="analizar" open onApprove={() => {}} onReject={() => {}} />);
     expect(screen.getByText("Disponible pronto")).toBeInTheDocument();
     rerender(<AnalysisCard item={approval} analysis={{ status: "error", message: "boom" }} mode="analizar" open onApprove={() => {}} onReject={() => {}} />);

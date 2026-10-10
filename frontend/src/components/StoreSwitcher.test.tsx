@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiProvider } from "../ApiContext";
 import { SessionProvider, useSession } from "../SessionContext";
 import { useCurrentCase } from "../useCurrentCase";
@@ -29,6 +29,7 @@ function setup(api = fakeApi()) {
 }
 
 beforeEach(() => localStorage.clear());
+afterEach(() => vi.restoreAllMocks());
 
 describe("StoreSwitcher", () => {
   it("lists display names, never codes, and marks the current store", async () => {
@@ -102,13 +103,29 @@ describe("persistence", () => {
     expect(localStorage.getItem("glazed.storeId")).toBe("S031");
   });
 
-  it("ignores a stored id that is no longer in /stores", async () => {
+  it("falls back to the first open store when the stored id is no longer in /stores", async () => {
     localStorage.setItem("glazed.storeId", "S999");
     setup();
-    await userEvent.click(screen.getByRole("button", { name: /cambiar sucursal/i }));
-    await screen.findByRole("dialog");
-    await waitFor(() => expect(screen.getByTestId("probe").textContent).toMatch(/^\|/));
-    expect(localStorage.getItem("glazed.storeId")).toBeNull();
+    await waitFor(() => expect(screen.getByTestId("probe").textContent).toMatch(/^S030\|/));
+    expect(localStorage.getItem("glazed.storeId")).toBe("S030");
+  });
+
+  it("falls back to the first open store when the stored one is closed", async () => {
+    localStorage.setItem("glazed.storeId", "S030");
+    setup(fakeApi({ listStores: vi.fn(async () => [{ ...store, closed_on: "2026-07-01" }, store2]) }));
+    await waitFor(() => expect(screen.getByTestId("probe").textContent).toMatch(/^S031\|/));
+  });
+
+  it("falls back when the stored store is not yet open", async () => {
+    localStorage.setItem("glazed.storeId", "S031");
+    setup(fakeApi({ listStores: vi.fn(async () => [store, { ...store2, opened_on: "2026-12-01T00:00:00" }]) }));
+    await waitFor(() => expect(screen.getByTestId("probe").textContent).toMatch(/^S030\|/));
+  });
+
+  it("compares only the YYYY-MM-DD part of the dates", () => {
+    expect(storeClosedReason({ ...store, closed_on: "2026-07-19T10:00:00" })).toBe(true);
+    expect(storeClosedReason({ ...store, opened_on: "2026-07-19T08:00:00" })).toBe(false);
+    expect(storeClosedReason({ ...store, closed_on: "2026-07-20T00:00:00" })).toBe(false);
   });
 
   it("survives localStorage throwing", async () => {
@@ -118,7 +135,5 @@ describe("persistence", () => {
     await userEvent.click(screen.getByRole("button", { name: /cambiar sucursal/i }));
     await userEvent.click(await screen.findByRole("button", { name: new RegExp(store2.display_name!) }));
     await waitFor(() => expect(screen.getByTestId("probe").textContent).toMatch(/^S031\|/));
-    get.mockRestore();
-    set.mockRestore();
   });
 });

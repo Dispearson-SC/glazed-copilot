@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import DaySwitcher from "../DaySwitcher";
 import StoreSwitcher from "../StoreSwitcher";
 
 /** Fixed 64px top bar: logo, brand, store code and the settings button. */
@@ -7,9 +7,7 @@ export default function CopilotTopBar({ storeCode, onSettings }: { storeCode: st
     <header className="fixed inset-x-0 top-0 z-40 bg-surface/[.88] pt-safe backdrop-blur-xl shadow-[0_1px_8px_rgba(75,48,37,.04)]">
       <div className="mx-auto flex h-16 max-w-[640px] items-center justify-between px-4">
         <div className="flex min-w-0 items-center gap-2">
-          <Link to="/resumen" aria-label="Volver al resumen" className="flex-shrink-0 no-underline">
-            <img alt="Logo Glazed Co." src="/Logo.png" className="h-8 w-8 rounded-full object-contain" />
-          </Link>
+          <img alt="Logo Glazed Co." src="/Logo.png" className="h-8 w-8 flex-shrink-0 rounded-full object-contain" />
           <StoreSwitcher className="min-h-[44px]">
             <div className="flex min-w-0 flex-col">
               <span className="font-headline-sm text-headline-sm tracking-tight text-primary">Glazed Co.</span>
@@ -29,6 +27,7 @@ export default function CopilotTopBar({ storeCode, onSettings }: { storeCode: st
           <span aria-hidden="true" className="material-symbols-outlined text-[22px]">tune</span>
         </button>
       </div>
+      <DaySwitcher storeId={storeCode} className="pb-1" />
     </header>
   );
 }

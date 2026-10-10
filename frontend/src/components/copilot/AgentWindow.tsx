@@ -9,6 +9,9 @@ import type { AgentsStatusResponse } from "../../types";
 import type { useChat } from "../../useChat";
 import AgentOrb from "./AgentOrb";
 import AnalysisCard from "./AnalysisCard";
+import { ChatSkeleton } from "./Skeleton";
+import TransferOptions from "./TransferOptions";
+import ConversationBar from "./ConversationBar";
 
 type Chat = ReturnType<typeof useChat>;
 
@@ -69,12 +72,14 @@ function AnalysisLoader({ caseId, item, mode, open, busy, onApprove, onReject }:
       alive = false;
     };
   }, [api, caseId, item.issueId]);
-  return <AnalysisCard item={item} analysis={analysis} mode={mode} open={open} busy={busy} onApprove={onApprove} onReject={onReject} />;
+  return <AnalysisCard item={item} analysis={analysis} mode={mode} open={open} busy={busy} onApprove={onApprove} onReject={onReject} extra={item.isTransfer ? <TransferOptions caseId={caseId} /> : undefined} />;
 }
 
 /** Agente window: the existing chat (useChat) in the copilot look, with the pinned context and the analysis cards. */
 export default function AgentWindow({
   caseId,
+  storeId = "",
+  simToday = "",
   chat,
   items,
   openIds,
@@ -85,6 +90,8 @@ export default function AgentWindow({
   onReject,
 }: {
   caseId: string;
+  storeId?: string;
+  simToday?: string;
   chat: Chat;
   /** Every decision seen this session, so a decided card still renders as 'Decisión registrada'. */
   items: DecisionItem[];
@@ -101,6 +108,7 @@ export default function AgentWindow({
   const { state, dispatch, showToast } = useCopilot();
   const [draft, setDraft] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
+  useEffect(() => setDraft(""), [caseId]);
   const busy = chat.status === "working";
   const pendingIds = new Set(openIds ?? items.map((i) => i.id));
 
@@ -133,7 +141,7 @@ export default function AgentWindow({
 
   return (
     <>
-      <div ref={scroller} className="fixed inset-x-0 bottom-[204px] top-16 overflow-y-auto">
+      <div ref={scroller} className="fixed inset-x-0 bottom-[204px] top-[100px] overflow-y-auto">
         <div className="mx-auto max-w-[640px] px-4 pb-4">
           <section className="flex flex-col items-center px-2 pb-4 pt-5 text-center">
             <AgentOrb size={116} />
@@ -141,6 +149,8 @@ export default function AgentWindow({
             <h1 className="m-0 mt-2 font-headline-lg text-headline-lg tracking-tight text-primary">¿Qué decidimos hoy?</h1>
             <p className="m-0 mt-1 font-body-md text-body-md text-on-surface-variant">{pendingLine}</p>
           </section>
+
+          <ConversationBar storeId={storeId} simToday={simToday} caseId={caseId} />
 
           {state.ctx && (
             <div className="mb-3 flex items-center gap-2 rounded-full bg-surface-container-high py-2 pl-3.5 pr-2 text-primary">
@@ -155,6 +165,7 @@ export default function AgentWindow({
           )}
 
           <div className="flex flex-col gap-2.5">
+            {chat.historyLoading && chat.messages.length === 0 && <ChatSkeleton />}
             {chat.messages.map((m, i) => (
               <div key={m.id} className="contents">
                 {renderCards(i)}

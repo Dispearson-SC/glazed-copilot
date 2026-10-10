@@ -86,6 +86,8 @@ export interface DecisionItem {
   value: string;
   conf: number;
   confPct: string;
+  /** "Confianza calibrada" or "Confianza estimada (sin calibrar)". */
+  confLabel: string;
   deadline: string;
   supplier: string;
   arrive: string;
@@ -94,6 +96,10 @@ export interface DecisionItem {
   /** Backend impact chips (technical cards). */
   chips: string[];
   warn: string;
+  /** Spanish labels of every kind merged into this issue (approvals). */
+  kinds?: string[];
+  /** A stock transfer between stores (kind transfer_opportunity / action transfer_stock). */
+  isTransfer?: boolean;
 }
 
 const TIER_NAMES: Record<string, string> = { N1: "Automática", N2: "Propuesta", N3: "Diálogo" };
@@ -113,6 +119,7 @@ const ACTION_ICONS: Record<string, string> = {
   adjust_order_qty: "tune",
   markdown_end_of_day: "sell",
   transfer: "swap_horiz",
+  transfer_stock: "swap_horiz",
 };
 
 function benefitText(r: Range3 | null | undefined): string {
@@ -128,21 +135,27 @@ const confScore = (c: PendingResponse["technical"][number]["confidence"] | undef
 
 const confText = (score: number | null | undefined): string => (score == null ? "Sin datos" : pct(score));
 
+/** "Calibrada" only when the backend says the score is calibrated; a bare number (old backend) is not. */
+export const confLabelFor = (calibrated: boolean | undefined): string => (calibrated ? "Confianza calibrada" : "Confianza estimada (sin calibrar)");
+const confCalibrated = (c: PendingResponse["technical"][number]["confidence"] | undefined): boolean => (c != null && typeof c === "object" ? c.calibrated === true : false);
+
 /** Maps GET /decisions/pending to cards. Approvals and technical come split by the backend; a technical line with no issue/option is read-only. */
 export function buildPendingItems(pending: PendingResponse | null, simToday: string): DecisionItem[] {
   if (!pending) return [];
   const approvals = pending.approvals.map((a): DecisionItem => ({
     id: a.issue_id, issueId: a.issue_id, optionId: a.recommendation.option_id, kind: "approval", readOnly: false, tier: a.tier,
     icon: ACTION_ICONS[a.recommendation.action_type] ?? "bolt", level: tierLabel(a.tier), title: a.recommendation.label, summary: a.problem,
-    value: benefitText(a.impact_usd), conf: a.confidence.score ?? 0, confPct: confText(a.confidence.score), deadline: deadlineText(a.deadline, simToday),
+    value: benefitText(a.impact_usd), conf: a.confidence.score ?? 0, confPct: confText(a.confidence.score), confLabel: confLabelFor(a.confidence.calibrated), deadline: deadlineText(a.deadline, simToday),
     supplier: "", arrive: "", cost: "", why: a.problem, chips: [], warn: "",
+    kinds: (a.kinds ?? []).map((k) => kindLabelEs(k)),
+    isTransfer: a.kind === "transfer_opportunity" || a.recommendation.action_type === "transfer_stock",
   }));
   const techs = pending.technical.map((t): DecisionItem => {
     const decidable = Boolean(t.issue_id && t.option_id);
     return {
       id: t.issue_id ?? `line|${t.sku}`, issueId: t.issue_id ?? "", optionId: t.option_id ?? "", kind: "tech", readOnly: !decidable, tier: t.tier ?? "",
       icon: t.expected_delivery || t.qty ? "shopping_basket" : "bolt", level: t.tier ? tierLabel(t.tier) : "", title: t.label, summary: "",
-      value: benefitText(null), conf: confScore(t.confidence) ?? 0, confPct: confText(confScore(t.confidence)), deadline: deadlineText(t.deadline, simToday),
+      value: benefitText(null), conf: confScore(t.confidence) ?? 0, confPct: confText(confScore(t.confidence)), confLabel: confLabelFor(confCalibrated(t.confidence)), deadline: deadlineText(t.deadline, simToday),
       supplier: t.supplier_name ?? t.supplier_id ?? "", arrive: t.expected_delivery ? `llega ${weekdayDay(t.expected_delivery)}` : "",
       cost: t.cost_usd?.mid ? usd(t.cost_usd.mid) : "", why: t.why, chips: t.impact_chips ?? [], warn: t.warning ?? "",
     };
@@ -150,13 +163,14 @@ export function buildPendingItems(pending: PendingResponse | null, simToday: str
   // The same issue can come back as an approval and as a technical line (or merged under several kinds): one card per issue_id,
   // and the approval wins because it asks for the manager's opinion.
   const approvalIds = new Set(approvals.map((a) => a.id));
+  const mergedIds = new Set(pending.approvals.flatMap((a) => a.merged_issue_ids ?? []));
   const seen = new Set<string>();
   const uniqueTechs = techs.filter((t) => {
-    if (approvalIds.has(t.id) || seen.has(t.id)) return false;
+    if (approvalIds.has(t.id) || mergedIds.has(t.id) || seen.has(t.id)) return false;
     seen.add(t.id);
     return true;
   });
-  const uniqueApprovals = approvals.filter((a, i) => approvals.findIndex((x) => x.id === a.id) === i);
+  const uniqueApprovals = approvals.filter((a, i) => approvals.findIndex((x) => x.id === a.id) === i && !mergedIds.has(a.id));
   return [...uniqueTechs, ...uniqueApprovals];
 }
 
@@ -297,7 +311,7 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
   const { asOf, forecast, ayer, hoy, expiring, outlook, metrics } = input;
   const date = day === "ayer" ? shiftDate(asOf, -1) : day === "hoy" ? asOf : shiftDate(asOf, 1);
   const point = forecast?.points.find((p) => p.date === date);
-  const od: OutlookDay | undefined = day === "ayer" ? undefined : outlook?.days.find((d) => d.date === date);
+  const od: OutlookDay | undefined = outlook?.days.find((d) => d.date === date);
   const sales = od?.net_sales;
   const expectedValue = sales?.mid ?? point?.forecast;
   const range = sales ? rangeText(sales.low, sales.high) : point ? rangeText(point.p10, point.p90) : null;
@@ -309,7 +323,7 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
     date: cap(longDate(date)),
     expected: expectedValue == null ? "Sin datos" : usd(expectedValue),
     range,
-    conf: day === "ayer" ? "Pronóstico cerrado" : `Pronóstico ${NO_DATA}`,
+    conf: day === "ayer" ? (od?.vs_forecast_pct != null ? `${signedPct(od.vs_forecast_pct)} vs pronóstico` : "Pronóstico cerrado") : `Pronóstico ${NO_DATA}`,
     real: "Pendiente",
     realNote: day === "hoy" ? "Se registra al cierre" : "Día futuro",
     realKnown: false,
@@ -328,8 +342,10 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
     const wx = ayer?.context?.weather;
     const delta = ayer?.vs_same_weekday_avg?.delta_pct;
     const rainy = (wx?.precip_mm ?? 0) > 0;
-    view.real = t?.net_sales == null ? "Sin datos" : usd(t.net_sales);
-    view.realKnown = t?.net_sales != null;
+    // Yesterday's real sales: the day summary, else the outlook's backtest actual.
+    const realSales = t?.net_sales ?? od?.actual?.net_sales;
+    view.real = realSales == null ? "Sin datos" : usd(realSales);
+    view.realKnown = realSales != null;
     view.realNote = delta == null ? "Sin comparativo" : `${signedPct(delta)} vs promedio mismo día`;
     view.weather = {
       icon: rainy ? "rainy" : "sunny",
@@ -383,12 +399,14 @@ export interface InventoryRow {
   statusLabel: string;
   /** Backend explanation of the status. */
   reason: string;
+  /** Backend closing sentence (display_status_es); empty when the inventory does not serve it. */
+  display: string;
 }
 
 const num = (n: number): string => String(Math.round(n * 100) / 100);
 const STATUS_LABELS = { critical: "Crítico", watch: "Seguimiento", ok: "En orden" } as const;
 
-export function buildInventoryRows(inv: InventoryResponse | null, plan: OrderPlan | null, limit = 6): InventoryRow[] {
+export function buildInventoryRows(inv: InventoryResponse | null, plan: OrderPlan | null, limit = Infinity): InventoryRow[] {
   return (inv?.items ?? []).slice(0, limit).map((it) => {
     const line = plan?.lines.find((l) => l.sku === it.sku);
     const denom = Math.max(it.avg_daily_demand, it.on_hand);
@@ -412,6 +430,7 @@ export function buildInventoryRows(inv: InventoryResponse | null, plan: OrderPla
       status: it.status ?? null,
       statusLabel: it.status ? STATUS_LABELS[it.status] : "",
       reason: it.status_reason ?? "",
+      display: it.display_status_es ?? "",
     };
   });
 }
@@ -516,6 +535,9 @@ const KIND_LABELS_ES: Record<string, string> = {
   compliance_deviation: "Acción aprobada sin ejecutar",
   orphan_sku: "Ventas sin producto en el catálogo",
   sku_key_mismatch: "Claves de producto que no coinciden",
+  inflated_order: "Pedido inflado",
+  expiring: "Próximo a caducar",
+  transfer_opportunity: "Oportunidad de traslado",
 };
 export const kindLabelEs = (kind: string | null | undefined, label?: string | null): string => label || (kind ? KIND_LABELS_ES[kind] : undefined) || "Advertencia";
 
@@ -534,6 +556,8 @@ function alertCopyBase(a: AlertRecord): { icon: string; title: string; body: str
       return { icon: "event", title: `Efecto de calendario: ${i.event?.name ?? "evento"}`, body: sev ? `Impacto estimado de ${sev} si el plan no lo refleja.` : "Sin datos" };
     case "compliance_deviation":
       return { icon: "rule", title: "Acción aprobada sin ejecutar", body: "Una decisión aprobada no se ejecutó. Revisa qué pasó." };
+    case "transfer_opportunity":
+      return { icon: "swap_horiz", title: kindLabelEs(i.kind, a.kind_label_es), body: sev ? `Trasladar stock puede ahorrar ${sev}.` : "Hay stock que se puede trasladar a otra sucursal." };
     default:
       return { icon: "warning", title: kindLabelEs(i.kind, a.kind_label_es), body: sev ? `Impacto estimado de ${sev}.` : "Sin datos" };
   }

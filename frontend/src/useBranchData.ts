@@ -34,7 +34,7 @@ export function useBranchData(caseId: string, asOf: string, enabled: boolean, re
         api.getDaySummary(caseId, shiftDate(asOf, -1)),
         api.getDaySummary(caseId, asOf),
         api.getExpiring(caseId),
-        api.getInventory(caseId, { limit: "6" }),
+        api.getInventory(caseId, { limit: "50" }),
         api.getDeliveries(caseId),
         api.getOrderPlan(caseId),
         fetchOutlook(api, caseId),

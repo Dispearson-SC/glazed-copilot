@@ -46,7 +46,9 @@ export type CopilotAction =
   | { type: "closeReject" }
   | { type: "toast"; text: string | null }
   | { type: "analysis"; itemId: string; title: string; mode: AnalysisRef["mode"]; at: number; issueId?: string; optionId?: string }
-  | { type: "handled"; id: string; accepted: boolean };
+  | { type: "handled"; id: string; accepted: boolean }
+  /** The active case changed: drop everything that belonged to the previous one. */
+  | { type: "resetCase" };
 
 export function copilotReducer(s: CopilotState, a: CopilotAction): CopilotState {
   switch (a.type) {
@@ -77,6 +79,8 @@ export function copilotReducer(s: CopilotState, a: CopilotAction): CopilotState 
         analyses: [...s.analyses, { id: `an-${s.seq}`, itemId: a.itemId, mode: a.mode, at: a.at }],
         seq: s.seq + 1,
       };
+    case "resetCase":
+      return { ...s, ctx: null, menuFor: null, rejectFor: null, accepted: 0, handled: [], analyses: [], seq: 1 };
     case "handled":
       if (s.handled.includes(a.id)) return s;
       return { ...s, handled: [...s.handled, a.id], accepted: s.accepted + (a.accepted ? 1 : 0), menuFor: null };

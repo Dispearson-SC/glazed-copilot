@@ -109,3 +109,17 @@ Format: design element | needed field/endpoint | backend status | suggested cont
   - Vite was started WITHOUT `VITE_API_URL` (default proxy to :8100): with `VITE_API_URL=http://localhost:8100` the browser calls the backend cross-origin and the backend sends no CORS headers (README), so every request failed.
   - Remaining visual differences (not data errors): Main still follows the earlier port (title shows store name instead of "Café Central", no bell icon, "Ventas por día" instead of the hourly "Actividad de hoy", initials instead of product photos, floating chat button overlaps the chart); Copiloto top bar shows the branch name instead of the code S030; Decisiones lists every issue the backend returns (17 approvals, 7 technical in the check), so counts differ from the mock's 3/4; inventory pills show days of cover (no status field yet); Sucursal Hoy/Ayer hero shows "Sin datos" because the live forecast carries no point for those days; the first six inventory rows are zero-stock items because the backend sorts by days of cover.
   - Not verified: pixel measurements by overlay (comparison was visual); Accept/Reject/Analizar against the live backend (not clicked to avoid mutating real data; covered by tests with a fake API); `/outlook` shape (route answers 404); real (non-mocked) rendering of an approval card with N3 data; desktop widths.
+
+## Demo batch
+- 1 Day switcher (◀ fecha ▶): dab6ac5, 360 tests green
+- 2 Inventory display_status_es + top 10 / Ver todo: 8046dbd, 362 tests green
+- 3 Forecast/Hoy: is_today outlook, Ayer forecast vs actual (only DayView consumes past days): 987dd3c, 366 tests green
+- 4 Decision dedupe via merged_issue_ids + kinds[] pills: 7c03f74, 369 tests green
+- 5 StoreSwitcher advisories: ca6c79b, 372 tests green
+
+- Scope change: the app is the Copiloto only. /resumen, /login, /chat, the floating chat, PageShell and the Main components were removed; every other path redirects to /copiloto.
+- 6 Conversations (Nueva conversación + list, per-store localStorage): 2707765, 343 tests green
+- A Store-switch stale data fix (usePolling scope guard, per-case reset): 0ef3f05, 345 tests green
+- B Skeleton placeholders (decisions, alerts, memories, Sucursal, analysis, chat history; no forecast chart exists after the Resumen removal): b5bbc14, 354 tests green
+- 7 Manager notes (Anotar): 4c7e895, 359 tests green
+- 8 Transfers (card, icon, kind, options in analysis, alert): 8cebfa0, 367 tests green

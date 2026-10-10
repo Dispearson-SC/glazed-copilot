@@ -1,7 +1,7 @@
 import type { Api } from "./api";
 import { useApi } from "./ApiContext";
 import { DEFAULT_SIM_TODAY } from "./config";
-import { useSession } from "./SessionContext";
+import { readStoredCase, useSession } from "./SessionContext";
 import type { Case } from "./types";
 import { usePolling } from "./usePolling";
 
@@ -22,23 +22,21 @@ export const pickCase = (cases: Case[], preferredId = "", defaultSimToday = DEFA
 
 const inFlight = new Map<string, Promise<Case[]>>();
 
-/** Creates the default-date live case once per store (shared across concurrent callers), then re-lists. */
-function ensureDefaultCase(api: Api, storeId: string): Promise<Case[]> {
-  let p = inFlight.get(storeId);
+/** Creates a live case at `simToday` once per store+date (shared across concurrent callers), then re-lists. */
+export function ensureCaseAt(api: Api, storeId: string, simToday: string, title = `Demo ${simToday}`): Promise<Case[]> {
+  const key = `${storeId}|${simToday}`;
+  let p = inFlight.get(key);
   if (!p) {
     p = (async () => {
-      await api.createCase({
-        store_id: storeId,
-        sim_today: DEFAULT_SIM_TODAY,
-        mode: "live",
-        title: `Demo ${DEFAULT_SIM_TODAY}`,
-      });
+      await api.createCase({ store_id: storeId, sim_today: simToday, mode: "live", title });
       return api.listCases({ store_id: storeId });
-    })().finally(() => inFlight.delete(storeId));
-    inFlight.set(storeId, p);
+    })().finally(() => inFlight.delete(key));
+    inFlight.set(key, p);
   }
   return p;
 }
+
+const ensureDefaultCase = (api: Api, storeId: string) => ensureCaseAt(api, storeId, DEFAULT_SIM_TODAY);
 
 export function useCurrentCase(storeId: string, refreshKey = 0) {
   const api = useApi();
@@ -47,6 +45,8 @@ export function useCurrentCase(storeId: string, refreshKey = 0) {
     async () => {
       if (!storeId) return null;
       const cases = await api.listCases({ store_id: storeId });
+      const remembered = caseId ? "" : readStoredCase(storeId);
+      if (remembered && cases.some((c) => c.case_id === remembered)) return pickCase(cases, remembered);
       if (caseId || liveAt(cases, DEFAULT_SIM_TODAY).length > 0) return pickCase(cases, caseId);
       try {
         return pickCase(await ensureDefaultCase(api, storeId), caseId);
@@ -57,6 +57,9 @@ export function useCurrentCase(storeId: string, refreshKey = 0) {
     60_000,
     false,
     [storeId, refreshKey, caseId],
+    { keepOnChange: true },
   );
-  return { currentCase: res.data, loading: res.loading, error: res.error };
+  // Never hand back a case of another store while the new store's cases are loading.
+  const currentCase = res.data && res.data.store_id === storeId ? res.data : null;
+  return { currentCase, loading: res.loading, error: res.error };
 }

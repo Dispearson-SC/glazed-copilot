@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import AgentWindow from "../components/copilot/AgentWindow";
 import AlertsWindow from "../components/copilot/AlertsWindow";
@@ -30,7 +30,7 @@ function CopilotShell() {
   const session = useSession();
   const storeId = session.storeId || firstId;
   const active = stores.find((s) => s.store_id === storeId);
-  const { currentCase } = useCurrentCase(storeId, session.refreshKey);
+  const { currentCase, loading: caseLoading } = useCurrentCase(storeId, session.refreshKey);
   const caseId = currentCase?.case_id ?? "";
   const simToday = currentCase?.sim_today ?? "";
   const chat = useChat(caseId, { storeId });
@@ -39,15 +39,26 @@ function CopilotShell() {
   const warningsData = useWarningsData(storeId, caseId, session.refreshKey);
   const memoryData = useMemoryData(caseId, session.refreshKey);
   const inbox = useInbox(caseId, session.refreshKey);
+  const [rejectItem, setRejectItem] = useState<DecisionItem | null>(null);
   const { decide, busyId } = useDecide(caseId, async () => {
     await data.refresh();
     await inbox.refreshCounts();
     await memoryData.refresh();
   });
+  // A different case starts clean: handled ids, accepted count, analysis cards, context and open sheets belong to the old one.
+  useEffect(() => {
+    dispatch({ type: "resetCase" });
+    setRejectItem(null);
+  }, [caseId, dispatch]);
   const [site, branch] = splitStoreName(active ? storeLabel(active) : "Sucursal");
 
   // Every decision seen this session stays available to the chat cards even after it is decided.
   const known = useRef(new Map<string, DecisionItem>());
+  const knownCase = useRef(caseId);
+  if (knownCase.current !== caseId) {
+    knownCase.current = caseId;
+    known.current.clear();
+  }
   data.items.forEach((i) => known.current.set(i.id, i));
   const visible = data.items.filter((i) => !state.handled.includes(i.id));
   const approvals = visible.filter((i) => i.kind === "approval").length;
@@ -77,7 +88,6 @@ function CopilotShell() {
   };
 
   // The item the reject sheet was opened for; used when known.current no longer has it, so the sheet always renders.
-  const [rejectItem, setRejectItem] = useState<DecisionItem | null>(null);
   const openReject = (i: DecisionItem) => {
     setRejectItem(i);
     dispatch({ type: "openReject", id: i.id });
@@ -90,6 +100,8 @@ function CopilotShell() {
       {state.tab === "agente" && (
         <AgentWindow
           caseId={caseId}
+          storeId={storeId}
+          simToday={simToday}
           chat={chat}
           items={[...known.current.values()]}
           openIds={visible.map((i) => i.id)}
@@ -104,6 +116,7 @@ function CopilotShell() {
         <DecisionsWindow
           items={visible}
           simToday={simToday}
+          loading={data.items.length === 0 && (data.loading || (!caseId && caseLoading))}
           loadState={data.items.length === 0 && data.error ? (isUnavailable(data.error) ? "soon" : "error") : "ok"}
           menuFor={state.menuFor}
           busyId={busyId}
@@ -131,13 +144,18 @@ function CopilotShell() {
       {state.tab === "memorias" && (
         <MemoriesWindow
           storeCode={storeId}
+          caseId={caseId}
+          onNoteSaved={() => {
+            showToast("Nota guardada");
+            void memoryData.refresh();
+          }}
           memories={memories}
           filter={state.memFilter}
           onFilter={(value) => dispatch({ type: "memFilter", value })}
-          state={memoryData.state}
+          state={!caseId && !caseLoading ? "ok" : memoryData.state}
         />
       )}
-      {state.tab === "alertas" && <AlertsWindow warnings={warnings} filter={state.alertFilter} onFilter={(value) => dispatch({ type: "alertFilter", value })} onAsk={ask} />}
+      {state.tab === "alertas" && <AlertsWindow loading={warningsData === null && (caseLoading || Boolean(caseId))} warnings={warnings} filter={state.alertFilter} onFilter={(value) => dispatch({ type: "alertFilter", value })} onAsk={ask} />}
       <CapsuleNav tab={state.tab} onChange={(tab) => dispatch({ type: "tab", tab })} badges={badges} />
       <Toast text={state.toast} />
       {reject && (

@@ -5,6 +5,7 @@ const REMOVED = [
   "pages/AlertsPage", "pages/CasesPage", "pages/PurchasesPage", "pages/TracePage", "pages/DecisionsPage",
   "pages/InventoryPage", "pages/WeekPage", "SimControl", "CentinelaPanel", "IssueDetail", "ComingSoon",
   "pages/HomePage", "shell/TopBar", "shell/BottomNav", "dashboard/Hero", "dashboard/TrendChart", "dashboard/ForecastChart", "dashboard/BriefingCard", "dashboard/ContextChips", "dashboard/UpcomingCard", "dashboard/ForecastAccuracy", "issues",
+  "pages/DashboardPage", "pages/LoginPage", "pages/ChatPage", "chat/FloatingChat", "chat/ChatView", "components/PageShell", "components/TopBar", "components/BottomNav",
 ];
 
 describe("legacy code is gone", () => {
@@ -15,7 +16,5 @@ describe("legacy code is gone", () => {
   it("ships no legacy css layer, semaphore or reasoning links", () => {
     const css = readFileSync("src/index.css", "utf8");
     for (const legacy of [".card", ".panel", ".badge", ".lanes", ".light", ".timeline", "main button"]) expect(css).not.toContain(legacy);
-    expect(readFileSync("src/pages/DashboardPage.tsx", "utf8")).not.toMatch(/semaphore|Alertas abiertas|Lo que se pierde/);
-    expect(readFileSync("src/chat/ChatView.tsx", "utf8")).not.toContain("Ver razonamiento");
   });
 });

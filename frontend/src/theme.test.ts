@@ -11,9 +11,9 @@ describe("Artisanal Roast theme", () => {
     expect(colors.surface).toBe("#fff8f4");
     expect(colors["on-tertiary-container"]).toBe("#cb9564");
     const fonts = tailwind.theme?.extend?.fontFamily as Record<string, string[]>;
-    for (const k of ["display-hero", "display-hero-mobile", "headline-lg", "headline-md", "headline-sm"]) expect(fonts[k][0]).toBe("Playfair Display");
-    for (const k of ["metric-value", "metric-value-sm", "body-lg", "body-md", "label-md", "label-sm"]) expect(fonts[k][0]).toBe("Plus Jakarta Sans");
-    expect(fonts["body-md"][0]).toBe("Plus Jakarta Sans");
+    // Numbers render in Inter: a digits-only Inter subset comes first, so letters fall back to the design fonts.
+    for (const k of ["display-hero", "display-hero-mobile", "headline-lg", "headline-md", "headline-sm"]) expect(fonts[k].slice(0, 2)).toEqual(["Inter", "Playfair Display"]);
+    for (const k of ["metric-value", "metric-value-sm", "body-lg", "body-md", "label-md", "label-sm"]) expect(fonts[k].slice(0, 2)).toEqual(["Inter", "Plus Jakarta Sans"]);
   });
 
   it("loads the fonts and Material Symbols in index.html", () => {
@@ -21,7 +21,17 @@ describe("Artisanal Roast theme", () => {
     expect(html).toContain("Material+Symbols+Outlined");
     expect(html).toContain("Plus+Jakarta+Sans");
     expect(html).toContain("Playfair+Display");
+    // Inter is loaded only for numerals and number punctuation (Google Fonts text= subset).
+    expect(html).toMatch(/family=Inter:wght@[^"&]*&text=[^"&]*0123456789/);
     expect(html).toContain('content="#4b3025"');
+  });
+
+  it("uses the numerals-first stack for the base text and inline headings", () => {
+    const css = readFileSync("src/index.css", "utf8");
+    expect(css).toMatch(/font-family:\s*"Inter",\s*"Plus Jakarta Sans"/);
+    for (const f of ["src/components/StoreSwitcher.tsx", "src/components/copilot/NoteSheet.tsx", "src/components/copilot/ConversationBar.tsx"]) {
+      expect(readFileSync(f, "utf8")).not.toMatch(/fontFamily: "'Playfair Display', serif"/);
+    }
   });
 
   it("proxies /api to the host backend port 8100 by default", () => {

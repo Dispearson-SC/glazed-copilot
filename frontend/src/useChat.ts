@@ -56,6 +56,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
   const api = useApi();
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [local, setLocal] = useState<ChatMessage[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [status, setStatus] = useState<ChatStatus>("idle");
   const [stillRunning, setStillRunning] = useState(false);
   const [progress, setProgress] = useState<TurnProgress[]>([]);
@@ -66,10 +67,13 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
   const lastText = useRef("");
   const lastContext = useRef<MessageContext | undefined>(undefined);
 
+  const liveCase = useRef(caseId);
+  liveCase.current = caseId;
   const refreshProposals = useCallback(async () => {
     if (!caseId) return;
     try {
       const all = await api.listProposals({ case_id: caseId, status: "pending" });
+      if (liveCase.current !== caseId) return; // answered after the case changed
       setProposals(all.filter((p) => p.status === "pending"));
     } catch {
       /* keep the last list; the next refresh retries */
@@ -84,6 +88,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
     setStillRunning(false);
     setProgress([]);
     setProposals([]);
+    setHistoryLoading(Boolean(enabled && caseId));
     if (!enabled || !caseId) return;
     let alive = true;
     const patch = (id: string, next: ChatMessage) => setHistory((h) => h.map((m) => (m.id === id ? next : m)));
@@ -151,7 +156,8 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
       })
       .catch(() =>
         api.getTrace(storeId, caseId).then((ev) => alive && setHistory(buildHistory(ev))).catch(() => {}),
-      );
+      )
+      .finally(() => alive && setHistoryLoading(false));
     void refreshProposals();
     return () => {
       alive = false;
@@ -256,6 +262,8 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
 
   return {
     messages: [...history, ...local],
+    /** The stored turns are still being fetched. */
+    historyLoading,
     status,
     stillRunning,
     progress,

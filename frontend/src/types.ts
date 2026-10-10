@@ -27,6 +27,15 @@ export interface Case {
   core_conversation_id: string | null;
   title: string;
   created_at: string;
+  issue_key?: string | null;
+  archived?: boolean;
+}
+
+/** POST /cases/{id}/advance. `outcomes` lists decisions whose result became measurable. */
+export interface AdvanceResult {
+  sim_today: string;
+  new_alerts: unknown[];
+  outcomes: unknown[];
 }
 
 export interface Proposal {
@@ -149,6 +158,8 @@ export interface ForecastPoint {
   quantiles?: Record<string, number>;
   /** True for dates after as_of. */
   projected?: boolean;
+  /** "backtest" for dates up to as_of (forecast made before the day), "forward" after. */
+  forecast_kind?: "backtest" | "forward";
 }
 
 export interface ForecastMetrics {
@@ -326,6 +337,9 @@ export interface InventoryItem {
   forecast_outflow_units?: number | null;
   scheduled_in_units?: number | null;
   next_delivery_date?: string | null;
+  closing_reason?: "sold_out" | "discarded_perishable" | "in_stock" | "no_movement";
+  /** Backend sentence that explains the closing stock, e.g. "Agotado hoy (6.9 h sin stock) · llegan 40 mañana". */
+  display_status_es?: string;
 }
 
 export interface InventoryResponse {
@@ -363,6 +377,11 @@ export interface OutlookDay {
   weather?: null;
   weather_note?: string;
   projected?: boolean;
+  is_today?: boolean;
+  forecast_kind?: "backtest" | "forward";
+  /** Past days only. Today's actual is never shown (it is recorded at close). */
+  actual?: { net_sales?: number | null; transactions?: number | null; avg_ticket?: number | null } | null;
+  vs_forecast_pct?: number | null;
 }
 
 export interface Outlook {
@@ -509,4 +528,41 @@ export interface InboxCounts {
   approvals: number;
   technical: number;
   alerts: number;
+}
+
+/** POST /cases/{id}/notes: a manager note that becomes a memory (category eventos|demanda|proveedores|preferencias). */
+export interface NoteBody {
+  text: string;
+  category: "eventos" | "demanda" | "proveedores" | "preferencias";
+  date_from?: string;
+  date_to?: string;
+  impact?: string;
+}
+export interface NoteResult {
+  saved: boolean;
+  memory_id: string;
+}
+
+/** GET /cases/{id}/transfers/options: stock to move between stores before it expires. */
+export interface TransferOption {
+  option_id: string;
+  sku: string;
+  product_name: string;
+  from_store: string;
+  to_store: string;
+  to_store_name: string;
+  qty: number;
+  transfer_cost_usd: number;
+  net_usd: Range3;
+  confidence: { score: number | null; calibrated: boolean };
+  expires_on: string;
+  rationale_es: string;
+}
+export interface TransferOptionsResponse {
+  as_of: string;
+  store_id: string;
+  options: TransferOption[];
+  /** Why there is nothing to move (code), with its Spanish text when the backend sends it. */
+  reason?: string;
+  reason_es?: string;
 }

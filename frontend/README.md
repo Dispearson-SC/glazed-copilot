@@ -23,9 +23,7 @@ npm run preview
 
 The app has four screens: the three below plus `/copiloto`. The three were copied from the Glazed-Co design (github.com/CesarOliva/Glazed-Co @ b9d4132: markup, Tailwind classes, spacing, Material Symbols icons). Any other path redirects to `/`.
 
-- `/` (Resumen): dashboard of the current case's store, from the simulation clock (never the wall clock). Header with "Fecha simulada" and the sim date, hero with the day's net sales, delta and progress against the same-weekday average, metric cards (transactions, average ticket, units), "Ventas por día" chart (7 actual days plus up to 3 projected days, model name captioned), top 3 products, link to the chat and "Datos al <as_of>". A floating chat bubble opens a compact chat.
-- `/login`: store and case picker (no credentials; access control is the reverse proxy's basic auth). The choice lives in `SessionContext` (`storeId`, `caseId`).
-- `/chat`: full chat with the copilot over the same logic as the floating panel (turn history, polling, inline pending proposals with Aprobar/Rechazar, reply chip).
+- The app is the Copiloto only: `/copiloto` is the single screen; `/`, `/resumen`, `/login`, `/chat` and any unknown path redirect to it (`?tab=` picks the opening window).
 
 - `/copiloto`: the decision copilot (handoff `Copiloto.dc.html`), five windows behind a capsule navigation. It wires real data only; whatever the backend does not serve yet shows "Sin datos" / "Disponible pronto" (see the GAP LIST in `odd/tasks/copiloto.md`).
   - Agente: the chat over `useChat` (polling, history, inline proposals, markdown), pinned context ("Hablando de: ..."), suggestions and analysis/dialogue cards. The context is prefixed into the message text (`chatContextText`) until `POST /messages` accepts a `context` field.

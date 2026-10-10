@@ -93,3 +93,47 @@ describe("labels", () => {
     expect(deadlineText(null, SIM)).toBe("Sin fecha límite");
   });
 });
+
+describe("buildPendingItems merged issues and kinds", () => {
+  const base = pendingA.approvals[0];
+  const withMerge = {
+    ...pendingA,
+    approvals: [{ ...base, kinds: ["overstock_waste", "inflated_order"], merged_issue_ids: ["S030|inflated_order|SKU-100502"] }],
+    technical: [{ ...pendingA.technical[0], issue_id: "S030|inflated_order|SKU-100502" }],
+  };
+
+  it("drops an item whose issue_id was merged into another approval", () => {
+    expect(buildPendingItems(withMerge, SIM).map((i) => i.id)).toEqual(["S030|overstock_waste|SKU-100502"]);
+  });
+
+  it("carries the Spanish kind labels of the approval, never the raw codes", () => {
+    const [a] = buildPendingItems(withMerge, SIM);
+    expect(a.kinds).toEqual(["Sobreinventario y merma", "Pedido inflado"]);
+  });
+
+  it("labels the transfer opportunity", () => {
+    const p = { ...withMerge, approvals: [{ ...withMerge.approvals[0], kinds: ["transfer_opportunity"], merged_issue_ids: [] }], technical: [] };
+    expect(buildPendingItems(p, SIM)[0].kinds).toEqual(["Oportunidad de traslado"]);
+  });
+});
+
+describe("confidence label follows calibration", () => {
+  const approval = pendingA.approvals[0];
+  const tech = pendingA.technical[0];
+  const build = (a: typeof approval, t: typeof tech) => buildPendingItems({ ...pendingA, approvals: [a], technical: [t] }, "2026-07-19");
+
+  it("says 'calibrada' only when the backend says calibrated", () => {
+    const a = build({ ...approval, confidence: { score: 0.86, calibrated: true } }, tech).find((i) => i.kind === "approval")!;
+    expect(a.confLabel).toBe("Confianza calibrada");
+  });
+
+  it("says 'estimada (sin calibrar)' when calibrated is false, on approvals and technical items", () => {
+    const items = build({ ...approval, confidence: { score: 0.3, calibrated: false } }, { ...tech, confidence: { score: 0.3, calibrated: false } });
+    expect(items.map((i) => i.confLabel)).toEqual(["Confianza estimada (sin calibrar)", "Confianza estimada (sin calibrar)"]);
+  });
+
+  it("treats a bare number (old backend) as not calibrated", () => {
+    const t = build(approval, { ...tech, confidence: 0.41 }).find((i) => i.kind === "tech")!;
+    expect(t.confLabel).toBe("Confianza estimada (sin calibrar)");
+  });
+});

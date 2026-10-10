@@ -1,4 +1,5 @@
 import { filterWarnings, SOON_TEXT, type WarningItem } from "../../data/copilot";
+import { AlertsSkeleton } from "./Skeleton";
 import { FilterChips } from "./MemoriesWindow";
 
 export const ALERT_FILTERS = [
@@ -20,22 +21,25 @@ export default function AlertsWindow({
   filter,
   onFilter,
   onAsk,
+  loading = false,
 }: {
   warnings: WarningItem[];
   filter: string;
   onFilter: (f: string) => void;
   onAsk: (w: WarningItem) => void;
+  loading?: boolean;
 }) {
   const shown = filterWarnings(warnings, filter);
   return (
-    <main className="mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 pb-28 pt-[68px]">
+    <main className="mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 pb-28 pt-[104px]">
       <header className="flex flex-col gap-1 pt-3">
         <span className="font-label-md text-label-md uppercase tracking-[0.05em] text-on-tertiary-container">Centinela · Auditor · Abastecimiento</span>
         <h1 className="m-0 font-headline-lg text-headline-lg tracking-tight text-primary">Advertencias</h1>
         <p className="m-0 font-body-md text-body-md text-on-surface-variant">Todo lo que el sistema detectó, ordenado por impacto en dinero.</p>
       </header>
       <FilterChips options={ALERT_FILTERS} value={filter} onChange={onFilter} />
-      {shown.map((w) => (
+      {loading && <AlertsSkeleton />}
+      {(loading ? [] : shown).map((w) => (
         <article key={w.id} className="flex flex-col gap-2 rounded-[18px] border border-partition/60 bg-white p-4 shadow-card">
           <div className="flex items-start gap-3">
             <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${TONES[w.tone]}`}>
@@ -63,7 +67,7 @@ export default function AlertsWindow({
           </div>
         </article>
       ))}
-      {shown.length === 0 && (
+      {!loading && shown.length === 0 && (
         <p className="m-0 rounded-[18px] bg-surface-container p-4 text-center text-[13px] leading-[19px] text-on-surface-variant">
           {filter === "auto" ? `Sin acciones automáticas todavía. ${SOON_TEXT}.` : "Sin advertencias por ahora"}
         </p>
