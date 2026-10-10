@@ -190,4 +190,6 @@ def build_analysis(issue: dict[str, Any]) -> dict[str, Any]:
             "pros": _pros(best), "cons": _cons(best, dn), "requires_approval": tier in APPROVAL_TIERS,
             "dialog": {"why": why, "if_accept": accept, "if_not_act": not_act,
                        "alternatives": [{"option_id": o["option_id"], "label": label(o, issue),
-                                         "net_usd_mid": o.get("net_usd_mid")} for o in options if o is not best]}}
+                                         "net_usd_mid": o.get("net_usd_mid"), "action_type": o["action_type"],
+                                         "params": o.get("params") or {}, "data_caveat": o.get("data_caveat")}
+                                        for o in options if o is not best]}}

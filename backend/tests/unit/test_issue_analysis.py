@@ -34,6 +34,7 @@ def test_text_is_spanish_and_cites_computed_numbers_only():
     assert {x["option_id"] for x in d["alternatives"]} == {"altA", "dnA"}
     alt = next(x for x in d["alternatives"] if x["option_id"] == "altA")
     assert alt["net_usd_mid"] == 30.0 and alt["label"]
+    assert alt["action_type"] and isinstance(alt["params"], dict) and "data_caveat" in alt  # decidable with its detail
     assert any("proveedor" in c.lower() for c in a["cons"])  # English risk string translated
     assert a["pros"] and a["cons"]
     blob = " ".join([a["problem"], a["title"], d["why"], d["if_accept"], d["if_not_act"], *a["pros"], *a["cons"]])

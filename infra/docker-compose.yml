@@ -55,6 +55,10 @@ services:
       GLAZED_AUTH_REQUIRED: ${GLAZED_AUTH_REQUIRED:-false}
       # Demo only: passwordless user picker. Never enable on a real deployment.
       GLAZED_DEMO_LOGIN: ${GLAZED_DEMO_LOGIN:-false}
+      # order policy: margin (default) | waste_aware (waste penalty + promotions priced from history)
+      GLAZED_ORDER_POLICY: ${GLAZED_ORDER_POLICY:-margin}
+      GLAZED_WASTE_PENALTY: ${GLAZED_WASTE_PENALTY:-0}
+      GLAZED_SERVICE_CAP: ${GLAZED_SERVICE_CAP:-}
       GLAZED_COOKIE_SECURE: ${GLAZED_COOKIE_SECURE:-false}
       GLAZED_SESSION_SECRET: ${GLAZED_SESSION_SECRET:-}
       GLAZED_ADMIN_EMAIL: ${GLAZED_ADMIN_EMAIL:-}
