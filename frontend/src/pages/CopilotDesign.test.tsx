@@ -122,7 +122,7 @@ describe("Copiloto (/copiloto) matches Copiloto.dc.html", () => {
 
   it("Alertas: header, four filters and cards with tone, time, agent and Preguntar (no Revertir)", async () => {
     await open(/^Alertas/);
-    expect(await screen.findByText("Centinela · Auditor · Abastecimiento")).toBeInTheDocument();
+    expect(await screen.findByText("Centinela · Abastecimiento")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Advertencias" })).toBeInTheDocument();
     expect(screen.getByText("Todo lo que el sistema detectó, ordenado por impacto en dinero.")).toBeInTheDocument();
     for (const f of ["Todas", "Operación", "Datos e integridad", "Automáticas"]) expect(screen.getByRole("button", { name: f })).toBeInTheDocument();
@@ -154,5 +154,13 @@ describe("Copiloto (/copiloto) matches Copiloto.dc.html", () => {
     for (const legacy of [/Promedio mismo día/, /Algunos datos no cargaron/, /Merma real/, /Venta perdida \(7 días\)/, /Agente no informado/, /Nuevo aprendizaje/]) {
       expect(screen.queryByText(legacy)).toBeNull();
     }
+  });
+});
+
+describe("hidden integrity auditor", () => {
+  it("never names the Auditor in the alerts header", async () => {
+    const { container } = renderPage(api(), "/copiloto?tab=alertas", "/copiloto", <CopilotPage />);
+    await screen.findByText("Centinela · Abastecimiento");
+    expect(container.textContent ?? "").not.toMatch(/Auditor/i);
   });
 });

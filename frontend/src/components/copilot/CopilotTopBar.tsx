@@ -15,10 +15,12 @@ export default function CopilotTopBar({ storeCode, onSettings }: { storeCode: st
     if (!el) return;
     const publish = () => document.documentElement.style.setProperty("--copilot-header-h", `${Math.ceil(el.getBoundingClientRect().height)}px`);
     publish();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(publish);
-    ro.observe(el);
-    return () => ro.disconnect();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(publish);
+    ro?.observe(el);
+    return () => {
+      ro?.disconnect();
+      document.documentElement.style.removeProperty("--copilot-header-h");
+    };
   }, []);
   return (
     <header ref={bar} className="fixed inset-x-0 top-0 z-40 bg-surface/[.88] pt-safe backdrop-blur-xl shadow-[0_1px_8px_rgba(75,48,37,.04)]">
