@@ -1,4 +1,4 @@
-import type { AccuracyBy, DeliveriesResponse, ExpiringResponse, InventoryResponse, InventorySort, PromosResponse, StaffingResponse, AdvanceResult, ForecastAccuracy, Alert, Briefing, Case, CaseMode, ComplianceRecord, DaySummary, DecisionRow, Execution, ForecastResponse, InjectBody, Kpis, OrderPlan, Proposal, Store, TraceEvent, Turn, TurnRecord } from "./types";
+import type { AgentsStatusResponse, AlertRecord, Case, CaseDecisionBody, CaseDecisionResult, InboxCounts, IssueAnalysis, MemoryRecord, MessageContext, PendingResponse, CaseMode, DaySummary, DeliveriesResponse, ExpiringResponse, HistoryResponse, InventoryResponse, Kpis, Outlook, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, SupplierPerformance, TraceEvent, Turn, TurnRecord } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -51,21 +51,14 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
   const send = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
 
   return {
-    health: () => request<{ status: string }>("/health"),
     listStores: () => request<Store[]>("/stores"),
     listCases: (query: { store_id?: string }) => request<Case[]>("/cases", {}, query),
     createCase: (b: { store_id: string; sim_today: string; mode?: CaseMode; title?: string }) =>
       request<Case>("/cases", send("POST", b)),
-    forkCase: (caseId: string, b: { title?: string } = {}) =>
-      request<Case>(`/cases/${caseId}/fork`, send("POST", b)),
-    sendMessage: (caseId: string, text: string) =>
-      request<{ turn_id: string }>(`/cases/${caseId}/messages`, send("POST", { text })),
-    /** Wave 11 route; may answer 404/501 until deployed. */
+    sendMessage: (caseId: string, text: string, context?: MessageContext) =>
+      request<{ turn_id: string }>(`/cases/${caseId}/messages`, send("POST", context ? { text, context } : { text })),
     listTurns: (caseId: string) => request<TurnRecord[]>(`/cases/${caseId}/turns`),
     getTurn: (caseId: string, turnId: string) => request<Turn>(`/cases/${caseId}/turns/${turnId}`),
-    listAlerts: (query: { store_id?: string; state?: string }) => request<Alert[]>("/alerts", {}, query),
-    setAlertState: (alertId: string, state: string) =>
-      request<Alert>(`/alerts/${alertId}`, send("PATCH", { state })),
     listProposals: (query: { case_id?: string; status?: string }) =>
       request<Proposal[]>("/proposals", {}, query),
     decide: (proposalId: string, b: { approved: boolean; reason?: string }, opts: { idempotencyKey?: string } = {}) =>
@@ -73,32 +66,39 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
         ...send("POST", b),
         ...(opts.idempotencyKey ? { headers: { "Idempotency-Key": opts.idempotencyKey } } : {}),
       }),
-    getCase: (caseId: string) => request<Case>(`/cases/${caseId}`),
+    listIssues: (caseId: string, q: { limit?: string; category?: string; kind?: string } = {}) =>
+      request<Issue[]>(`/cases/${caseId}/issues`, {}, q),
+    getKpis: (caseId: string) => request<Kpis>(`/cases/${caseId}/kpis`),
+    getExpiring: (caseId: string, q: { days?: string } = {}) => request<ExpiringResponse>(`/cases/${caseId}/expiring`, {}, q),
+    getInventory: (caseId: string, q: { sort?: string; limit?: string } = {}) => request<InventoryResponse>(`/cases/${caseId}/inventory`, {}, q),
+    getDeliveries: (caseId: string, q: { days?: string } = {}) => request<DeliveriesResponse>(`/cases/${caseId}/deliveries`, {}, q),
+    getOutlook: (caseId: string, q: { days?: string } = {}) => request<Outlook>(`/cases/${caseId}/outlook`, {}, q),
+    getHistory: (caseId: string) => request<HistoryResponse>(`/cases/${caseId}/history`),
+    getSupplierPerformance: (caseId: string) => request<SupplierPerformance[]>(`/cases/${caseId}/suppliers/performance`),
+    getOrderPlan: (caseId: string) => request<OrderPlan>(`/cases/${caseId}/order-plan`),
+    listAlerts: (q: { store_id?: string; state?: string }) => request<AlertRecord[]>("/alerts", {}, q),
+    /** Step 1 of a decision: turns (issue, option) into a pending proposal. Repeating the key returns the same proposal. */
+    propose: (b: { case_id: string; issue_id: string; option_id: string; rationale?: string }, opts: { idempotencyKey?: string } = {}) =>
+      request<Proposal>("/proposals", {
+        ...send("POST", b),
+        ...(opts.idempotencyKey ? { headers: { "Idempotency-Key": opts.idempotencyKey } } : {}),
+      }),
     getDaySummary: (caseId: string, date?: string) =>
       request<DaySummary>(`/cases/${caseId}/day-summary`, {}, { date }),
-    getBriefing: (caseId: string) => request<Briefing>(`/cases/${caseId}/briefing`),
-    /** Wave 11 route; may answer 404/501 until deployed. */
-    getForecast: (caseId: string, q: { sku?: string; from?: string; to?: string; level?: "sku" | "store" } = {}) =>
+    getPending: (caseId: string) => request<PendingResponse>(`/cases/${caseId}/decisions/pending`),
+    getAnalysis: (caseId: string, issueId: string) => request<IssueAnalysis>(`/cases/${caseId}/issues/${encodeURIComponent(issueId)}/analysis`),
+    /** Atomic proposal + decision. The same Idempotency-Key replays the original outcome; 409 = already decided; 400 = rejecting without a reason. */
+    recordDecision: (caseId: string, b: CaseDecisionBody, opts: { idempotencyKey?: string } = {}) =>
+      request<CaseDecisionResult>(`/cases/${caseId}/decisions`, {
+        ...send("POST", b),
+        ...(opts.idempotencyKey ? { headers: { "Idempotency-Key": opts.idempotencyKey } } : {}),
+      }),
+    getMemories: (caseId: string, q: { category?: string; q?: string } = {}) => request<MemoryRecord[]>(`/cases/${caseId}/memories`, {}, q),
+    getAgentsStatus: () => request<AgentsStatusResponse>("/agents/status"),
+    getInboxCounts: (caseId: string) => request<InboxCounts>(`/cases/${caseId}/inbox-counts`),
+    getForecast: (caseId: string, q: { sku?: string; from?: string; to?: string; level?: "sku" | "store"; metric?: string } = {}) =>
       request<ForecastResponse>(`/cases/${caseId}/forecast`, {}, q),
-    getForecastAccuracy: (caseId: string, by: AccuracyBy) =>
-      request<ForecastAccuracy>(`/cases/${caseId}/forecast/accuracy`, {}, { by }),
-    // Wave 12 routes; may answer 404/501 until deployed.
-    getInventory: (caseId: string, q: { sort?: InventorySort; limit?: string } = {}) =>
-      request<InventoryResponse>(`/cases/${caseId}/inventory`, {}, q),
-    getExpiring: (caseId: string, q: { days?: string } = {}) => request<ExpiringResponse>(`/cases/${caseId}/expiring`, {}, q),
-    getDeliveries: (caseId: string, q: { days?: string } = {}) => request<DeliveriesResponse>(`/cases/${caseId}/deliveries`, {}, q),
-    getPromos: (caseId: string, q: { status?: string; days?: string } = {}) => request<PromosResponse>(`/cases/${caseId}/promos`, {}, q),
-    getStaffing: (caseId: string, q: { days?: string } = {}) => request<StaffingResponse>(`/cases/${caseId}/staffing`, {}, q),
-    getDecisions: (caseId: string, q: { from?: string; to?: string } = {}) =>
-      request<DecisionRow[]>(`/cases/${caseId}/decisions`, {}, q),
-    advance: (caseId: string, days = 1) => request<AdvanceResult>(`/cases/${caseId}/advance`, send("POST", { days })),
-    // REQUIRED backend routes (not in the public API yet).
-    getOrderPlan: (caseId: string) => request<OrderPlan>(`/cases/${caseId}/order-plan`),
-    getKpis: (caseId: string) => request<Kpis>(`/cases/${caseId}/kpis`),
-    proposeOption: (b: { case_id: string; issue_id: string; option_id: string; rationale: string }) =>
-      request<Proposal>("/proposals", send("POST", b)),
-    getCompliance: (caseId: string) => request<ComplianceRecord[]>(`/cases/${caseId}/compliance`),
-    inject: (caseId: string, b: InjectBody) => request<unknown>(`/cases/${caseId}/inject`, send("POST", b)),
+    /** Trace events: only the chat history fallback reads them. */
     getTrace: (storeId: string, caseId: string) =>
       request<TraceEvent[]>("/trace", {}, { store_id: storeId, case_id: caseId }),
   };

@@ -14,24 +14,16 @@ describe("api client", () => {
 
   it("builds GET urls with query params and drops undefined", async () => {
     const api = createApi("http://x:1", fetchFn as unknown as typeof fetch);
-    await api.listAlerts({ store_id: "S030", state: undefined });
-    expect(fetchFn).toHaveBeenCalledWith("http://x:1/api/v1/alerts?store_id=S030", expect.anything());
+    await api.listCases({ store_id: "S030" });
+    expect(fetchFn).toHaveBeenCalledWith("http://x:1/api/v1/cases?store_id=S030", expect.anything());
+    await api.getDaySummary("c1", undefined);
+    expect(fetchFn).toHaveBeenLastCalledWith("http://x:1/api/v1/cases/c1/day-summary", expect.anything());
   });
 
   it("uses a relative base when the base url is empty", async () => {
     const api = createApi("", fetchFn as unknown as typeof fetch);
     await api.listStores();
     expect((fetchFn.mock.calls[0] as unknown as [string])[0]).toBe("/api/v1/stores");
-  });
-
-  it("PATCHes alert state as JSON", async () => {
-    const api = createApi("", fetchFn as unknown as typeof fetch);
-    await api.setAlertState("a1", "vista");
-    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("/api/v1/alerts/a1");
-    expect(init.method).toBe("PATCH");
-    expect(JSON.parse(init.body as string)).toEqual({ state: "vista" });
-    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
   });
 
   it("POSTs a proposal decision", async () => {
@@ -53,13 +45,11 @@ describe("api client", () => {
   it("creates, forks and messages cases", async () => {
     const api = createApi("", fetchFn as unknown as typeof fetch);
     await api.createCase({ store_id: "S030", sim_today: "2026-03-01", mode: "live" });
-    await api.forkCase("c1", { title: "what-if" });
     await api.sendMessage("c1", "hola");
     await api.getTurn("c1", "t1");
     const urls = fetchFn.mock.calls.map((c) => (c as unknown as [string])[0]);
     expect(urls).toEqual([
       "/api/v1/cases",
-      "/api/v1/cases/c1/fork",
       "/api/v1/cases/c1/messages",
       "/api/v1/cases/c1/turns/t1",
     ]);
@@ -89,47 +79,6 @@ describe("api client", () => {
     const api = createApi("", failing as unknown as typeof fetch);
     await expect(api.listStores()).rejects.toMatchObject({ status: 0 });
   });
-
-  it("reads compliance and injects demo events", async () => {
-    const api = createApi("", fetchFn as unknown as typeof fetch);
-    await api.getCompliance("c1");
-    expect((fetchFn.mock.calls[0] as unknown as [string])[0]).toBe("/api/v1/cases/c1/compliance");
-    await api.inject("c1", { execution: { proposal_id: "p1", status: "not_executed", detail: "x" } });
-    const [url, init] = fetchFn.mock.calls[1] as unknown as [string, RequestInit];
-    expect(url).toBe("/api/v1/cases/c1/inject");
-    expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body as string)).toEqual({ execution: { proposal_id: "p1", status: "not_executed", detail: "x" } });
-  });
-});
-
-describe("api client (Wave 5)", () => {
-  it("GETs order plan and kpis for a case", async () => {
-    const fetchFn = mockFetch({});
-    const api = createApi("", fetchFn as unknown as typeof fetch);
-    await api.getOrderPlan("c1");
-    await api.getKpis("c1");
-    const urls = fetchFn.mock.calls.map((c) => (c as unknown as [string])[0]);
-    expect(urls).toEqual(["/api/v1/cases/c1/order-plan", "/api/v1/cases/c1/kpis"]);
-  });
-
-  it("POSTs advance with a default of one day", async () => {
-    const fetchFn = mockFetch({ sim_today: "2026-03-02", new_alerts: [] });
-    const api = createApi("", fetchFn as unknown as typeof fetch);
-    await api.advance("c1");
-    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("/api/v1/cases/c1/advance");
-    expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body as string)).toEqual({ days: 1 });
-  });
-
-  it("proposes an option by id only (backend copies params and tier)", async () => {
-    const fetchFn = mockFetch({});
-    const api = createApi("", fetchFn as unknown as typeof fetch);
-    await api.proposeOption({ case_id: "c1", issue_id: "i1", option_id: "o1", rationale: "x" });
-    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("/api/v1/proposals");
-    expect(JSON.parse(init.body as string)).toEqual({ case_id: "c1", issue_id: "i1", option_id: "o1", rationale: "x" });
-  });
 });
 
 describe("resolveBase", () => {
@@ -154,5 +103,53 @@ describe("forecast api", () => {
     expect(isUnavailable(new ApiError(501, "x"))).toBe(true);
     expect(isUnavailable(new ApiError(500, "x"))).toBe(false);
     expect(isUnavailable(new Error("x"))).toBe(false);
+  });
+});
+
+describe("wave 14 routes", () => {
+  const setup = () => {
+    const f = vi.fn(async () => new Response("{}", { status: 200 }));
+    return { f, api: createApi("", f as unknown as typeof fetch), url: (i = 0) => (f.mock.calls[i] as unknown as [string])[0], init: (i = 0) => (f.mock.calls[i] as unknown as [string, RequestInit])[1] };
+  };
+
+  it("sends the chat context as a field of POST /messages", async () => {
+    const { api, url, init } = setup();
+    await api.sendMessage("c1", "Analiza", { issue_id: "S1|x|1", option_id: "o1", mode: "analizar" });
+    expect(url()).toBe("/api/v1/cases/c1/messages");
+    expect(JSON.parse(init().body as string)).toEqual({ text: "Analiza", context: { issue_id: "S1|x|1", option_id: "o1", mode: "analizar" } });
+  });
+
+  it("omits the context when there is none", async () => {
+    const { api, init } = setup();
+    await api.sendMessage("c1", "hola");
+    expect(JSON.parse(init().body as string)).toEqual({ text: "hola" });
+  });
+
+  it("GETs pending decisions, an issue analysis (id encoded), inbox counts, agents status and memories", async () => {
+    const { api, f, url } = setup();
+    await api.getPending("c1");
+    await api.getAnalysis("c1", "S1|stockout_risk|SKU-1");
+    await api.getInboxCounts("c1");
+    await api.getAgentsStatus();
+    await api.getMemories("c1", { category: "proveedores", q: "pan" });
+    await api.getForecast("c1", { metric: "footfall", level: "store" });
+    expect(f.mock.calls.map((c) => (c as unknown as [string])[0])).toEqual([
+      "/api/v1/cases/c1/decisions/pending",
+      "/api/v1/cases/c1/issues/S1%7Cstockout_risk%7CSKU-1/analysis",
+      "/api/v1/cases/c1/inbox-counts",
+      "/api/v1/agents/status",
+      "/api/v1/cases/c1/memories?category=proveedores&q=pan",
+      "/api/v1/cases/c1/forecast?metric=footfall&level=store",
+    ]);
+    expect(url(0)).toContain("pending");
+  });
+
+  it("POSTs the atomic decision with the Idempotency-Key header", async () => {
+    const { api, url, init } = setup();
+    await api.recordDecision("c1", { issue_id: "i1", option_id: "o1", approved: false, reason: "caro" }, { idempotencyKey: "k-9" });
+    expect(url()).toBe("/api/v1/cases/c1/decisions");
+    expect(init().method).toBe("POST");
+    expect(init().headers).toMatchObject({ "Idempotency-Key": "k-9" });
+    expect(JSON.parse(init().body as string)).toEqual({ issue_id: "i1", option_id: "o1", approved: false, reason: "caro" });
   });
 });

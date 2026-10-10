@@ -21,30 +21,37 @@ npm run preview
 
 ## Pages
 
-- `/` (Inicio): dashboard of the current case's store, from the simulation clock (never the wall clock). Hero with the day's net sales and delta vs the same-weekday average ("promedio de N semanas"), metric cards (transactions, average ticket, units), 7-day net-sales trend, top 3 products, observed weather and calendar chips, and the copilot briefing (headline, orders due today/tomorrow, suggested focus), plus the legacy loss cards and alert semaphore.
-- `/login`: store and case picker (no credentials; access control is the reverse proxy's basic auth). The choice lives in `SessionContext` (`storeId`, `caseId`).
+The app has four screens: the three below plus `/copiloto`. The three were copied from the Glazed-Co design (github.com/CesarOliva/Glazed-Co @ b9d4132: markup, Tailwind classes, spacing, Material Symbols icons). Any other path redirects to `/`.
 
-- `/alerts`: store selector, alerts of the store (auto-refresh every 10 s), "Marcar vista", and a detail panel with the issue payload and pending proposals (Aprobar / Rechazar with reason).
-- `/stores/:storeId/trace?case=&turn=`: agent inspector. Pick a case; see the trace as a chronological conversational channel (from -> to bubbles, kind, expandable payload) and as one lane per agent (orchestrator highlighted). With `turn=<id>` it polls every 3 s while the turn is `pending`.
-- `/cases`: list, create and fork cases, and an "ask" box that posts a message to a case and shows the reply when the turn finishes (with a link to its trace).
+- `/` (Resumen): dashboard of the current case's store, from the simulation clock (never the wall clock). Header with "Fecha simulada" and the sim date, hero with the day's net sales, delta and progress against the same-weekday average, metric cards (transactions, average ticket, units), "Ventas por día" chart (7 actual days plus up to 3 projected days, model name captioned), top 3 products, link to the chat and "Datos al <as_of>". A floating chat bubble opens a compact chat.
+- `/login`: store and case picker (no credentials; access control is the reverse proxy's basic auth). The choice lives in `SessionContext` (`storeId`, `caseId`).
+- `/chat`: full chat with the copilot over the same logic as the floating panel (turn history, polling, inline pending proposals with Aprobar/Rechazar, reply chip).
+
+- `/copiloto`: the decision copilot (handoff `Copiloto.dc.html`), five windows behind a capsule navigation. It wires real data only; whatever the backend does not serve yet shows "Sin datos" / "Disponible pronto" (see the GAP LIST in `odd/tasks/copiloto.md`).
+  - Agente: the chat over `useChat` (polling, history, inline proposals, markdown), pinned context ("Hablando de: ..."), suggestions and analysis/dialogue cards. The context is prefixed into the message text (`chatContextText`) until `POST /messages` accepts a `context` field.
+  - Decisiones: approvals = `/issues` whose recommended option is N2/N3; technical = `/order-plan` lines (plus N1 issue options). Aceptar/Aprobar/Rechazar run `POST /proposals` then `POST /proposals/{id}/decision` with Idempotency-Key; the card, toast and learned memory change only after the backend accepted. An order-plan line without issue is read-only.
+  - Sucursal: Ayer (day-summary + vs same-weekday average), Hoy and Mañana (forecast / `/outlook` when deployed). Today's real sales are never shown ("Pendiente · Se registra al cierre"). Mañana weather is permanently "Sin pronóstico".
+  - Memorias: `/history` decision log, `/suppliers/performance`, plus rejections taught in this session. Advertencias: open `/alerts` and integrity issues; no "Revertir" (N1 auto-execution does not exist).
+  - Each source not served yet is one function in `src/data/copilot.ts` returning `{status: "soon"}`; swapping it is a one-line change. `src/data/copilot.ts` holds view-model types and pure adapters only, no sample data.
 
 All pages show error and empty states when the backend is unreachable.
-
-## API assumptions
-
-`TraceEvent` is `{event_id?, case_id, store_id, ts, from_agent, to_agent, kind: message|tool_call|tool_result|escalation, payload}`. Agent ids for lanes: `orchestrator, present, past, supply, strategist, sentinel, auditor, liaison`; any other id (for example `manager`) appears in the timeline only. Payload summary uses `payload.text`, else `payload.tool`, else JSON.
 
 ## Dashboard data mapping
 
 | Widget | Source |
 |---|---|
-| Hero, metric cards, top products, chips | `GET /cases/{id}/day-summary` (default date = `as_of` - 1) |
-| 7-day trend | `day-summary?date=D` for the 6 days before the summary date, plus the summary itself |
-| Headline, orders due, suggested focus | `GET /cases/{id}/briefing` |
-| Loss cards | `GET /cases/{id}/kpis` (lost sales shown as a low-high range) |
+| Top bar | `store_display_name` of the active store, Glazed logo |
+| Header | "Resumen de hoy"; long date of the day-summary `date`; sim date of the case |
+| Hero, metric cards, top products | `GET /cases/{id}/day-summary` (default date = `as_of` - 1) |
+| Chart, actual bars | `day-summary?date=D` for the 6 days before the summary date, plus the summary itself |
+| Chart, projected bars and caption | `GET /cases/{id}/forecast?level=store` (optional: 404/501/errors just hide them) |
 
-Rules: a day with `totals: null` (HTTP 200) shows "Sin datos", never 0, and a trend day without data is marked "sin datos" instead of drawing a bar. HTTP errors (for example 400, date after `as_of`) are an error state, not "Sin datos". Average ticket shows "—" with zero transactions. `staff_hours` is not shown. Weather is observed, not a forecast. There is no hourly data and no daily goal. Store names use `display_name`.
+Rules: a day with `totals: null` (HTTP 200) shows "Sin datos", never 0, and a chart day without data is drawn as a dashed stub. HTTP errors (for example 400, date after `as_of`) are an error state, not "Sin datos". Average ticket shows "—" with zero transactions. `staff_hours` is not shown. There is no hourly data, no product photos (thumbnails show initials) and no daily goal: the hero bar compares against the same-weekday average (`weeks_used` weeks as reported). Store names use `display_name`.
+
+## Visual check
+
+Build or run the dev server and compare at 390 px width with the design (`screen.png`, and the handoff's `*.dc.html`, which only render inside the design canvas: expand their `{{ }}`/`sc-if`/`sc-for` with the values of `renderVals()` to get a static page). Note: the backend sends no CORS headers, so use `npm run dev` (Vite proxy), not `vite preview`, against a live backend.
 
 ## Layout
 
-`src/api.ts` typed client, `src/trace.ts` pure trace helpers, `src/usePolling.ts` polling hook, `src/pages/*` pages, `src/dashboard/*` dashboard widgets, `src/shell/*` top bar and bottom navigation, `src/index.css` Tailwind layers (tokens in `tailwind.config.ts`), `src/test/helpers.tsx` fake API for tests.
+`src/api.ts` typed client, `src/format.ts` formatters, `src/usePolling.ts` polling hook, `src/pages/*` the three pages, `src/components/*` design components (top bar, bottom nav, hero, metric cards, activity chart, top products, footer), `src/chat/*` chat view and floating chat, `src/index.css` Tailwind base (tokens in `tailwind.config.ts`, identical to the design's), `src/test/helpers.tsx` fake API for tests.

@@ -26,19 +26,6 @@ export interface Case {
   created_at: string;
 }
 
-export interface Alert {
-  alert_id: string;
-  alert_type: number;
-  store_id: string;
-  case_id: string;
-  severity_usd: number;
-  state: string;
-  issue: Partial<Issue> & Record<string, unknown>;
-  issue_key: string;
-  as_of: string;
-  created_at: string;
-}
-
 export interface Proposal {
   proposal_id: string;
   case_id: string;
@@ -69,9 +56,18 @@ export interface Execution {
 export type TurnStatus = "pending" | "done" | "failed" | "waiting_approval";
 
 export interface ReplyMeta {
-  source: "fast" | "agents";
+  source?: "fast" | "agents";
   template?: string;
-  elapsed_ms: number;
+  elapsed_ms?: number;
+  /** The issue context echoed by the backend. */
+  context?: { issue_id: string; option_id?: string | null; mode: "analizar" | "dialogo" };
+}
+
+/** `context` of POST /cases/{id}/messages. */
+export interface MessageContext {
+  issue_id: string;
+  option_id?: string;
+  mode: "analizar" | "dialogo";
 }
 
 export interface Turn {
@@ -83,6 +79,14 @@ export interface Turn {
   sanitized?: boolean;
   sanitized_fragments?: string[];
   reply_meta?: ReplyMeta | null;
+  /** Agents the orchestrator is consulting; present on every read of a turn. */
+  progress?: TurnProgress[];
+}
+
+export interface TurnProgress {
+  agent_id: string;
+  display_name_es: string;
+  state: "consulting" | "done";
 }
 
 export type TraceKind = "message" | "tool_call" | "tool_result" | "escalation";
@@ -98,139 +102,7 @@ export interface TraceEvent {
   payload: Record<string, unknown>;
 }
 
-// ---- Wave 5: deterministic issues and options ----
-export interface Range3 {
-  low: number;
-  mid: number;
-  high: number;
-}
-
-export type Tier = "N0" | "N1" | "N2" | "N3";
-
-export interface Evidence {
-  metric: string;
-  value: number | string;
-  unit: string;
-  period: string;
-  source: string;
-}
-
-export interface Option {
-  option_id: string;
-  action_type: string;
-  params: Record<string, unknown>;
-  expected_benefit_usd: Range3;
-  cost_usd: number;
-  net_usd_mid: number;
-  loss_impact: { waste_usd_delta: number; lost_sales_usd_delta: number };
-  confidence: { score: number; n_backtest: number; method: string };
-  tier: Tier;
-  tier_reasons: string[];
-  urgency: { deadline_date?: string | null; reason: string };
-  risk: string[];
-  if_act: string | null;
-  if_not: string | null;
-}
-
-export interface Issue {
-  issue_id: string;
-  kind: string;
-  sku?: string;
-  supplier_id?: string;
-  store_id: string;
-  store_display_name: string;
-  as_of: string;
-  severity_usd: number;
-  category?: string | null;
-  exposure_usd?: number | null;
-  evidence: Evidence[];
-  data_caveats: string[];
-  options: Option[];
-}
-
-export interface OrderLine {
-  sku: string;
-  name?: string;
-  supplier_id: string;
-  supplier_name?: string;
-  qty: number;
-  qty_low?: number;
-  qty_high?: number;
-  case_size?: number;
-  cases?: number;
-  service_level_target: number;
-  order_deadline: string | null;
-  projected_stockout_date: string | null;
-  stockout_risk_without_order: number;
-  vs_current_practice: { received_to_sold: number; qty_delta: number };
-  min_order_warning: string | MinOrderWarning | null;
-  /** Legacy fixtures send a number; the live route sends {low,mid,high}. */
-  expected_waste_usd?: number | Range3;
-  expected_lost_sales_usd?: number | Range3;
-  est_cost_usd?: number;
-  expected_delivery?: string | null;
-  order_deadline_status?: string;
-  stockout_risk_with_order?: number;
-  issue?: Issue;
-}
-
-export interface MinOrderWarning {
-  min_order_value: number;
-  order_value_usd: number;
-  suggestion?: string;
-}
-
-export interface PlanSupplier {
-  supplier_id: string;
-  supplier_name: string;
-  order_value_usd: number;
-  min_order_value: number;
-}
-
-export interface OrderPlan {
-  case_id: string;
-  store_id: string;
-  as_of: string;
-  lines: OrderLine[];
-  suppliers?: PlanSupplier[];
-}
-
-export interface Kpis {
-  waste_usd: number | Range3;
-  lost_sales_usd: Range3;
-  window?: { from: string; to: string };
-}
-
-export interface AdvanceResult {
-  sim_today: string;
-  new_alerts: Alert[];
-}
-
-// ---- Wave 6: Sentinel (Centinela) ----
-export type ExecutionStatus = "executed" | "not_executed" | "partial";
-export type Diagnosis = "not_executed" | "within_range" | "external_event" | "forecast_error";
-
-export interface ComplianceRecord {
-  decision_id: string;
-  issue_id: string | null;
-  action_type: string | null;
-  status: string;
-  applicable: boolean;
-  execution: { status: string; source: string; detail?: string; executed_at?: string } | null;
-  execution_status: ExecutionStatus | null;
-  horizon: { decision_date: string; days: number; ends: string; passed: boolean } | null;
-  simulated: { net_usd_mid: number; net_usd_low?: number | null; net_usd_high?: number | null; label: string } | null;
-  observed: { net_usd: number; label: string } | null;
-  events: { type: string; date_from: string; date_to: string; note?: string }[];
-  diagnosis: Diagnosis | null;
-  explanation: string;
-}
-
-export type InjectBody =
-  | { execution: { proposal_id: string; status: "not_executed" | "partial"; detail?: string } }
-  | { event: { type: string; date_from: string; date_to?: string; note?: string } };
-
-// ---- Dashboard: day summary and briefing (any field may be missing or null) ----
+// ---- Dashboard: day summary (any field may be missing or null) ----
 export interface DayTotals {
   footfall?: number | null;
   transactions?: number | null;
@@ -260,59 +132,7 @@ export interface DaySummary {
   store_display_name?: string;
 }
 
-export interface HeadlineItem {
-  key: string;
-  text: string;
-  value?: number | null;
-  unit?: string;
-  source?: string;
-  low?: number;
-  high?: number;
-}
-
-/** A line of the briefing's order_plan summary (due_today / due_tomorrow / top_lines). */
-export interface BriefOrderLine {
-  sku?: string;
-  name?: string;
-  supplier_id?: string;
-  supplier_name?: string;
-  qty?: number;
-  cases?: number;
-  est_cost_usd?: number;
-  expected_delivery?: string | null;
-  projected_stockout_date?: string | null;
-  order_deadline?: string | null;
-  order_deadline_status?: string;
-  stockout_risk_without_order?: number;
-  below_min_order?: boolean;
-}
-
-export interface BriefSupplier {
-  supplier_id: string;
-  supplier_name?: string;
-  on_time_pct?: number | null;
-  fill_pct?: number | null;
-  next_delivery?: string | null;
-}
-
-export interface Briefing {
-  snapshot?: {
-    as_of?: string;
-    kpis?: { lost_sales_usd?: Range3 | null } & Record<string, unknown>;
-    order_plan?: {
-      due_today?: BriefOrderLine[];
-      due_tomorrow?: BriefOrderLine[];
-      top_lines?: BriefOrderLine[];
-      total_lines?: number;
-      deadline_passed?: number;
-    };
-    suppliers?: BriefSupplier[];
-  };
-  headline?: HeadlineItem[];
-  suggested_focus?: string[];
-}
-
-// ---- Manager-day: forecast (Wave 11). Contract agreed with Core; route may not be deployed. ----
+// ---- Forecast. The route may not be deployed (404/501) or may fail; the dashboard degrades to actuals only. ----
 export interface ForecastPoint {
   date: string;
   forecast: number;
@@ -324,6 +144,8 @@ export interface ForecastPoint {
   censored: boolean;
   stockout_hours?: number;
   quantiles?: Record<string, number>;
+  /** True for dates after as_of. */
+  projected?: boolean;
 }
 
 export interface ForecastMetrics {
@@ -339,19 +161,6 @@ export interface ForecastMetrics {
   n_censored?: number;
 }
 
-export type AccuracyBy = "shelf_life" | "format" | "sku";
-
-export interface ForecastAccuracy {
-  store_id: string;
-  by: AccuracyBy;
-  as_of: string;
-  window: { from: string; to: string };
-  unit: string;
-  model: string;
-  groups: Record<string, ForecastMetrics>;
-  overall: ForecastMetrics;
-}
-
 export interface ForecastResponse {
   store_id: string;
   sku: string | null;
@@ -365,38 +174,14 @@ export interface ForecastResponse {
   points: ForecastPoint[];
   metrics_to_date: ForecastMetrics;
   projected?: boolean;
+  /** Present on `?metric=` reads. */
+  metric?: string;
+  /** `conversion` reads: false when the footfall counter was unreliable. */
+  conversion_valid?: boolean | null;
+  unit_label?: string;
 }
 
-// ---- Manager-day: decisions timeline (Wave 11) ----
-// The route answers a flat, ts-ordered list of rows (proposal -> decision -> execution -> outcome).
-export type DecisionKind = "proposal" | "decision" | "execution" | "outcome" | "skip_order";
-
-export interface DecisionOutcome {
-  observed: { net_usd?: number; waste_usd?: number; lost_sales_usd?: number } & Record<string, unknown>;
-  simulated: { net_usd_mid: number; net_usd_low?: number | null; net_usd_high?: number | null; label?: string } & Record<string, unknown>;
-  label: string;
-  score?: { within_expected_range?: boolean; error_vs_mid_usd?: number; diagnosis?: string };
-}
-
-export interface DecisionRow {
-  decision_id: string;
-  ts: string;
-  kind: DecisionKind;
-  issue_id: string;
-  action_type: string;
-  sku?: string;
-  supplier?: string;
-  qty?: number;
-  deadline?: string;
-  status: string;
-  reason?: string;
-  reason_category?: string;
-  /** Outcome rows: the end of the measured horizon. */
-  as_of?: string;
-  outcome?: DecisionOutcome;
-}
-
-// ---- Manager-day: stored conversation (Wave 11 GET /cases/{id}/turns) ----
+// ---- Manager-day: stored conversation (GET /cases/{id}/turns) ----
 export interface TurnRecord {
   turn_id: string;
   ts: string;
@@ -409,91 +194,310 @@ export interface TurnRecord {
   reply_meta?: ReplyMeta | null;
 }
 
-// ---- Manager-day: Wave 12 (inventory, expiring, deliveries, promos, staffing). Contracts agreed with Core. ----
-export interface InventoryItem {
-  sku: string;
-  product_name: string;
-  department: string;
-  on_hand: number;
-  avg_daily_demand: number;
-  days_of_cover: number | null;
-  turnover_28d: number | null;
-  weeks_of_supply: number | null;
-  inventory_value_usd: number;
-  last_sale_date: string | null;
-  slow_mover: boolean;
-  projected_stockout_date: string | null;
+// ---- Copilot: issues, order plan, alerts (public API, case scoped) ----
+export interface Range3 {
+  low?: number | null;
+  mid?: number | null;
+  high?: number | null;
 }
 
-export type InventorySort = "days_of_cover" | "turnover" | "slow";
+export interface IssueOption {
+  option_id: string;
+  action_type: string;
+  params: Record<string, unknown>;
+  expected_benefit_usd?: Range3 | null;
+  cost_usd?: number | null;
+  net_usd_mid?: number | null;
+  loss_impact?: { waste_usd_delta?: number | null; lost_sales_usd_delta?: number | null } | null;
+  confidence?: { score: number; n_backtest?: number; method?: string } | null;
+  tier: string;
+  tier_reasons?: string[];
+  urgency?: { deadline_date: string | null; reason?: string } | null;
+  risk?: string[];
+  if_act?: string | null;
+  if_not?: string | null;
+  cost_of_inaction_usd?: { mid?: number | null } | null;
+}
 
-export interface InventoryResponse {
+export interface IssueEvidence {
+  metric: string;
+  value: number | string;
+  unit?: string;
+  period?: string;
+}
+
+export interface Issue {
+  issue_id: string;
+  kind: string;
+  sku?: string | null;
+  product_name?: string | null;
+  supplier_id?: string | null;
   as_of?: string;
-  coverage: { skus_with_inventory: number; skus_selling: number };
-  items: InventoryItem[];
+  severity_usd?: number | null;
+  category?: string;
+  integrity?: boolean;
+  evidence?: IssueEvidence[];
+  options?: IssueOption[];
+  recommended_option_id?: string | null;
+  exposure_usd?: number | null;
+  event?: { name?: string; type?: string; days?: string[] } | null;
 }
 
-export interface ExpiringItem {
+export interface OrderLine {
   sku: string;
-  product_name: string;
-  expiring_units: number;
-  expiry_date: string;
-  shelf_life_days: number;
-  waste_usd: number | Range3;
-  lot_age_inferred: boolean;
+  product_name?: string;
+  name?: string;
+  supplier_id?: string;
+  supplier_name?: string;
+  qty?: number;
+  cases?: number;
+  case_size?: number;
+  est_cost_usd?: number | null;
+  expected_delivery?: string | null;
+  usable_stock?: number | null;
+  projected_stockout_date?: string | null;
+  order_deadline?: string | null;
+  stockout_risk_without_order?: number | null;
+  stockout_risk_with_order?: number | null;
+  min_order_warning?: { min_order_value: number; order_value_usd: number } | null;
+  /** The decidable issue of this line; absent = the line cannot go through proposals. */
+  issue?: Issue | null;
+}
+
+export interface OrderPlan {
+  store_id: string;
+  as_of: string;
+  total_lines: number;
+  lines: OrderLine[];
+  case_id?: string;
+}
+
+export interface AlertRecord {
+  alert_id: string;
+  alert_type: number;
+  store_id: string;
+  case_id: string;
+  severity_usd?: number | null;
+  state: string;
+  as_of?: string;
+  created_at?: string;
+  issue_key?: string;
+  /** operacion | integridad | automatica */
+  category?: string;
+  agent_id?: string;
+  ts?: string;
+  issue?: (Partial<Issue> & { options?: IssueOption[] }) | null;
+}
+
+// ---- Sucursal window: kpis, expiring, inventory, deliveries ----
+export interface Kpis {
+  as_of: string;
+  days_with_data?: number;
+  net_sales?: number | null;
+  transactions?: number | null;
+  conversion?: number | null;
+  waste_usd?: number | null;
+  lost_sales_usd?: Range3 | null;
+  window?: { from: string; to: string };
 }
 
 export interface ExpiringResponse {
-  as_of?: string;
-  items: ExpiringItem[];
-  by_day: { date: string; waste_usd: number | Range3 }[];
-  total_waste_usd: number | Range3;
+  as_of: string;
+  total_waste_usd?: Range3 | null;
+  by_day?: { date: string; waste_usd: Range3; projected?: boolean }[];
 }
 
-export interface DeliveryEntry {
+export interface InventoryItem {
+  sku: string;
+  product_name: string;
+  department?: string;
+  on_hand: number;
+  avg_daily_demand: number;
+  days_of_cover: number | null;
+  projected_stockout_date?: string | null;
+  status?: "critical" | "watch" | "ok";
+  status_reason?: string;
+  forecast_outflow_units?: number | null;
+  scheduled_in_units?: number | null;
+  next_delivery_date?: string | null;
+}
+
+export interface InventoryResponse {
+  as_of: string;
+  /** Days covered by `forecast_outflow_units`. */
+  outflow_days?: number;
+  items: InventoryItem[];
+}
+
+export interface DeliveryRow {
   supplier_id: string;
   supplier_name: string;
-  po_id: string | null;
-  kind: "open_po" | "scheduled";
+  po_id: string;
+  kind: string;
   lines: { sku: string; product_name: string; qty: number }[];
-  value_usd: number;
-  status: "on_time" | "late" | "expected";
+  value_usd?: number;
+  expected_date: string;
+  status: string;
+  projected?: boolean;
 }
 
 export interface DeliveriesResponse {
-  as_of?: string;
-  days: { date: string; deliveries: DeliveryEntry[] }[];
+  as_of: string;
+  days: { date: string; projected: boolean; deliveries: DeliveryRow[] }[];
 }
 
-export interface Promo {
-  promo_id: string;
-  name: string;
-  department: string;
-  discount_pct: number;
-  start_date: string;
-  end_date: string;
-  status: "active" | "upcoming" | "past";
-  audit_verdict: string | null;
-  evaluation: { uplift_pct: number } | null;
-}
-
-export interface PromosResponse {
-  as_of?: string;
-  items: Promo[];
-}
-
-export interface StaffingDay {
+/** GET /cases/{id}/outlook?days=2: next-days expectations (verified against the live backend). */
+export interface OutlookDay {
   date: string;
-  forecast_transactions: number;
-  recommended_staff_hours: number;
-  planned_staff_hours: number | null;
-  gap_hours: number | null;
-  basis: "daily";
+  net_sales?: Range3 | null;
+  transactions?: Range3 | null;
+  avg_ticket?: Range3 | null;
+  expected_waste_usd?: Range3 | null;
+  expected_lost_sales_usd?: Range3 | null;
+  weather?: null;
+  weather_note?: string;
+  projected?: boolean;
 }
 
-export interface StaffingResponse {
+export interface Outlook {
   as_of?: string;
-  benchmark: { format: string; tx_per_staff_hour_p50: number };
-  days: StaffingDay[];
-  note: string;
+  days: OutlookDay[];
+}
+
+// ---- Memorias / Advertencias ----
+export interface DecisionLogEntry {
+  decision_id: string;
+  issue_id: string;
+  kind?: string;
+  sku?: string | null;
+  action_type: string;
+  tier?: string;
+  status: string;
+  rationale?: string;
+  reason?: string;
+  created_at: string;
+}
+
+export interface HistoryResponse {
+  as_of: string;
+  decision_log: DecisionLogEntry[];
+}
+
+export interface SupplierPerformance {
+  supplier_id: string;
+  supplier_name: string;
+  received_pos: number;
+  lead_time_mean_days: number;
+  on_time_pct: number;
+  fill_pct: number;
+  window_days: number;
+}
+
+// ---- Wave 14: pending decisions, analysis, atomic decision, memories, agents ----
+export interface PendingApproval {
+  issue_id: string;
+  title: string;
+  tier: string;
+  deadline: string | null;
+  impact_usd: Range3;
+  confidence: { score: number | null; calibrated: boolean };
+  problem: string;
+  recommendation: { option_id: string; label: string; action_type: string; params: Record<string, unknown> };
+  requires_approval: boolean;
+  kind?: string;
+  sku?: string | null;
+  product_name?: string | null;
+}
+
+export interface PendingTechnical {
+  /** null when the plan line has no decidable issue. */
+  issue_id: string | null;
+  option_id: string | null;
+  sku: string;
+  product_name?: string | null;
+  supplier_id?: string | null;
+  supplier_name?: string | null;
+  qty?: number | null;
+  expected_delivery?: string | null;
+  cost_usd: Range3;
+  why: string;
+  impact_chips: string[];
+  deadline: string | null;
+  confidence: number | null;
+  tier: string | null;
+  label: string;
+  warning?: string;
+  warning_codes?: string[];
+}
+
+/** GET /cases/{id}/decisions/pending */
+export interface PendingResponse {
+  as_of: string;
+  store_id: string;
+  approvals: PendingApproval[];
+  technical: PendingTechnical[];
+}
+
+/** GET /cases/{id}/issues/{issue_id}/analysis (Spanish, built by the backend). */
+export interface IssueAnalysis {
+  issue_id: string;
+  title: string;
+  tier: string;
+  deadline: string | null;
+  impact_usd: Range3;
+  confidence: { score: number | null; calibrated: boolean };
+  problem: string;
+  recommendation: { option_id: string; label: string; action_type: string; params: Record<string, unknown> };
+  pros: string[];
+  cons: string[];
+  requires_approval: boolean;
+  dialog: { why: string; if_accept: string; if_not_act: string; alternatives: { option_id: string; label: string; net_usd_mid: number | null }[] };
+}
+
+/** POST /cases/{id}/decisions */
+export interface CaseDecisionBody {
+  issue_id: string;
+  option_id: string;
+  approved: boolean;
+  reason?: string;
+}
+
+export interface CaseDecisionResult {
+  decision_id: string;
+  proposal_id: string;
+  status: string;
+  reason_category?: string;
+  idempotent_replay?: boolean;
+}
+
+/** GET /cases/{id}/memories */
+export interface MemoryRecord {
+  memory_id: string;
+  category: string;
+  text: string;
+  source: string;
+  cases_count: number;
+  verified: boolean;
+  created_at: string;
+  /** Created less than 24 hours ago. */
+  new: boolean;
+}
+
+export interface AgentStatus {
+  agent_id: string;
+  display_name_es: string;
+  status: "up" | "degraded" | "down";
+}
+
+/** GET /agents/status: every agent shares the Core state. */
+export interface AgentsStatusResponse {
+  connected: boolean;
+  agents: AgentStatus[];
+}
+
+/** GET /cases/{id}/inbox-counts */
+export interface InboxCounts {
+  approvals: number;
+  technical: number;
+  alerts: number;
 }

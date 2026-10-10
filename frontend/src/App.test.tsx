@@ -1,10 +1,10 @@
 import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { ApiProvider } from "./ApiContext";
 import App from "./App";
 import { SessionProvider } from "./SessionContext";
+import { splitStoreName } from "./format";
 import { fakeApi } from "./test/helpers";
 
 const open = (path = "/", api = fakeApi()) =>
@@ -18,73 +18,72 @@ const open = (path = "/", api = fakeApi()) =>
     </ApiProvider>,
   );
 
-describe("App", () => {
-  it("links all pages in the navigation", async () => {
+describe("App routes", () => {
+  it("serves the dashboard at /", async () => {
     open();
-    const nav = screen.getByRole("navigation");
-    for (const [name, href] of [["Inicio", "/"], ["Alertas", "/alerts"], ["Casos", "/cases"], ["Inspector", "/trace"]] as const)
-      expect(await screen.findByRole("link", { name })).toHaveAttribute("href", href);
-    expect(nav).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: "Compras" })).toHaveAttribute("href", "/purchases");
+    expect(await screen.findByTestId("hero")).toBeInTheDocument();
   });
 
-  it("links Decisiones in the navigation and redirects to the store timeline", async () => {
-    open();
-    expect(await screen.findByRole("link", { name: "Decisiones" })).toHaveAttribute("href", "/decisions");
+  it("serves the login at /login", async () => {
+    open("/login");
+    expect(await screen.findByRole("button", { name: "Entrar al resumen" })).toBeInTheDocument();
   });
 
-  it("redirects /decisions to the store decisions screen", async () => {
-    open("/decisions");
-    expect(await screen.findByRole("heading", { name: "Decisiones" })).toBeInTheDocument();
+  it("serves the chat at /chat", async () => {
+    open("/chat");
+    expect(await screen.findByTestId("chat-header")).toBeInTheDocument();
   });
 
-  it("routes /inventory and /week to their store screens", async () => {
-    open("/inventory");
-    expect(await screen.findByRole("heading", { name: "Inventario" })).toBeInTheDocument();
+  it.each(["/alerts", "/cases", "/purchases", "/decisions", "/inventory", "/week", "/trace", "/stores/S030/trace"])(
+    "sends the removed route %s to the dashboard",
+    async (path) => {
+      open(path);
+      expect(await screen.findByTestId("hero")).toBeInTheDocument();
+    },
+  );
+});
+
+describe("top bar title", () => {
+  it("shows the full store name and the page subtitle 'Resumen' (Main.dc.html)", async () => {
+    const plain = { store_id: "S030", name: "Tienda Única", format: "mall", site_id: "X", region: "N", display_name: "Tienda Única" };
+    open("/", fakeApi({ listStores: async () => [plain] }));
+    const bar = await screen.findByRole("banner");
+    expect(await within(bar).findByText("Tienda Única")).toBeInTheDocument();
+    expect(within(bar).getByText("Resumen")).toBeInTheDocument();
   });
 
-  it("routes /week to the week screen", async () => {
-    open("/week");
-    expect(await screen.findByRole("heading", { name: "Semana" })).toBeInTheDocument();
-  });
-
-  it("renders Home at / with the simulation control in the header", async () => {
-    open();
-    expect(await screen.findByTestId("loss-waste")).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Avanzar 1 día" })).toBeInTheDocument();
-  });
-
-  it("redirects /purchases to the store purchases screen", async () => {
-    open("/purchases");
-    expect(await screen.findByTestId("supplier-SUP1")).toBeInTheDocument();
-  });
-
-  it("refreshes alerts after advancing a day", async () => {
-    const api = fakeApi();
-    open("/alerts", api);
-    await screen.findByTestId("alert-a1");
-    const before = (api.listAlerts as unknown as { mock: { calls: unknown[] } }).mock.calls.length;
-    await userEvent.click(await screen.findByRole("button", { name: "Avanzar 1 día" }));
-    await screen.findByText(/2026-03-02/);
-    await new Promise((r) => setTimeout(r, 50));
-    expect((api.listAlerts as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBeGreaterThan(before);
+  it("splits only on the first separator", () => {
+    expect(splitStoreName("A · B · C")).toEqual(["A", "B · C"]);
+    expect(splitStoreName("Solo")).toEqual(["Solo", null]);
   });
 });
 
 describe("App shell", () => {
-  it("shows the store display name in the top bar and links to the picker", async () => {
+  it("shows the store display name in the top bar with the sign-in link", async () => {
     open();
-    expect(await within(screen.getByRole("banner")).findByText("Aeropuerto Norte · Glazed Centro")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Cambiar sucursal" })).toHaveAttribute("href", "/login");
-  });
-
-  it("serves the picker at /login", async () => {
-    open("/login");
-    expect(await screen.findByRole("button", { name: "Entrar" })).toBeInTheDocument();
+    const bar = await screen.findByRole("banner");
+    expect(await within(bar).findByText("Aeropuerto Norte · Glazed Centro")).toBeInTheDocument();
+    expect(within(bar).getByText("Resumen")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Iniciar sesión" })).toHaveAttribute("href", "/login");
+    expect(screen.queryByRole("link", { name: "Cambiar sucursal" })).toBeNull();
   });
 
   it("marks the current page in the bottom navigation", async () => {
-    open("/alerts");
-    expect(await screen.findByRole("link", { name: "Alertas" })).toHaveAttribute("aria-current", "page");
+    open("/");
+    expect(await screen.findByRole("link", { name: /Resumen/, current: "page" })).toHaveAttribute("href", "/");
+  });
+
+  it("the design's Chat entry opens /chat", async () => {
+    open("/");
+    await screen.findByRole("navigation", { name: "Navegación principal" });
+    expect(screen.getByRole("link", { name: /Chat/ })).toHaveAttribute("href", "/chat");
+  });
+});
+
+describe("copilot route", () => {
+  it("serves /copiloto with the capsule navigation and the top bar", async () => {
+    open("/copiloto");
+    expect(await screen.findByRole("navigation", { name: "Ventanas del copiloto" })).toBeInTheDocument();
+    expect(screen.getByText("Glazed Co.")).toBeInTheDocument();
   });
 });

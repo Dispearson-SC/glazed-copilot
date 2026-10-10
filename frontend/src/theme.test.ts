@@ -11,7 +11,8 @@ describe("Artisanal Roast theme", () => {
     expect(colors.surface).toBe("#fff8f4");
     expect(colors["on-tertiary-container"]).toBe("#cb9564");
     const fonts = tailwind.theme?.extend?.fontFamily as Record<string, string[]>;
-    expect(fonts["headline-sm"][0]).toBe("Poppins");
+    for (const k of ["display-hero", "display-hero-mobile", "headline-lg", "headline-md", "headline-sm"]) expect(fonts[k][0]).toBe("Playfair Display");
+    for (const k of ["metric-value", "metric-value-sm", "body-lg", "body-md", "label-md", "label-sm"]) expect(fonts[k][0]).toBe("Plus Jakarta Sans");
     expect(fonts["body-md"][0]).toBe("Plus Jakarta Sans");
   });
 
@@ -19,7 +20,7 @@ describe("Artisanal Roast theme", () => {
     const html = readFileSync("index.html", "utf8");
     expect(html).toContain("Material+Symbols+Outlined");
     expect(html).toContain("Plus+Jakarta+Sans");
-    expect(html).toContain("Poppins");
+    expect(html).toContain("Playfair+Display");
     expect(html).toContain('content="#4b3025"');
   });
 
@@ -34,13 +35,47 @@ describe("Artisanal Roast theme", () => {
   });
 });
 
-describe("legacy pages restyle", () => {
-  it("uses theme tokens instead of the old hard-coded palette", () => {
+describe("legacy css layer", () => {
+  it("is gone: only the design base and utilities remain", () => {
     const css = readFileSync("src/index.css", "utf8");
     expect(css).not.toContain("#c2185b");
-    expect(css).toMatch(/\.card[\s\S]*@apply[^;]*bg-surface-container-lowest/);
-    expect(css).toMatch(/\.badge[\s\S]*@apply/);
-    expect(css).toMatch(/button[\s\S]*@apply[^;]*rounded-full/);
-    expect(() => readFileSync("src/legacy.css")).toThrow();
+    expect(css).not.toMatch(/\.card|\.badge|main button/);
+    expect(css).toContain(".pb-safe");
+    expect(css).toContain(".pt-safe");
+  });
+});
+
+describe("design parity", () => {
+  it("loads Playfair Display (DESIGN.md display/headline), Plus Jakarta Sans and Material Symbols", () => {
+    const html = readFileSync("index.html", "utf8");
+    expect(html).toContain("family=Playfair+Display:wght@500;600;700");
+    expect(html).toContain("family=Plus+Jakarta+Sans:wght@400;500;600;700");
+    expect(html).toContain("family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200");
+    expect(html).not.toContain("Poppins");
+    expect(html).toContain('name="apple-mobile-web-app-capable"');
+  });
+
+  it("types display and headline roles as in DESIGN.md", () => {
+    const sizes = tailwind.theme?.extend?.fontSize as Record<string, [string, { lineHeight: string; fontWeight: string }]>;
+    expect(sizes["display-hero"][0]).toBe("40px");
+    expect(sizes["display-hero-mobile"][1].fontWeight).toBe("600");
+    expect(sizes["headline-lg"][0]).toBe("28px");
+    expect(sizes["headline-md"][1].fontWeight).toBe("500");
+    expect(sizes["headline-sm"][0]).toBe("18px");
+  });
+});
+
+describe("copilot design tokens (handoff: missing tokens)", () => {
+  it("adds the partition and elevation colors", () => {
+    const colors = tailwind.theme?.extend?.colors as Record<string, string>;
+    expect(colors.partition).toBe("#e8dccb");
+    expect(colors.elevation).toBe("#fffcf7");
+  });
+
+  it("adds the card, hero and sheet shadows", () => {
+    const shadows = tailwind.theme?.extend?.boxShadow as Record<string, string>;
+    expect(shadows.card).toBe("0 1px 3px rgba(75,48,37,.04), 0 8px 24px -4px rgba(75,48,37,.07)");
+    expect(shadows.hero).toBe("0 12px 32px -6px rgba(75,48,37,.22)");
+    expect(shadows.sheet).toBe("0 -20px 40px -10px rgba(75,48,37,.18)");
   });
 });

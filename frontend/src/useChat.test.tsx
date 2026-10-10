@@ -334,3 +334,61 @@ describe("useChat", () => {
     await waitFor(() => expect(result.current.messages.at(-1)?.meta).toEqual(meta));
   });
 });
+
+describe("useChat send with display text", () => {
+  it("shows the short text in the bubble but sends the full text with its context", async () => {
+    const api = fakeApi();
+    const { result } = setup(api);
+    await act(async () => { await result.current.send("Contexto: X (i1).\nAnaliza: X", { display: "Analiza: X" }); });
+    expect(api.sendMessage).toHaveBeenCalledWith("c1", "Contexto: X (i1).\nAnaliza: X");
+    expect(result.current.messages.find((m) => m.role === "user")).toMatchObject({ text: "Analiza: X" });
+    expect(result.current.messages.find((m) => m.role === "user")?.ts).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+});
+
+describe("useChat message context", () => {
+  const ctx = { issue_id: "S030|stockout_risk|SKU-1", option_id: "o1", mode: "analizar" as const };
+
+  it("sends the context as a field of POST /messages and keeps the text clean", async () => {
+    const api = fakeApi();
+    const { result } = setup(api);
+    await act(async () => { await result.current.send("Analiza: Pedir pavo", { context: ctx }); });
+    expect(api.sendMessage).toHaveBeenCalledWith("c1", "Analiza: Pedir pavo", ctx);
+  });
+
+  it("sends no third argument when there is no context", async () => {
+    const api = fakeApi();
+    const { result } = setup(api);
+    await act(async () => { await result.current.send("hola"); });
+    expect(api.sendMessage).toHaveBeenCalledWith("c1", "hola");
+  });
+
+  it("resends the same context when the user retries", async () => {
+    const api = fakeApi({ getTurn: vi.fn(async () => ({ turn_id: "t1", status: "failed", error: "se cayó" })) });
+    const { result } = setup(api);
+    await act(async () => { await result.current.send("Analiza", { context: ctx, display: "Analiza: X" }); });
+    await act(async () => { await result.current.retry(); });
+    expect(vi.mocked(api.sendMessage).mock.calls.map((c) => c[2])).toEqual([ctx, ctx]);
+  });
+});
+
+describe("useChat turn progress", () => {
+  const consulting = [{ agent_id: "supply", display_name_es: "Analista de abastecimiento", state: "consulting" as const }, { agent_id: "past", display_name_es: "Analista histórico", state: "done" as const }];
+
+  it("exposes the agents being consulted while the turn is pending and clears them when it is done", async () => {
+    let finished = false;
+    const getTurn = vi.fn(async () => (finished ? { turn_id: "t1", status: "done" as const, reply: "listo", progress: [] } : { turn_id: "t1", status: "pending" as const, progress: consulting }));
+    const { result } = setup(fakeApi({ getTurn }));
+    await act(async () => { void result.current.send("hola"); });
+    await waitFor(() => expect(result.current.progress).toEqual(consulting));
+    finished = true;
+    await waitFor(() => expect(result.current.status).toBe("idle"));
+    expect(result.current.progress).toEqual([]);
+  });
+
+  it("has no progress when the backend does not send it", async () => {
+    const { result } = setup(fakeApi());
+    await act(async () => { await result.current.send("hola"); });
+    expect(result.current.progress).toEqual([]);
+  });
+});

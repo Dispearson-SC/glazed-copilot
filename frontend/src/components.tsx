@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { useApi } from "./ApiContext";
-import { storeLabel } from "./types";
 import type { Store } from "./types";
 
 export function ErrorBox({ error }: { error: Error | null }) {
   if (!error) return null;
   return (
-    <div role="alert" className="error">
+    <div role="alert" className="rounded-[14px] bg-error-container text-on-error-container px-4 py-2.5 font-body-md text-body-md">
       {error.message}. Verifica que el backend esté corriendo.
     </div>
   );
@@ -28,19 +27,4 @@ export function useStores() {
       .catch(setError);
   }, [api]);
   return { stores, storeId, setStoreId, error };
-}
-
-export function StoreSelect(props: { stores: Store[]; value: string; onChange: (id: string) => void }) {
-  return (
-    <label>
-      Sucursal{" "}
-      <select value={props.value} onChange={(e) => props.onChange(e.target.value)}>
-        {props.stores.map((s) => (
-          <option key={s.store_id} value={s.store_id}>
-            {storeLabel(s)}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
 }
