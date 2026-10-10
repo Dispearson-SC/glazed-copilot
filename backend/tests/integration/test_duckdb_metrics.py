@@ -26,6 +26,13 @@ def test_kpis_match_source(m):
     assert k["net_sales"] > 0 and 0 <= k["conversion"] <= 1.5
 
 
+def test_kpis_report_lost_sales_range_next_to_waste(m):
+    k = m.kpis(S, AS_OF, date(2026, 2, 1), AS_OF)
+    ls = k["lost_sales_usd"]
+    assert 0 <= ls["low"] <= ls["mid"] <= ls["high"] and ls["mid"] > 0
+    assert k["window"] == {"from": "2026-02-01", "to": "2026-03-10"} and k["waste_usd"] >= 0
+
+
 def test_kpis_cannot_read_past_as_of(m):
     with pytest.raises(FutureDate):
         m.kpis(S, AS_OF, date(2026, 3, 1), date(2026, 3, 11))

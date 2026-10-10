@@ -13,6 +13,7 @@ from typing import Any
 import duckdb
 
 from ...domain import FutureDate, NotFound
+from ...metrics.losses import lost_sales_window
 from ...metrics.plan import apply_min_order, plan_line
 from ...metrics.schedule import parse_delivery_days
 from ...metrics.snapshot import StoreSnapshot
@@ -95,7 +96,29 @@ class DuckDBMetrics:
             "conversion": _f(k["vtx"] / k["vff"], 4) if k["vff"] else None,
             "tx_per_staff_hour": _f(k["tx"] / k["staff_hours"]) if k["staff_hours"] else None,
             "waste_usd": _f(inv[0]), "stockout_hours": _f(inv[1]),
+            "lost_sales_usd": self._lost_sales(store_id, date_from, date_to),
+            "window": {"from": date_from.isoformat(), "to": date_to.isoformat()},
         }
+
+    def _lost_sales(self, store_id: str, date_from: date, date_to: date) -> dict[str, float]:
+        """stockout_hours x same-weekday sales rate per open hour x price (low = partial-day stockouts only)."""
+        oh = self._q("SELECT coalesce(typical_open_hours, 12) FROM stores WHERE store_id=?", [store_id])
+        open_h = float(oh[0][0]) if oh and oh[0][0] else 12.0
+        rows = self._rows(
+            "SELECT i.sku, i.date, i.received_qty, i.units_sold, i.expired_qty, i.closing_qty, i.stockout_hours,"
+            " p.list_price_base price FROM inventory_daily i JOIN products p USING (sku)"
+            " WHERE i.store_id=? AND i.date BETWEEN ? AND ? ORDER BY i.sku, i.date",
+            [store_id, date_from - timedelta(days=56), date_to])
+        by: dict[str, tuple[float, list[DayRow]]] = {}
+        for r in rows:
+            by.setdefault(r["sku"], (float(r["price"] or 0), []))[1].append(DayRow(
+                r["date"], int(r["received_qty"] or 0), int(r["units_sold"] or 0), int(r["expired_qty"] or 0),
+                int(r["closing_qty"] or 0), float(r["stockout_hours"] or 0.0)))
+        tot = {"low": 0.0, "mid": 0.0, "high": 0.0}
+        for price, rs in by.values():
+            for k, v in lost_sales_window(rs, price, open_h, date_from, date_to).items():
+                tot[k] += v
+        return {k: round(v, 2) for k, v in tot.items()}
 
     # -- Day summary -------------------------------------------------------------
     def day_summary(self, store_id: str, as_of: date, day: date) -> dict[str, Any]:
