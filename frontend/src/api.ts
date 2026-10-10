@@ -22,8 +22,25 @@ function qs(query?: Query): string {
 /** The route is not deployed yet (404) or not implemented (501). */
 export const isUnavailable = (e: unknown): boolean => e instanceof ApiError && (e.status === 404 || e.status === 501);
 
+export interface AuthUser {
+  user_id: string;
+  email: string;
+  name: string;
+  role: "admin" | "manager";
+  store_ids: string[];
+}
+
+export interface Health {
+  auth_required?: boolean;
+  [k: string]: unknown;
+}
+
+/** Routes whose 401 is an answer, not an expired session. */
+const isPublicPath = (path: string): boolean => path.startsWith("/auth/") || path === "/health";
+
 export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fetch(...a)) {
   const base = baseUrl.replace(/\/$/, "");
+  let onUnauthorized: (() => void) | null = null;
 
   async function request<T>(path: string, init: RequestInit = {}, query?: Query): Promise<T> {
     const headers: Record<string, string> = { Accept: "application/json" };
@@ -31,7 +48,7 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
     Object.assign(headers, init.headers as Record<string, string> | undefined);
     let res: Response;
     try {
-      res = await fetchFn(`${base}/api/v1${path}${qs(query)}`, { ...init, headers });
+      res = await fetchFn(`${base}/api/v1${path}${qs(query)}`, { ...init, headers, credentials: "include" });
     } catch (e) {
       throw new ApiError(0, `No se pudo conectar con el backend (${(e as Error).message})`);
     }
@@ -43,6 +60,7 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
       } catch {
         /* keep default detail */
       }
+      if (res.status === 401 && !isPublicPath(path)) onUnauthorized?.();
       throw new ApiError(res.status, detail);
     }
     return (await res.json()) as T;
@@ -51,6 +69,14 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
   const send = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
 
   return {
+    /** Called on any 401 from a route other than health/auth. */
+    setOnUnauthorized: (cb: (() => void) | null) => {
+      onUnauthorized = cb;
+    },
+    getHealth: () => request<Health>("/health"),
+    login: (b: { email: string; password: string }) => request<{ user: AuthUser }>("/auth/login", send("POST", b)),
+    logout: () => request<unknown>("/auth/logout", { method: "POST" }),
+    me: () => request<{ user: AuthUser }>("/auth/me"),
     listStores: () => request<Store[]>("/stores"),
     listCases: (query: { store_id?: string }) => request<Case[]>("/cases", {}, query),
     createCase: (b: { store_id: string; sim_today: string; mode?: CaseMode; title?: string }) =>

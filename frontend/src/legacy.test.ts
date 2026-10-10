@@ -5,7 +5,7 @@ const REMOVED = [
   "pages/AlertsPage", "pages/CasesPage", "pages/PurchasesPage", "pages/TracePage", "pages/DecisionsPage",
   "pages/InventoryPage", "pages/WeekPage", "SimControl", "CentinelaPanel", "IssueDetail", "ComingSoon",
   "pages/HomePage", "shell/TopBar", "shell/BottomNav", "dashboard/Hero", "dashboard/TrendChart", "dashboard/ForecastChart", "dashboard/BriefingCard", "dashboard/ContextChips", "dashboard/UpcomingCard", "dashboard/ForecastAccuracy", "issues",
-  "pages/DashboardPage", "pages/LoginPage", "pages/ChatPage", "chat/FloatingChat", "chat/ChatView", "components/PageShell", "components/TopBar", "components/BottomNav",
+  "pages/DashboardPage", "pages/ChatPage", "chat/FloatingChat", "chat/ChatView", "components/PageShell", "components/TopBar", "components/BottomNav",
 ];
 
 describe("legacy code is gone", () => {

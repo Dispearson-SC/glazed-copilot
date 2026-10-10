@@ -20,6 +20,20 @@ describe("api client", () => {
     expect(fetchFn).toHaveBeenLastCalledWith("http://x:1/api/v1/cases/c1/day-summary", expect.anything());
   });
 
+  it("sends credentials and reports 401s from non-auth routes only", async () => {
+    const f = vi.fn(async () => new Response("{}", { status: 401 }));
+    const api = createApi("http://x:1", f as unknown as typeof fetch);
+    const cb = vi.fn();
+    api.setOnUnauthorized(cb);
+    await expect(api.listStores()).rejects.toBeInstanceOf(ApiError);
+    expect(f).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ credentials: "include" }));
+    expect(cb).toHaveBeenCalledTimes(1);
+    await expect(api.me()).rejects.toBeInstanceOf(ApiError);
+    await expect(api.login({ email: "a", password: "b" })).rejects.toBeInstanceOf(ApiError);
+    await expect(api.getHealth()).rejects.toBeInstanceOf(ApiError);
+    expect(cb).toHaveBeenCalledTimes(1);
+  });
+
   it("uses a relative base when the base url is empty", async () => {
     const api = createApi("", fetchFn as unknown as typeof fetch);
     await api.listStores();

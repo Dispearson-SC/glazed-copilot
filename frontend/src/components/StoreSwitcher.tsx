@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useApi } from "../ApiContext";
 import { DEFAULT_SIM_TODAY } from "../config";
+import { isSingleStore, scopeStores, useAuth } from "../AuthContext";
 import { useSession } from "../SessionContext";
 import { useCurrentCase } from "../useCurrentCase";
 import { storeLabel, type Store } from "../types";
@@ -13,6 +14,8 @@ export const storeClosedReason = (s: Store, simToday: string = DEFAULT_SIM_TODAY
 export default function StoreSwitcher({ children, className = "" }: { children: ReactNode; className?: string }) {
   const api = useApi();
   const session = useSession();
+  const { user } = useAuth();
+  const readOnly = isSingleStore(user);
   const { storeId, setStoreId, bump } = session;
   const [stores, setStores] = useState<Store[]>([]);
   const [open, setOpen] = useState(false);
@@ -30,8 +33,9 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
     let alive = true;
     api
       .listStores()
-      .then((s) => {
+      .then((all) => {
         if (!alive) return;
+        const s = scopeStores(all, user);
         setStores(s);
         // A persisted choice that is gone, closed or not yet open falls back to the first open store.
         const cur = storeIdRef.current;
@@ -66,6 +70,8 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
     setStoreId(id);
     bump();
   };
+
+  if (readOnly) return <div className={`flex min-w-0 items-center ${className}`}><span className="min-w-0 flex-1">{children}</span></div>;
 
   return (
     <>
