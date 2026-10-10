@@ -8,6 +8,7 @@ import DecisionsWindow from "../components/copilot/DecisionsWindow";
 import MemoriesWindow from "../components/copilot/MemoriesWindow";
 import RejectSheet from "../components/copilot/RejectSheet";
 import Toast from "../components/copilot/Toast";
+import { isUnavailable } from "../api";
 import { useStores } from "../components";
 import { buildDayView, buildInventoryRows, buildMemories, buildScheduled, buildWarnings, chatContextText, type DecisionItem, type WarningItem } from "../data/copilot";
 import { splitStoreName } from "../format";
@@ -74,6 +75,7 @@ function CopilotShell() {
       <CopilotTopBar branch={branch ?? site} onSettings={() => showToast("Ajustes: disponible pronto")} />
       {state.tab === "agente" && (
         <AgentWindow
+          caseId={caseId}
           chat={chat}
           items={[...known.current.values()]}
           openIds={visible.map((i) => i.id)}
@@ -86,6 +88,7 @@ function CopilotShell() {
         <DecisionsWindow
           items={visible}
           simToday={simToday}
+          loadState={data.items.length === 0 && data.error ? (isUnavailable(data.error) ? "soon" : "error") : "ok"}
           menuFor={state.menuFor}
           busyId={null}
           accepted={state.accepted}

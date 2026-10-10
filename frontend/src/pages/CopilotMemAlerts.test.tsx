@@ -1,7 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { alertsA, historyA, integrityA, orderPlanA, suppliersA, wasteIssue } from "../test/copilotFixtures";
+import { alertsA, historyA, integrityA, pendingA, suppliersA } from "../test/copilotFixtures";
 import { caseA, fakeApi, renderPage } from "../test/helpers";
 import CopilotPage from "./CopilotPage";
 
@@ -9,8 +9,8 @@ const api = (over = {}) =>
   fakeApi({
     listCases: async () => [{ ...caseA, sim_today: "2026-07-19" }],
     listProposals: async () => [],
-    listIssues: vi.fn(async (_c: string, q: { category?: string } = {}) => (q.category === "integrity" ? integrityA : [wasteIssue])),
-    getOrderPlan: async () => orderPlanA,
+    getPending: async () => pendingA,
+    listIssues: vi.fn(async (_c: string, q: { category?: string } = {}) => (q.category === "integrity" ? integrityA : [])),
     getHistory: async () => historyA,
     getSupplierPerformance: async () => suppliersA,
     listAlerts: vi.fn(async () => alertsA),
@@ -55,7 +55,7 @@ describe("Memorias window", () => {
     const a = api();
     renderPage(a, "/copiloto", "/copiloto", <CopilotPage />);
     await userEvent.click(await screen.findByRole("button", { name: /^Decisiones/ }));
-    const card = (await screen.findByRole("heading", { name: /Comprar 1 caja/ })).closest("article")!;
+    const card = (await screen.findByRole("heading", { name: /Pedir 10 unidades/ })).closest("article")!;
     await userEvent.click(within(card).getByRole("button", { name: /Rechazar/ }));
     await userEvent.click(screen.getByRole("button", { name: "Mal momento" }));
     await userEvent.click(screen.getByRole("button", { name: "Enviar motivo y rechazar" }));

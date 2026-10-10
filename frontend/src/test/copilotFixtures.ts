@@ -131,3 +131,45 @@ export const alertsA: AlertRecord[] = [
 export const integrityA: IssueT[] = [
   { issue_id: "S030|orphan_sku|SKU-7xxxxx", kind: "orphan_sku", integrity: true, category: "integrity", exposure_usd: 14537.12, as_of: "2026-07-19" } as IssueT,
 ];
+
+// ---- Wave 14 (real shapes: GET /cases/fce42dd29fba/decisions/pending and /issues/{id}/analysis, S030, 2026-07-19) ----
+import type { IssueAnalysis, PendingResponse } from "../types";
+
+export const pendingA: PendingResponse = {
+  as_of: "2026-07-19",
+  store_id: "S030",
+  approvals: [
+    {
+      issue_id: "S030|overstock_waste|SKU-100502", title: "Sobreinventario y merma: 12 Croiss-Ant Donuts", tier: "N2", deadline: "2026-07-19",
+      impact_usd: { low: 58.92, mid: 58.92, high: 58.92 }, confidence: { score: 0.7416, calibrated: true },
+      problem: "Se recibe más 12 Croiss-Ant Donuts del que se vende y la merma de los últimos 14 días fue de $638.",
+      recommendation: { option_id: "65ead6dcd46e", label: "Omitir el pedido de 12 Croiss-Ant Donuts en este ciclo", action_type: "skip_order", params: { sku: "SKU-100502" } },
+      requires_approval: true, kind: "overstock_waste", sku: "SKU-100502", product_name: "12 Croiss-Ant Donuts",
+    },
+  ],
+  technical: [
+    {
+      issue_id: "S030|stockout_risk|SKU-100263", option_id: "8f63a675ef2b", sku: "SKU-100263", product_name: "Md Choc Stout C.B. Wsweet Cold Foam", supplier_id: "SUP03",
+      supplier_name: "Summit Frozen Foods", qty: 10, expected_delivery: "2026-07-21", cost_usd: { low: 14.6, mid: 14.6, high: 14.6 },
+      why: "Md Choc Stout C.B. Wsweet Cold Foam se agotaría el 2026-07-21 sin pedido; el pedido llega el 2026-07-21.",
+      impact_chips: ["Venta perdida esperada $10.63", "Merma esperada $0.96", "Riesgo de desabasto sin pedido 100%"], deadline: "2026-07-19", confidence: 0.4094, tier: "N2",
+      label: "Pedir 10 unidades de Md Choc Stout C.B. Wsweet Cold Foam",
+      warning: "El pedido a Summit Frozen Foods ($106) está por debajo del mínimo del proveedor ($300); conviene consolidarlo con la siguiente entrega. Es un aviso, no un bloqueo.",
+      warning_codes: ["below_min_order"],
+    },
+  ],
+};
+
+export const analysisApproval: IssueAnalysis = {
+  issue_id: "S030|overstock_waste|SKU-100502", title: "Sobreinventario y merma: 12 Croiss-Ant Donuts", tier: "N2", deadline: "2026-07-19",
+  impact_usd: { low: 58.92, mid: 58.92, high: 58.92 }, confidence: { score: 0.7416, calibrated: true },
+  problem: "Se recibe más 12 Croiss-Ant Donuts del que se vende y la merma de los últimos 14 días fue de $638.",
+  recommendation: { option_id: "65ead6dcd46e", label: "Omitir el pedido de 12 Croiss-Ant Donuts en este ciclo", action_type: "skip_order", params: {} },
+  pros: ["Reduce la merma en $58.92.", "Respaldado por 538 casos de backtest (confianza 74%)."],
+  cons: ["Omitir el pedido puede causar un desabasto antes de la próxima entrega."], requires_approval: true,
+  dialog: {
+    why: "Es la opción con mayor efecto neto esperado ($58.92) frente a no hacer nada, que cuesta $112.",
+    if_accept: "Si apruebas: Omitir el pedido de 12 Croiss-Ant Donuts en este ciclo.", if_not_act: "Si no actúas: pérdida esperada $112 (merma $112).",
+    alternatives: [{ option_id: "a0f43dce40dc", label: "No hacer nada", net_usd_mid: 0 }],
+  },
+};

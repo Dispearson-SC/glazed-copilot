@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useApi } from "../../ApiContext";
 import Markdown from "../../chat/Markdown";
 import { ProposalCard, SUGGESTIONS } from "../../chat/ChatView";
-import { chatContextText, type AnalysisRef, type DecisionItem } from "../../data/copilot";
+import { chatContextText, fetchIssueAnalysis, type AnalysisRef, type AnalysisState, type DecisionItem } from "../../data/copilot";
 import { clockTime } from "../../format";
 import { useCopilot } from "../../state/copilotStore";
 import type { ChatMessage } from "../../chatHistory";
@@ -36,8 +37,27 @@ function AssistantBubble({ m }: { m: ChatMessage }) {
   );
 }
 
+/** Fetches the backend analysis of the issue once and hands it to the card. */
+function AnalysisLoader({ caseId, item, mode, open, onApprove, onReject }: { caseId: string; item: DecisionItem; mode: AnalysisRef["mode"]; open: boolean; onApprove: (i: DecisionItem) => void; onReject: (i: DecisionItem) => void }) {
+  const api = useApi();
+  const [analysis, setAnalysis] = useState<AnalysisState>({ status: "loading" });
+  useEffect(() => {
+    let alive = true;
+    if (!item.issueId) {
+      setAnalysis({ status: "soon" });
+      return;
+    }
+    void fetchIssueAnalysis(api, caseId, item.issueId).then((a) => alive && setAnalysis(a));
+    return () => {
+      alive = false;
+    };
+  }, [api, caseId, item.issueId]);
+  return <AnalysisCard item={item} analysis={analysis} mode={mode} open={open} onApprove={onApprove} onReject={onReject} />;
+}
+
 /** Agente window: the existing chat (useChat) in the copilot look, with the pinned context and the analysis cards. */
 export default function AgentWindow({
+  caseId,
   chat,
   items,
   openIds,
@@ -45,6 +65,7 @@ export default function AgentWindow({
   onApprove,
   onReject,
 }: {
+  caseId: string;
   chat: Chat;
   /** Every decision seen this session, so a decided card still renders as 'Decisión registrada'. */
   items: DecisionItem[];
@@ -84,7 +105,7 @@ export default function AgentWindow({
     cardsAt(at).map((a) => {
       const item = items.find((i) => i.id === a.itemId);
       if (!item) return null;
-      return <AnalysisCard key={a.id} item={item} mode={a.mode} open={pendingIds.has(item.id)} onApprove={onApprove} onReject={onReject} />;
+      return <AnalysisLoader key={a.id} caseId={caseId} item={item} mode={a.mode} open={pendingIds.has(item.id)} onApprove={onApprove} onReject={onReject} />;
     });
 
   return (

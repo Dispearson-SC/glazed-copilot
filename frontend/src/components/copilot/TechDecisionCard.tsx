@@ -32,12 +32,12 @@ export default function TechDecisionCard({
       </div>
       {item.why && <p className="m-0 text-[13px] leading-[19px] text-on-surface">{item.why}</p>}
       <div className="flex flex-wrap gap-1.5">
-        {item.impact && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(185,133,86,.15)] px-2.5 py-[3px] font-label-sm text-label-sm font-semibold text-on-tertiary-fixed-variant">
+        {item.chips.map((c) => (
+          <span key={c} className="inline-flex items-center gap-1 rounded-full bg-[rgba(185,133,86,.15)] px-2.5 py-[3px] font-label-sm text-label-sm font-semibold text-on-tertiary-fixed-variant">
             <span aria-hidden="true" className="material-symbols-outlined text-[14px]">trending_down</span>
-            {item.impact}
+            {c}
           </span>
-        )}
+        ))}
         <span className="inline-flex items-center gap-1 rounded-full bg-surface-container-high px-2.5 py-[3px] font-label-sm text-label-sm font-semibold text-primary">
           <span aria-hidden="true" className="material-symbols-outlined text-[14px]">schedule</span>
           {item.deadline}

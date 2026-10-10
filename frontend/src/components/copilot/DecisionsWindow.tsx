@@ -1,4 +1,4 @@
-import type { DecisionItem } from "../../data/copilot";
+import { SOON_TEXT, type DecisionItem } from "../../data/copilot";
 import { dateLabel } from "../../format";
 import ApprovalCard from "./ApprovalCard";
 import TechDecisionCard from "./TechDecisionCard";
@@ -19,6 +19,7 @@ function SectionHead({ title, hint, count, dark }: { title: string; hint: string
 export default function DecisionsWindow({
   items,
   simToday,
+  loadState = "ok",
   menuFor,
   busyId,
   accepted,
@@ -30,6 +31,8 @@ export default function DecisionsWindow({
 }: {
   items: DecisionItem[];
   simToday: string;
+  /** "soon": the route answers 404/501; "error": it failed and there is nothing to show. */
+  loadState?: "ok" | "soon" | "error";
   menuFor: string | null;
   busyId: string | null;
   accepted: number;
@@ -49,10 +52,16 @@ export default function DecisionsWindow({
         <p className="m-0 font-body-md text-body-md text-on-surface-variant">El código calcula; el copiloto explica. Tú decides.</p>
       </header>
 
+      {loadState !== "ok" && (
+        <p role="alert" className="m-0 rounded-[18px] bg-surface-container p-4 text-center text-[13px] leading-[19px] text-on-surface-variant">
+          {loadState === "soon" ? `${SOON_TEXT}: las decisiones aún no están disponibles.` : "No se pudieron cargar las decisiones. Se reintentará en un minuto."}
+        </p>
+      )}
+
       <section className="flex flex-col gap-2">
         <SectionHead title="Se necesita aprobación / opinión" hint="Casos difíciles: analízalos con el copiloto" count={approvals.length} dark />
         {approvals.map((a) => <ApprovalCard key={a.id} item={a} onAnalyze={onAnalyze} />)}
-        {approvals.length === 0 && <p className="m-0 rounded-[18px] bg-surface-container p-4 text-center text-[13px] leading-[19px] text-on-surface-variant">Nada pendiente de tu opinión por ahora.</p>}
+        {approvals.length === 0 && loadState === "ok" && <p className="m-0 rounded-[18px] bg-surface-container p-4 text-center text-[13px] leading-[19px] text-on-surface-variant">Nada pendiente de tu opinión por ahora.</p>}
       </section>
 
       <section className="flex flex-col gap-2">
@@ -60,7 +69,7 @@ export default function DecisionsWindow({
         {techs.map((t) => (
           <TechDecisionCard key={t.id} item={t} menuOpen={menuFor === t.id} busy={busyId === t.id} onAccept={onAccept} onReject={onReject} onToggleMenu={onToggleMenu} onDialog={onDialog} />
         ))}
-        {techs.length === 0 && <p className="m-0 rounded-[18px] bg-surface-container p-4 text-center text-[13px] leading-[19px] text-on-surface-variant">Todas las decisiones técnicas de hoy están resueltas.</p>}
+        {techs.length === 0 && loadState === "ok" && <p className="m-0 rounded-[18px] bg-surface-container p-4 text-center text-[13px] leading-[19px] text-on-surface-variant">Todas las decisiones técnicas de hoy están resueltas.</p>}
         <p className="m-0 mt-1 flex items-center justify-center gap-1.5 font-label-sm text-label-sm font-normal text-on-surface-variant">
           <span aria-hidden="true" className="material-symbols-outlined text-[14px]">bolt</span>
           {accepted > 0 ? `${accepted} aceptada${accepted > 1 ? "s" : ""} por ti` : "Sin decisiones resueltas hoy"}

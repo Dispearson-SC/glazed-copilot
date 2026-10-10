@@ -50,6 +50,12 @@ export function fakeApi(over: Partial<Record<keyof Api, unknown>> = {}): Api {
     getTrace: vi.fn(async () => []),
     getDaySummary: vi.fn(async (_id: string, date?: string) => ({ ...daySummaryA, date: date ?? daySummaryA.date })),
     getForecast: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getPending: vi.fn(async () => ({ as_of: "2026-03-01", store_id: "S030", approvals: [], technical: [] })),
+    getAnalysis: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    recordDecision: vi.fn(async () => ({ decision_id: "pp-new", proposal_id: "pp-new", status: "approved" })),
+    getMemories: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getAgentsStatus: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getInboxCounts: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
     listTurns: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
   };
   return { ...base, ...over } as unknown as Api;

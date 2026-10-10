@@ -1,14 +1,17 @@
-import { SOON_TEXT, type DecisionItem } from "../../data/copilot";
+import { analysisSections, SOON_TEXT, type AnalysisState, type DecisionItem } from "../../data/copilot";
 
 /** Espresso-header card with the analysis (approvals) or the dialogue (technical decisions) of one decision. */
 export default function AnalysisCard({
   item,
+  analysis,
   mode,
   open,
   onApprove,
   onReject,
 }: {
   item: DecisionItem;
+  /** The backend analysis of the issue (GET /issues/{id}/analysis). */
+  analysis: AnalysisState;
   mode: "analizar" | "dialogo";
   /** True while the decision is still pending. */
   open: boolean;
@@ -16,6 +19,7 @@ export default function AnalysisCard({
   onReject: (item: DecisionItem) => void;
 }) {
   const isAnalysis = mode === "analizar";
+  const sections = analysis.status === "ok" ? analysisSections(mode, analysis.data) : [];
   return (
     <article className="overflow-hidden rounded-[18px] border border-partition/60 bg-white shadow-card">
       <div className="flex flex-col gap-1.5 bg-primary-container p-4 text-white">
@@ -43,8 +47,10 @@ export default function AnalysisCard({
         </div>
       </div>
       <div className="flex flex-col gap-3 px-4 py-3.5">
-        {item.sections.length === 0 && <p className="text-[13px] leading-[19px] text-on-surface-variant">Sin datos</p>}
-        {item.sections.map((s) => (
+        {analysis.status === "loading" && <p className="m-0 text-[13px] leading-[19px] text-on-surface-variant">Cargando análisis…</p>}
+        {analysis.status === "soon" && <p className="m-0 text-[13px] leading-[19px] text-on-surface-variant">{SOON_TEXT}</p>}
+        {analysis.status === "error" && <p className="m-0 text-[13px] leading-[19px] text-on-surface-variant">No se pudo cargar el análisis: {analysis.message}</p>}
+        {sections.map((s) => (
           <div key={s.label} className="flex flex-col gap-1">
             <span className="flex items-center gap-1.5 font-label-md text-label-md uppercase" style={{ color: s.color }}>
               <span aria-hidden="true" className="material-symbols-outlined text-[16px]">{s.icon}</span>

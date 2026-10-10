@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
-  ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, branchKpis, hoySummary, orderPlanA, wasteIssue,
+  ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, branchKpis, hoySummary, orderPlanA, pendingA,
 } from "../test/copilotFixtures";
 import { caseA, fakeApi, renderPage } from "../test/helpers";
 import CopilotPage from "./CopilotPage";
@@ -12,7 +12,7 @@ const api = (over = {}) =>
   fakeApi({
     listCases: async () => [julyCase],
     listProposals: async () => [],
-    listIssues: async () => [wasteIssue],
+    getPending: async () => pendingA,
     getOrderPlan: async () => orderPlanA,
     getForecast: vi.fn(async () => branchForecast),
     getDaySummary: vi.fn(async (_c: string, date?: string) => (date === "2026-07-18" ? ayerSummary : hoySummary)),

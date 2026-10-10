@@ -26,9 +26,7 @@ export function useDecide(caseId: string, refresh: () => Promise<void> | void) {
       const reason = approved ? undefined : [rejection?.label, rejection?.text].filter(Boolean).join(": ");
       setBusy(item.id);
       try {
-        const proposalId =
-          item.proposalId ??
-          (await api.propose({ case_id: caseId, issue_id: item.issueId, option_id: item.optionId, rationale: item.title }, { idempotencyKey: crypto.randomUUID() })).proposal_id;
+        const proposalId = (await api.propose({ case_id: caseId, issue_id: item.issueId, option_id: item.optionId, rationale: item.title }, { idempotencyKey: crypto.randomUUID() })).proposal_id;
         try {
           await api.decide(proposalId, approved ? { approved: true } : { approved: false, reason }, { idempotencyKey: crypto.randomUUID() });
         } catch (e) {

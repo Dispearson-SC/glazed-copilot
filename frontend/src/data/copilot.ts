@@ -1,8 +1,8 @@
 import { isUnavailable, type Api } from "../api";
 import { avgTicket, dayMonth, longDate, shiftDate, signedPct, usd, usdWhole, weekdayDay } from "../format";
 import type {
-  AlertRecord, DaySummary, DeliveriesResponse, ExpiringResponse, ForecastResponse, InventoryResponse, Issue, IssueOption, Kpis, OrderLine, OrderPlan,
-  DecisionLogEntry, HistoryResponse, Outlook, OutlookDay, Proposal, Range3, SupplierPerformance,
+  AlertRecord, DaySummary, DeliveriesResponse, ExpiringResponse, ForecastResponse, InventoryResponse, Issue, IssueAnalysis, Kpis, OrderPlan,
+  DecisionLogEntry, HistoryResponse, Outlook, OutlookDay, PendingResponse, Range3, SupplierPerformance,
 } from "../types";
 
 /**
@@ -62,8 +62,6 @@ export function chatContextText(text: string, ctx: ChatContext | null): string {
   return ctx ? `Contexto: ${ctx.title} (${ctx.issueId}).\n${text}` : text;
 }
 
-/** GET /cases/{id}/issues/{issue_id}/analysis (pending): sections are built locally from the issue meanwhile. */
-export const fetchIssueAnalysis = async (_api: Api, _caseId: string, _issueId: string): Promise<Source<never>> => SOON;
 /** /forecast?metric=traffic|weather (pending). */
 export const fetchForecastMetric = async (_api: Api, _caseId: string, _metric: string): Promise<Source<never>> => SOON;
 /** /inventory status fields: critical / follow-up / ok (pending). */
@@ -84,8 +82,7 @@ export const fetchInboxCounts = async (_api: Api, _caseId: string): Promise<Sour
 export const alertAgent = (a: AlertRecord): string | null => (a as { agent_id?: string }).agent_id ?? null;
 
 // ---------------------------------------------------------------------------------------------
-// Decisions: GET /cases/{id}/issues + GET /cases/{id}/order-plan + GET /proposals -> cards.
-// The UI never computes: it only formats backend values and picks wording by action type.
+// Decisions: GET /cases/{id}/decisions/pending -> cards. The UI never computes: it formats backend values.
 // ---------------------------------------------------------------------------------------------
 export interface AnalysisSection {
   label: string;
@@ -99,13 +96,10 @@ export interface DecisionItem {
   /** issue_id, or `line|<sku>` for an order-plan line without an issue. */
   id: string;
   issueId: string;
-  /** Recommended option; "" when the line cannot be decided through proposals. */
+  /** Option to decide; "" when the line cannot be decided. */
   optionId: string;
-  /** Existing pending proposal for this issue, reused instead of creating a new one. */
-  proposalId?: string;
   kind: "approval" | "tech";
   readOnly: boolean;
-  actionType: string;
   tier: string;
   icon: string;
   level: string;
@@ -120,9 +114,9 @@ export interface DecisionItem {
   arrive: string;
   cost: string;
   why: string;
-  impact: string;
+  /** Backend impact chips (technical cards). */
+  chips: string[];
   warn: string;
-  sections: AnalysisSection[];
 }
 
 const TIER_NAMES: Record<string, string> = { N1: "Automática", N2: "Propuesta", N3: "Diálogo" };
@@ -144,168 +138,76 @@ const ACTION_ICONS: Record<string, string> = {
   transfer: "swap_horiz",
 };
 
-function actionTitle(o: IssueOption, issue: Issue): string {
-  const product = issue.product_name || issue.sku || issue.kind;
-  const p = o.params as { cases?: number; qty?: number; event?: string };
-  switch (o.action_type) {
-    case "place_order":
-      return p.cases ? `Comprar ${p.cases} ${p.cases === 1 ? "caja" : "cajas"} de ${product}` : `Comprar ${p.qty ?? ""} pzas de ${product}`.replace("  ", " ");
-    case "skip_order":
-      return `Omitir el pedido de ${product}`;
-    case "adjust_order_qty":
-      return p.event ? `Ajustar el pedido por ${p.event}` : `Ajustar el pedido de ${product}`;
-    case "markdown_end_of_day":
-      return `Descuento al cierre en ${product}`;
-    case "transfer":
-      return `Transferir ${product}`;
-    default:
-      return `${o.action_type} · ${product}`;
-  }
-}
-
-function benefitText(o: IssueOption): string {
-  const b = o.expected_benefit_usd;
-  if (!b) return "";
-  const { low, mid, high } = b;
+function benefitText(r: Range3 | null | undefined): string {
+  if (!r) return "";
+  const { low, mid, high } = r;
   if (low != null && high != null && low !== high) return `+${usd(low)} a ${usd(high)}`;
   const one = mid ?? low ?? high;
   return one ? `+${usd(one)}` : "";
 }
 
-const evidence = (issue: Issue, metric: string): number | string | undefined => issue.evidence?.find((e) => e.metric === metric)?.value;
+const confText = (score: number | null | undefined): string => (score == null ? "Sin datos" : pct(score));
 
-function impactText(o: IssueOption, line?: OrderLine): string {
-  if (line?.stockout_risk_without_order != null && line.stockout_risk_with_order != null)
-    return `Riesgo de quiebre ${pct(line.stockout_risk_without_order)} → ${pct(line.stockout_risk_with_order)}`;
-  const waste = o.loss_impact?.waste_usd_delta;
-  const lost = o.loss_impact?.lost_sales_usd_delta;
-  if (waste != null && waste < 0) return `Merma evitada ~${usd(-waste)}`;
-  if (lost != null && lost < 0) return `Venta recuperada ~${usd(-lost)}`;
-  return "";
+/** Maps GET /decisions/pending to cards. Approvals and technical come split by the backend; a technical line with no issue/option is read-only. */
+export function buildPendingItems(pending: PendingResponse | null, simToday: string): DecisionItem[] {
+  if (!pending) return [];
+  const approvals = pending.approvals.map((a): DecisionItem => ({
+    id: a.issue_id, issueId: a.issue_id, optionId: a.recommendation.option_id, kind: "approval", readOnly: false, tier: a.tier,
+    icon: ACTION_ICONS[a.recommendation.action_type] ?? "bolt", level: tierLabel(a.tier), title: a.recommendation.label, summary: a.problem,
+    value: benefitText(a.impact_usd), conf: a.confidence.score ?? 0, confPct: confText(a.confidence.score), deadline: deadlineText(a.deadline, simToday),
+    supplier: "", arrive: "", cost: "", why: a.problem, chips: [], warn: "",
+  }));
+  const techs = pending.technical.map((t): DecisionItem => {
+    const decidable = Boolean(t.issue_id && t.option_id);
+    return {
+      id: t.issue_id ?? `line|${t.sku}`, issueId: t.issue_id ?? "", optionId: t.option_id ?? "", kind: "tech", readOnly: !decidable, tier: t.tier ?? "",
+      icon: t.expected_delivery || t.qty ? "shopping_basket" : "bolt", level: t.tier ? tierLabel(t.tier) : "", title: t.label, summary: "",
+      value: benefitText(null), conf: t.confidence ?? 0, confPct: confText(t.confidence), deadline: deadlineText(t.deadline, simToday),
+      supplier: t.supplier_name ?? t.supplier_id ?? "", arrive: t.expected_delivery ? `llega ${weekdayDay(t.expected_delivery)}` : "",
+      cost: t.cost_usd?.mid ? usd(t.cost_usd.mid) : "", why: t.why, chips: t.impact_chips ?? [], warn: t.warning ?? "",
+    };
+  });
+  return [...techs, ...approvals];
 }
 
-function whyText(o: IssueOption, issue: Issue, line?: OrderLine): string {
-  if (line?.usable_stock != null && line.expected_delivery) {
-    const out = line.projected_stockout_date ? ` Quiebre proyectado: ${weekdayDay(line.projected_stockout_date)}.` : "";
-    return `Stock utilizable ${line.usable_stock}; el próximo reparto llega el ${weekdayDay(line.expected_delivery)}.${out}`;
-  }
-  const waste = evidence(issue, "waste_usd_14d");
-  if (typeof waste === "number") {
-    const rec = evidence(issue, "received_28d");
-    const sold = evidence(issue, "sold_28d");
-    const flow = rec != null && sold != null ? `; se recibieron ${rec} y se vendieron ${sold} en 28 días` : "";
-    return `Merma de ${usd(waste)} en 14 días${flow}.`;
-  }
-  return o.urgency?.reason ?? "";
-}
+export type AnalysisState =
+  | { status: "loading" }
+  | { status: "soon" }
+  | { status: "error"; message: string }
+  | { status: "ok"; data: IssueAnalysis };
 
-function warnText(o: IssueOption, line?: OrderLine): string {
-  const out: string[] = [];
-  if (line?.min_order_warning)
-    out.push(`Pedido bajo el mínimo de ${usd(line.min_order_warning.min_order_value)} del proveedor (pedido: ${usd(line.min_order_warning.order_value_usd)}): considera consolidar.`);
-  const c = o.confidence;
-  if (c && c.score < 0.5) out.push(`Confianza limitada (${pct(c.score)})${c.n_backtest ? `: ${c.n_backtest} casos de validación` : ""}.`);
-  return out.join(" ");
-}
+const sec = (label: string, icon: string, color: string, items: string[]): AnalysisSection => {
+  const clean = items.filter(Boolean);
+  return { label, icon, color, items: clean.length ? clean : NONE };
+};
 
-const sec = (label: string, icon: string, color: string, items: string[]): AnalysisSection => ({ label, icon, color, items: items.filter(Boolean).length ? items.filter(Boolean) : NONE });
-
-function sectionsFor(kind: "approval" | "tech", o: IssueOption, issue: Issue, f: { title: string; why: string; impact: string; value: string }): AnalysisSection[] {
-  const inaction = issue.options?.find((x) => x.action_type === "do_nothing");
-  const others = (issue.options ?? []).filter((x) => x.option_id !== o.option_id && x.action_type !== "do_nothing");
-  if (kind === "approval")
+/** Sections of the analysis (Analizar) or dialogue (Dialogar) card, straight from GET /issues/{id}/analysis (Spanish from the backend). */
+export function analysisSections(mode: "analizar" | "dialogo", a: IssueAnalysis): AnalysisSection[] {
+  if (mode === "analizar")
     return [
-      sec("Problema", "report", "#7a5649", [f.why]),
-      sec("Recomendación", "recommend", "#331b11", [f.title, o.urgency?.reason ?? ""]),
-      sec("Pros", "add_circle", "#cb9564", [f.value && `Beneficio esperado: ${f.value}`, f.impact]),
-      sec("Contras", "remove_circle", "#82746f", [...(o.risk ?? []), o.cost_usd ? `Costo: ${usd(o.cost_usd)}` : ""]),
-      sec("Requiere tu aprobación", "how_to_reg", "#4b3025", o.tier_reasons ?? []),
+      sec("Problema", "report", "#7a5649", [a.problem]),
+      sec("Recomendación", "recommend", "#331b11", [a.recommendation.label]),
+      sec("Pros", "add_circle", "#cb9564", a.pros),
+      sec("Contras", "remove_circle", "#82746f", a.cons),
+      ...(a.requires_approval ? [sec("Requiere tu aprobación", "how_to_reg", "#4b3025", [`${tierLabel(a.tier)}: la decisión es tuya.`])] : []),
     ];
-  const cost = inaction?.cost_of_inaction_usd?.mid ?? inaction?.cost_usd;
-  const waste = o.loss_impact?.waste_usd_delta;
+  const alts = a.dialog.alternatives.map((x) => (x.net_usd_mid == null ? x.label : `${x.label} (efecto neto ${usd(x.net_usd_mid)})`));
   return [
-    sec("Por qué", "help", "#7a5649", [f.why]),
-    sec("Si aceptas", "check_circle", "#cb9564", [f.impact, f.value && `Beneficio esperado: ${f.value}`, waste != null && waste > 0 ? `Merma esperada: +${usd(waste)}` : ""]),
-    sec("Si no actúas", "block", "#82746f", [o.if_not ?? "", cost ? `Costo de no actuar: ${usd(cost)}` : ""]),
-    sec("Alternativas", "alt_route", "#331b11", others.length ? others.map((x) => actionTitle(x, issue)) : ["Sin alternativas propuestas por el sistema."]),
+    sec("Por qué", "help", "#7a5649", [a.dialog.why]),
+    sec("Si aceptas", "check_circle", "#cb9564", [a.dialog.if_accept]),
+    sec("Si no actúas", "block", "#82746f", [a.dialog.if_not_act]),
+    sec("Alternativas", "alt_route", "#331b11", alts.length ? alts : ["Sin alternativas propuestas por el sistema."]),
   ];
 }
 
-function toItem(issue: Issue, line: OrderLine | undefined, kind: "approval" | "tech", o: IssueOption, proposals: Proposal[], simToday: string): DecisionItem {
-  const title = actionTitle(o, issue);
-  const why = whyText(o, issue, line);
-  const impact = impactText(o, line);
-  const value = benefitText(o);
-  const conf = o.confidence?.score ?? 0;
-  const pending = proposals.find((p) => p.issue_id === issue.issue_id && p.status === "pending");
-  const cost = line?.est_cost_usd ?? o.cost_usd;
-  return {
-    id: issue.issue_id,
-    issueId: issue.issue_id,
-    optionId: o.option_id,
-    ...(pending ? { proposalId: pending.proposal_id } : {}),
-    kind,
-    readOnly: false,
-    actionType: o.action_type,
-    tier: o.tier,
-    icon: ACTION_ICONS[o.action_type] ?? "bolt",
-    level: tierLabel(o.tier),
-    title,
-    summary: why,
-    value,
-    conf,
-    confPct: pct(conf),
-    deadline: deadlineText(o.urgency?.deadline_date, simToday),
-    supplier: line?.supplier_name ?? issue.supplier_id ?? "",
-    arrive: line?.expected_delivery ? `llega ${weekdayDay(line.expected_delivery)}` : "",
-    cost: cost ? usd(cost) : "",
-    why,
-    impact,
-    warn: warnText(o, line),
-    sections: sectionsFor(kind, o, issue, { title, why, impact, value }),
-  };
-}
-
-const recommended = (issue: Issue): IssueOption | undefined =>
-  issue.options?.find((o) => o.option_id === issue.recommended_option_id) ?? issue.options?.find((o) => o.action_type !== "do_nothing");
-
-/**
- * Approvals: issues (GET /issues) whose recommended option is N2/N3. Technical: order-plan lines plus issue options with tier N1.
- * Items already decided for this case are hidden; a pending proposal is reused. Tiers come from the backend.
- */
-export function buildDecisionItems(input: { issues: Issue[]; plan: OrderPlan | null; proposals: Proposal[]; simToday: string }): DecisionItem[] {
-  const { issues, plan, proposals, simToday } = input;
-  const decided = new Set(proposals.filter((p) => p.status !== "pending").map((p) => p.issue_id));
-  const seen = new Set<string>();
-  const out: DecisionItem[] = [];
-  for (const line of plan?.lines ?? []) {
-    const issue = line.issue;
-    const o = issue && recommended(issue);
-    if (!issue || !o || o.action_type === "do_nothing") {
-      out.push(readOnlyLine(line, simToday));
-      continue;
-    }
-    seen.add(issue.issue_id);
-    if (decided.has(issue.issue_id)) continue;
-    out.push(toItem(issue, line, "tech", o, proposals, simToday));
+/** GET /cases/{id}/issues/{issue_id}/analysis. 404/501 mean "not deployed": the UI says "Disponible pronto". */
+export async function fetchIssueAnalysis(api: Api, caseId: string, issueId: string): Promise<AnalysisState> {
+  try {
+    return { status: "ok", data: await api.getAnalysis(caseId, issueId) };
+  } catch (e) {
+    if (isUnavailable(e)) return SOON;
+    return { status: "error", message: (e as Error).message };
   }
-  for (const issue of issues) {
-    if (seen.has(issue.issue_id) || issue.integrity || issue.category === "integrity" || decided.has(issue.issue_id)) continue;
-    const o = recommended(issue);
-    if (!o || o.action_type === "do_nothing") continue;
-    out.push(toItem(issue, undefined, o.tier === "N1" ? "tech" : "approval", o, proposals, simToday));
-  }
-  return out.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "tech" ? -1 : 1));
-}
-
-function readOnlyLine(line: OrderLine, simToday: string): DecisionItem {
-  const product = line.product_name || line.name || line.sku;
-  return {
-    id: `line|${line.sku}`, issueId: "", optionId: "", kind: "tech", readOnly: true, actionType: "place_order", tier: "", icon: "shopping_basket",
-    level: "", title: `Comprar ${line.qty ?? ""} pzas de ${product}`.replace("  ", " "), summary: "", value: "", conf: 0, confPct: "Sin datos", deadline: deadlineText(line.order_deadline, simToday),
-    supplier: line.supplier_name ?? line.supplier_id ?? "", arrive: line.expected_delivery ? `llega ${weekdayDay(line.expected_delivery)}` : "",
-    cost: line.est_cost_usd ? usd(line.est_cost_usd) : "", why: "", impact: "", warn: "", sections: [],
-  };
 }
 
 /** GET /cases/{id}/outlook?days=2 feeds Hoy and Mañana. A 404/501 means "not deployed yet": the UI says "Disponible pronto". */

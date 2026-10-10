@@ -2,34 +2,37 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { buildDecisionItems } from "../../data/copilot";
+import { ApiProvider } from "../../ApiContext";
+import { buildPendingItems } from "../../data/copilot";
 import { CopilotProvider } from "../../state/copilotStore";
-import { orderPlanA, wasteIssue } from "../../test/copilotFixtures";
-import { proposalA } from "../../test/helpers";
+import { analysisApproval, pendingA } from "../../test/copilotFixtures";
+import { fakeApi, proposalA } from "../../test/helpers";
 import type { useChat } from "../../useChat";
 import AgentWindow from "./AgentWindow";
 import AnalysisCard from "./AnalysisCard";
 
-const items = buildDecisionItems({ issues: [wasteIssue], plan: orderPlanA, proposals: [], simToday: "2026-07-19" });
+const items = buildPendingItems(pendingA, "2026-07-19");
 const [tech, approval] = items;
+const ok = { status: "ok", data: analysisApproval } as const;
 
 describe("AnalysisCard", () => {
   it("shows the badge, level, title, the three header figures and every section", () => {
-    render(<AnalysisCard item={approval} mode="analizar" open onApprove={() => {}} onReject={() => {}} />);
+    render(<AnalysisCard item={approval} analysis={ok} mode="analizar" open onApprove={() => {}} onReject={() => {}} />);
     expect(screen.getByText("Análisis")).toBeInTheDocument();
     expect(screen.getByText("N2 · Propuesta")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: approval.title })).toBeInTheDocument();
     expect(screen.getByText("Impacto").nextSibling).toHaveTextContent("+$58.92");
+    expect(screen.getByText(/Reduce la merma en \$58.92/)).toBeInTheDocument();
     expect(screen.getByText("Confianza").nextSibling).toHaveTextContent("74%");
     expect(screen.getByText("Límite").nextSibling).toHaveTextContent("Hoy");
     for (const l of ["Problema", "Recomendación", "Pros", "Contras", "Requiere tu aprobación"]) expect(screen.getByText(l)).toBeInTheDocument();
   });
 
   it("labels the buttons Aprobar / Rechazar for approvals and Aceptar for technical decisions, in dialogue mode", () => {
-    const { rerender } = render(<AnalysisCard item={approval} mode="analizar" open onApprove={() => {}} onReject={() => {}} />);
+    const { rerender } = render(<AnalysisCard item={approval} analysis={ok} mode="analizar" open onApprove={() => {}} onReject={() => {}} />);
     expect(screen.getByRole("button", { name: /Aprobar/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Rechazar/ })).toBeInTheDocument();
-    rerender(<AnalysisCard item={tech} mode="dialogo" open onApprove={() => {}} onReject={() => {}} />);
+    rerender(<AnalysisCard item={tech} analysis={ok} mode="dialogo" open onApprove={() => {}} onReject={() => {}} />);
     expect(screen.getByText("Diálogo")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Aceptar/ })).toBeInTheDocument();
   });
@@ -37,18 +40,27 @@ describe("AnalysisCard", () => {
   it("calls the handlers and turns into 'Decisión registrada' once closed", async () => {
     const onApprove = vi.fn();
     const onReject = vi.fn();
-    const { rerender } = render(<AnalysisCard item={approval} mode="analizar" open onApprove={onApprove} onReject={onReject} />);
+    const { rerender } = render(<AnalysisCard item={approval} analysis={ok} mode="analizar" open onApprove={onApprove} onReject={onReject} />);
     await userEvent.click(screen.getByRole("button", { name: /Aprobar/ }));
     await userEvent.click(screen.getByRole("button", { name: /Rechazar/ }));
     expect(onApprove).toHaveBeenCalledWith(approval);
     expect(onReject).toHaveBeenCalledWith(approval);
-    rerender(<AnalysisCard item={approval} mode="analizar" open={false} onApprove={onApprove} onReject={onReject} />);
+    rerender(<AnalysisCard item={approval} analysis={ok} mode="analizar" open={false} onApprove={onApprove} onReject={onReject} />);
     expect(screen.getByText("Decisión registrada")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Aprobar/ })).toBeNull();
   });
 
+  it("says it is loading, 'Disponible pronto' on a 404 and the error otherwise, instead of empty sections", () => {
+    const { rerender } = render(<AnalysisCard item={approval} analysis={{ status: "loading" }} mode="analizar" open onApprove={() => {}} onReject={() => {}} />);
+    expect(screen.getByText("Cargando análisis…")).toBeInTheDocument();
+    rerender(<AnalysisCard item={approval} analysis={{ status: "soon" }} mode="analizar" open onApprove={() => {}} onReject={() => {}} />);
+    expect(screen.getByText("Disponible pronto")).toBeInTheDocument();
+    rerender(<AnalysisCard item={approval} analysis={{ status: "error", message: "boom" }} mode="analizar" open onApprove={() => {}} onReject={() => {}} />);
+    expect(screen.getByText("No se pudo cargar el análisis: boom")).toBeInTheDocument();
+  });
+
   it("disables decisions on a read-only item and says 'Disponible pronto'", () => {
-    render(<AnalysisCard item={{ ...tech, readOnly: true }} mode="dialogo" open onApprove={() => {}} onReject={() => {}} />);
+    render(<AnalysisCard item={{ ...tech, readOnly: true }} analysis={ok} mode="dialogo" open onApprove={() => {}} onReject={() => {}} />);
     expect(screen.getByRole("button", { name: /Aceptar/ })).toBeDisabled();
     expect(screen.getAllByText(/Disponible pronto/).length).toBeGreaterThan(0);
   });
@@ -60,8 +72,12 @@ const chatOf = (over: Partial<Chat> = {}): Chat => ({
   send: vi.fn(async () => {}), retry: vi.fn(async () => {}), decide: vi.fn(async () => {}), ...over,
 }) as Chat;
 
-const wrap = ({ children }: { children: ReactNode }) => <CopilotProvider>{children}</CopilotProvider>;
-const props = { items, pendingLine: "1 esperan tu opinión · 1 listas para aceptar", onApprove: () => {}, onReject: () => {} };
+const wrap = ({ children }: { children: ReactNode }) => (
+  <ApiProvider api={fakeApi({ getAnalysis: vi.fn(async () => analysisApproval) })}>
+    <CopilotProvider>{children}</CopilotProvider>
+  </ApiProvider>
+);
+const props = { caseId: "c1", items, pendingLine: "1 esperan tu opinión · 1 listas para aceptar", onApprove: () => {}, onReject: () => {} };
 
 describe("AgentWindow", () => {
   it("shows the orb status, title and pending line; never invents an agent count", () => {
