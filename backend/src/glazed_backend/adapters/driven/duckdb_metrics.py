@@ -521,7 +521,11 @@ class DuckDBMetrics:
         else:
             net = realized_add_net(win, uncensor(rows, snap.store.open_hours).demand, qty, prod.price, prod.unit_cost,
                                    is_short_life(prod.shelf_life_days))
+        lost = lost_sales_window(rows, prod.price, snap.store.open_hours, win[0].date, win[-1].date)
         return {"net_usd": round(net, 2), "window": [win[0].date.isoformat(), win[-1].date.isoformat()],
+                "waste_usd": round(sum(r.expired for r in win) * prod.unit_cost, 2),  # realized, this SKU, this window
+                "lost_sales_usd": round(lost["mid"], 2),  # realized (mid estimate), this SKU, this window
+                "censored": any(r.stockout_hours > 0 for r in win),  # a stockout hid part of the demand
                 "units_sold": sum(r.sold for r in win), "units_expired": sum(r.expired for r in win),
                 "method": "replay of the calibration rule on the decision window"}
 

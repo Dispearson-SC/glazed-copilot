@@ -3,12 +3,12 @@
 from datetime import date, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Header, Response
+from fastapi import APIRouter, Header, Query, Response
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
-from ...application import sentinel
+from ...application import decisions as uc_decisions, sentinel
 from ...domain import AlertState, DomainError, NotFound
 from .store_names import StoreNames
 
@@ -229,6 +229,11 @@ def build_public_router(c: Any) -> APIRouter:
     @r.post("/proposals/{proposal_id}/outcome", status_code=201)
     def outcome(proposal_id: str, b: OutcomeBody):
         return jsonable_encoder(uc.RecordOutcome(c.proposals, c.cases, c.memory).execute(proposal_id, b.summary))
+
+    @r.get("/cases/{case_id}/decisions")
+    def decisions(case_id: str, date_from: Annotated[date | None, Query(alias="from")] = None,
+                  date_to: Annotated[date | None, Query(alias="to")] = None):
+        return uc_decisions.ListDecisions(c.cases, c.proposals, c.executions, checker()).execute(case_id, date_from, date_to)
 
     @r.get("/cases/{case_id}/executions")
     def executions(case_id: str):

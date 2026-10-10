@@ -266,3 +266,10 @@ def test_observed_outcome_measures_a_reduction_only_after_the_window_closes(m):
     got = m.observed_outcome(S, date(2026, 3, 14), opt["action_type"], params)
     assert isinstance(got["net_usd"], float) and got["window"] == ["2026-03-11", "2026-03-13"]
     assert m.observed_outcome(S, date(2026, 3, 14), "run_promo", params) is None
+
+
+def test_observed_outcome_names_realized_waste_lost_sales_and_censoring(m):
+    over = next(i for i in m.issues(S, AS_OF, limit=1000) if i["kind"] == "inflated_order")
+    opt = next(o for o in over["options"] if o["action_type"] in ("adjust_order_qty", "skip_order"))
+    got = m.observed_outcome(S, date(2026, 3, 14), opt["action_type"], {**opt["params"], "decision_as_of": AS_OF.isoformat()})
+    assert got["waste_usd"] >= 0 and got["lost_sales_usd"] >= 0 and isinstance(got["censored"], bool)
