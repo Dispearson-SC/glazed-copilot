@@ -256,6 +256,23 @@ def build_public_router(c: Any) -> APIRouter:
     def expiring(case_id: str, days: int | None = None, limit: int | None = None):
         return uc_manager.ExpiringView(c.metrics, names).execute(case_of(case_id), days, limit)
 
+    @r.get("/cases/{case_id}/issues")
+    def case_issues(case_id: str, limit: int = 5, kind: str | None = None, category: str | None = None):
+        return uc_manager.select_issues(c.metrics, names, c.served, case_of(case_id), limit, kind, category)
+
+    @r.get("/cases/{case_id}/inventory/projection")
+    def inventory_projection(case_id: str, sku: str, horizon: int = 7):
+        return uc_manager.inventory_projection(c.metrics, case_of(case_id), sku, horizon)
+
+    @r.get("/cases/{case_id}/suppliers/performance")
+    def suppliers_performance(case_id: str):
+        case = case_of(case_id)
+        return c.metrics.supplier_performance(case.store_id, case.sim_today)
+
+    @r.get("/cases/{case_id}/history")
+    def case_history(case_id: str, weeks: int | None = None):
+        return uc_manager.case_history(c.metrics, checker(), case_of(case_id), weeks)
+
     @r.get("/cases/{case_id}/executions")
     def executions(case_id: str):
         uc.ResumeCase(c.cases).execute(case_id)

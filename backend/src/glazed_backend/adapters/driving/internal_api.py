@@ -105,21 +105,7 @@ def build_internal_router(c: Any) -> APIRouter:
         """Default: operational issues only (integrity never crowds out alerts). `kind=` filters by kind;
         `category=integrity` returns integrity issues only; `category=all` returns both, ranked by
         severity_usd (operational) / exposure_usd (integrity)."""
-        cap = max(1, min(limit, 20))
-        pool = c.metrics.issues(case.store_id, case.sim_today, 10_000)
-        if kind:
-            pool = [i for i in pool if i.get("kind") == kind]
-        if category == "all":
-            pool = sorted(pool, key=lambda i: -float(i.get("exposure_usd") or 0) if i.get("category") == "integrity"
-                          else -float(i.get("severity_usd") or 0))
-        elif category:
-            pool = [i for i in pool if i.get("category") == category]
-        elif not kind:
-            pool = [i for i in pool if i.get("category") != "integrity"]
-        found = names.tag(pool[:cap], case.store_id)
-        for issue in found:
-            c.served[(case.case_id, issue["issue_id"])] = issue
-        return found
+        return uc_manager.select_issues(c.metrics, names, c.served, case, limit, kind, category)
 
     def own_case(case: Case, store_id: str | None, as_of: date | None) -> None:
         """store_id and as_of are accepted only as assertions: they may never move the read away from the case."""
@@ -156,7 +142,7 @@ def build_internal_router(c: Any) -> APIRouter:
 
     @r.get("/inventory/projection")
     def projection(case: Ctx, sku: str, horizon: int = 7):
-        return c.metrics.inventory_projection(case.store_id, case.sim_today, sku, max(1, min(horizon, 30)))
+        return uc_manager.inventory_projection(c.metrics, case, sku, horizon)
 
     @r.get("/order-plan")
     def order_plan(case: Ctx):
@@ -194,9 +180,9 @@ def build_internal_router(c: Any) -> APIRouter:
         return jsonable_encoder(chk.one(case.case_id, decision_id) if decision_id else chk.for_case(case.case_id))
 
     @r.get("/history")
-    def history(case: Ctx):
+    def history(case: Ctx, weeks: int | None = None):
         chk = sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace)
-        return {**c.metrics.history(case.store_id, case.sim_today), "decision_log": chk.decision_log(case.case_id)}
+        return uc_manager.case_history(c.metrics, chk, case, weeks)
 
     @r.get("/experiences")
     def experiences(case: Ctx, response: Response, query: str = "", limit: int = 5):

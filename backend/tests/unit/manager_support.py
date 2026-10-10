@@ -25,6 +25,7 @@ def build(configure=None, as_of=AS_OF):
                   executions=InMemoryExecutions(), backtests=InMemoryBacktests(), trace=InMemoryTrace(), clock=FakeClock(),
                   forecasters=[BaselineForecast()], flow_forecaster=WeekdayFlow())
     client = TestClient(create_app(c))
+    client.container = c
     cid = client.post("/api/v1/cases", json={"store_id": "S030", "sim_today": as_of.isoformat()}).json()["case_id"]
     return client, cid, m
 

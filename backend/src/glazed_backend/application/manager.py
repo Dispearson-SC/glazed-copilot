@@ -78,3 +78,38 @@ class ExpiringView(_View):
         by_day, total = summarize_expiry(items)
         return self.envelope(case, days=days, total_items=len(items), items=items[:clamp_limit(limit)], by_day=by_day,
                              total_waste_usd=total)
+
+
+def select_issues(metrics: Any, names: Any, served: dict, case: Case, limit: int = 5, kind: str | None = None,
+                  category: str | None = None) -> list[dict[str, Any]]:
+    """Default: operational issues only (integrity never crowds out alerts). `kind=` filters by kind;
+    `category=integrity` returns integrity issues only; `category=all` returns both, ranked by severity_usd
+    (operational) / exposure_usd (integrity). Every issue returned is registered as served for option lookup."""
+    cap = max(1, min(limit, 20))
+    pool = metrics.issues(case.store_id, case.sim_today, 10_000)
+    if kind:
+        pool = [i for i in pool if i.get("kind") == kind]
+    if category == "all":
+        pool = sorted(pool, key=lambda i: -float(i.get("exposure_usd") or 0) if i.get("category") == "integrity"
+                      else -float(i.get("severity_usd") or 0))
+    elif category:
+        pool = [i for i in pool if i.get("category") == category]
+    elif not kind:
+        pool = [i for i in pool if i.get("category") != "integrity"]
+    found = names.tag(pool[:cap], case.store_id)
+    for issue in found:
+        served[(case.case_id, issue["issue_id"])] = issue
+    return found
+
+
+def inventory_projection(metrics: Any, case: Case, sku: str, horizon: int = 7) -> dict[str, Any]:
+    return metrics.inventory_projection(case.store_id, case.sim_today, sku, max(1, min(horizon, 30)))
+
+
+def case_history(metrics: Any, checker: Any, case: Case, weeks: int | None = None) -> dict[str, Any]:
+    """Weekly series (never a week starting after the case date) plus the decision log; `weeks` keeps the latest N."""
+    if weeks is not None and not 1 <= weeks <= 52:
+        raise DomainError("weeks must be between 1 and 52")
+    out = metrics.history(case.store_id, case.sim_today)
+    series = [w for w in out.get("weeks", []) if w["week_start"] <= case.sim_today.isoformat()]  # NO LOOK-AHEAD
+    return {**out, "weeks": series[-weeks:] if weeks else series, "decision_log": checker.decision_log(case.case_id)}

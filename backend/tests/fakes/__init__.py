@@ -110,6 +110,7 @@ class FakeMetrics:
         return {"store_id": store_id, "as_of": str(as_of), "method": "simple_v0", "lines": []}
 
     def supplier_performance(self, store_id, as_of):
+        self.calls.append(("supplier_performance", store_id, as_of))
         return [{"supplier_id": "SUP01", "on_time_pct": 90.0}]
 
     def promo_evaluation(self, store_id, as_of, promo_id):
@@ -124,8 +125,11 @@ class FakeMetrics:
         self.calls.append(("observed_outcome", store_id, as_of, action_type))
         return self.observed
 
+    history_weeks: list = []  # weekly rows served by history(); `leak` keeps weeks after as_of
+
     def history(self, store_id, as_of):
-        return {"as_of": str(as_of)}
+        return {"store_id": store_id, "as_of": str(as_of),
+                "weeks": [dict(w) for w in self.history_weeks if self.leak or w["week_start"] <= str(as_of)]}
 
     def backtest_day(self, store_id, day, policy):
         self.calls.append(("backtest_day", store_id, day, policy))
