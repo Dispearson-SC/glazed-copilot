@@ -4,6 +4,9 @@ const usdDigits = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, max
 
 export const usd = (n: number): string => `${n < 0 ? "-" : ""}$${usdDigits.format(Math.abs(n))}`;
 
+/** Money with an explicit sign: "+$1,234.56", "-$22.00", and a bare "$0.00" for zero. */
+export const signedUsd = (n: number): string => (n > 0 ? `+${usd(n)}` : usd(n));
+
 const DAY_MS = 86_400_000;
 
 export const NO_DATA = "Sin datos";

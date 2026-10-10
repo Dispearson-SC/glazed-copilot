@@ -24,3 +24,12 @@ describe("dateLabel", () => {
     expect(dateLabel("2026-07-19")).toBe("Domingo 19 de julio");
   });
 });
+
+describe("signedUsd", () => {
+  it("signs gains, losses and leaves zero bare", async () => {
+    const { signedUsd } = await import("./format");
+    expect(signedUsd(1234.5)).toBe("+$1,234.50");
+    expect(signedUsd(-22)).toBe("-$22.00");
+    expect(signedUsd(0)).toBe("$0.00");
+  });
+});

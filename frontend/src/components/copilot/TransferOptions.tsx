@@ -1,7 +1,7 @@
 import { useApi } from "../../ApiContext";
 import { isUnavailable } from "../../api";
 import { SOON_TEXT, confLabelFor } from "../../data/copilot";
-import { usd } from "../../format";
+import { signedUsd, usd } from "../../format";
 import type { Range3, TransferOptionsResponse } from "../../types";
 import { usePolling } from "../../usePolling";
 import { Bone, Loading } from "./Skeleton";
@@ -11,12 +11,11 @@ const REASONS_ES: Record<string, string> = {
   no_surplus: "No hay excedente para trasladar",
 };
 
-const signed = (n: number) => `${n < 0 ? "-" : "+"}${usd(Math.abs(n))}`;
 const netText = (r: Range3): string => {
   const { low, mid, high } = r;
-  if (low != null && high != null && low !== high) return `${signed(low)} a ${signed(high)}`;
+  if (low != null && high != null && low !== high) return `${signedUsd(low)} a ${signedUsd(high)}`;
   const one = mid ?? low ?? high;
-  return one == null ? "Sin datos" : signed(one);
+  return one == null ? "Sin datos" : signedUsd(one);
 };
 
 /** Stock-transfer options of the case (GET /transfers/options), shown inside the analysis of a "Oportunidad de traslado". */

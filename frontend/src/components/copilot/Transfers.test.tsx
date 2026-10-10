@@ -122,3 +122,14 @@ describe("transfer alerts", () => {
     expect(w).toMatchObject({ title: "Oportunidad de traslado", icon: "swap_horiz" });
   });
 });
+
+describe("benefitText", () => {
+  it("never doubles the sign of a loss and keeps a legitimate zero", async () => {
+    const { benefitText } = await import("../../data/copilot");
+    expect(benefitText({ low: -30, mid: -10, high: 10 })).toBe("-$30.00 a +$10.00");
+    expect(benefitText({ low: -22, mid: -22, high: -22 })).toBe("-$22.00");
+    expect(benefitText({ low: 38.43, mid: 40, high: 45 })).toBe("+$38.43 a +$45.00");
+    expect(benefitText({ low: 0, mid: 0, high: 0 })).toBe("$0.00");
+    expect(benefitText(null)).toBe("");
+  });
+});
