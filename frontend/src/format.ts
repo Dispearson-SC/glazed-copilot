@@ -54,3 +54,7 @@ export const clockTime = (ts: string | undefined): string => {
   const d = ts ? new Date(ts) : null;
   return d && !Number.isNaN(d.getTime()) ? d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
 };
+
+const usdWholeFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+/** "$4,320" (no cents), for ranges. */
+export const usdWhole = (n: number): string => `${n < 0 ? "-" : ""}$${usdWholeFmt.format(Math.abs(n))}`;

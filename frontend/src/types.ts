@@ -258,3 +258,69 @@ export interface AlertRecord {
   issue_key?: string;
   issue?: (Partial<Issue> & { options?: IssueOption[] }) | null;
 }
+
+// ---- Sucursal window: kpis, expiring, inventory, deliveries ----
+export interface Kpis {
+  as_of: string;
+  days_with_data?: number;
+  net_sales?: number | null;
+  transactions?: number | null;
+  conversion?: number | null;
+  waste_usd?: number | null;
+  lost_sales_usd?: Range3 | null;
+  window?: { from: string; to: string };
+}
+
+export interface ExpiringResponse {
+  as_of: string;
+  total_waste_usd?: Range3 | null;
+  by_day?: { date: string; waste_usd: Range3; projected?: boolean }[];
+}
+
+export interface InventoryItem {
+  sku: string;
+  product_name: string;
+  department?: string;
+  on_hand: number;
+  avg_daily_demand: number;
+  days_of_cover: number | null;
+  projected_stockout_date?: string | null;
+}
+
+export interface InventoryResponse {
+  as_of: string;
+  items: InventoryItem[];
+}
+
+export interface DeliveryRow {
+  supplier_id: string;
+  supplier_name: string;
+  po_id: string;
+  kind: string;
+  lines: { sku: string; product_name: string; qty: number }[];
+  value_usd?: number;
+  expected_date: string;
+  status: string;
+  projected?: boolean;
+}
+
+export interface DeliveriesResponse {
+  as_of: string;
+  days: { date: string; projected: boolean; deliveries: DeliveryRow[] }[];
+}
+
+/** GET /cases/{id}/outlook?days=2 (approved, not deployed yet): next-days expectations. Shape as proposed by the backend owner; unverified until the route answers 200. */
+export interface OutlookDay {
+  date: string;
+  net_sales?: Range3 | null;
+  transactions?: Range3 | null;
+  ticket?: Range3 | null;
+  expected_waste_usd?: Range3 | null;
+  expected_lost_sales_usd?: Range3 | null;
+  weather?: null;
+}
+
+export interface Outlook {
+  as_of?: string;
+  days: OutlookDay[];
+}

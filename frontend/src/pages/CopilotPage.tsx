@@ -1,17 +1,19 @@
 import { useCallback, useRef } from "react";
 import AgentWindow from "../components/copilot/AgentWindow";
+import BranchWindow from "../components/copilot/BranchWindow";
 import CapsuleNav, { type CapsuleBadges } from "../components/copilot/CapsuleNav";
 import CopilotTopBar from "../components/copilot/CopilotTopBar";
 import DecisionsWindow from "../components/copilot/DecisionsWindow";
 import RejectSheet from "../components/copilot/RejectSheet";
 import Toast from "../components/copilot/Toast";
 import { useStores } from "../components";
-import { chatContextText, type DecisionItem } from "../data/copilot";
+import { buildDayView, buildInventoryRows, buildScheduled, chatContextText, type DecisionItem } from "../data/copilot";
 import { splitStoreName } from "../format";
 import { CopilotProvider, useCopilot } from "../state/copilotStore";
 import { useSession } from "../SessionContext";
 import { storeLabel } from "../types";
 import { useChat } from "../useChat";
+import { useBranchData } from "../useBranchData";
 import { useCopilotData } from "../useCopilotData";
 import { useCurrentCase } from "../useCurrentCase";
 import { useDecide } from "../useDecide";
@@ -27,6 +29,7 @@ function CopilotShell() {
   const simToday = currentCase?.sim_today ?? "";
   const chat = useChat(caseId, { storeId });
   const data = useCopilotData(caseId, simToday, session.refreshKey);
+  const branch_ = useBranchData(caseId, simToday, state.tab === "sucursal", session.refreshKey);
   const decide = useDecide(caseId, data.refresh);
   const [site, branch] = splitStoreName(active ? storeLabel(active) : "Sucursal");
 
@@ -47,6 +50,9 @@ function CopilotShell() {
     },
     [chat, dispatch],
   );
+
+  const b = branch_.data;
+  const dayView = b ? buildDayView(state.day, { asOf: simToday, forecast: b.forecast, ayer: b.ayer, hoy: b.hoy, kpis: b.kpis, expiring: b.expiring, outlook: b.outlook }) : null;
 
   const reject = state.rejectFor ? known.current.get(state.rejectFor) : undefined;
 
@@ -77,7 +83,20 @@ function CopilotShell() {
           onDialog={(i) => openCard(i, "dialogo")}
         />
       )}
-      {state.tab !== "agente" && state.tab !== "decisiones" && <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-16" data-window={state.tab} />}
+      {state.tab === "sucursal" && (
+        <BranchWindow
+          day={state.day}
+          onDay={(day) => dispatch({ type: "day", day })}
+          view={dayView}
+          inventory={buildInventoryRows(b?.inventory ?? null, b?.plan ?? null)}
+          inventoryFailed={Boolean(b?.failed.includes("inventory"))}
+          scheduled={buildScheduled(b?.deliveries ?? null)}
+          pendingBuy={visible.filter((i) => i.kind === "tech").length}
+          partial={Boolean(b?.failed.length)}
+          onGoDecisiones={() => dispatch({ type: "tab", tab: "decisiones" })}
+        />
+      )}
+      {state.tab !== "agente" && state.tab !== "decisiones" && state.tab !== "sucursal" && <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-16" data-window={state.tab} />}
       <CapsuleNav tab={state.tab} onChange={(tab) => dispatch({ type: "tab", tab })} badges={badges} />
       <Toast text={state.toast} />
       {reject && (

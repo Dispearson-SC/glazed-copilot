@@ -1,6 +1,9 @@
-import type { Api } from "../api";
-import { usd, weekdayDay } from "../format";
-import type { AlertRecord, Issue, IssueOption, OrderLine, OrderPlan, Proposal } from "../types";
+import { isUnavailable, type Api } from "../api";
+import { avgTicket, longDate, shiftDate, signedPct, usd, usdWhole, weekdayDay } from "../format";
+import type {
+  AlertRecord, DaySummary, DeliveriesResponse, ExpiringResponse, ForecastResponse, InventoryResponse, Issue, IssueOption, Kpis, OrderLine, OrderPlan,
+  Outlook, OutlookDay, Proposal, Range3,
+} from "../types";
 
 /**
  * Copilot view models. Types only plus pure adapters from the public API shapes:
@@ -303,4 +306,192 @@ function readOnlyLine(line: OrderLine, simToday: string): DecisionItem {
     supplier: line.supplier_name ?? line.supplier_id ?? "", arrive: line.expected_delivery ? `llega ${weekdayDay(line.expected_delivery)}` : "",
     cost: line.est_cost_usd ? usd(line.est_cost_usd) : "", why: "", impact: "", warn: "", sections: [],
   };
+}
+
+/** GET /cases/{id}/outlook?days=2 feeds Hoy and Mañana. A 404/501 means "not deployed yet": the UI says "Disponible pronto". */
+export async function fetchOutlook(api: Api, caseId: string): Promise<Source<Outlook>> {
+  try {
+    return { status: "ok", data: await api.getOutlook(caseId, { days: "2" }) };
+  } catch (e) {
+    if (isUnavailable(e)) return SOON;
+    throw e;
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Sucursal window
+// ---------------------------------------------------------------------------------------------
+export interface Stat {
+  label: string;
+  value: string;
+  sub: string;
+}
+
+export interface DayView {
+  title: string;
+  date: string;
+  expected: string;
+  range: string | null;
+  /** "Pronóstico", "Pronóstico cerrado". */
+  conf: string;
+  real: string;
+  realNote: string;
+  /** True when real sales are an actual figure (Ayer). */
+  realKnown: boolean;
+  weather: { icon: string; tag: string; temp: string; text: string; effect: string | null };
+  traffic: { value: string; caption: string };
+  context: string;
+  orders: { label: string; value: string };
+  ticket: { value: string };
+  conversion: { value: string };
+  waste: Stat;
+  lost: Stat;
+}
+
+export interface DayViewInput {
+  asOf: string;
+  forecast: ForecastResponse | null;
+  /** Day summary of as_of - 1. */
+  ayer: DaySummary | null;
+  /** Day summary of as_of: only its calendar context is read, never its sales. */
+  hoy: DaySummary | null;
+  kpis: Kpis | null;
+  expiring: ExpiringResponse | null;
+  outlook?: Outlook | null;
+}
+
+const NO_FORECAST = "Sin pronóstico";
+const cap = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
+const weekdayLong = (iso: string): string => cap(new Intl.DateTimeFormat("es-MX", { weekday: "long", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`)));
+const rangeText = (lo?: number | null, hi?: number | null): string | null => (lo == null || hi == null ? null : `${usdWhole(lo)} – ${usdWhole(hi)}`);
+
+function contextText(date: string, s: DaySummary | null): string {
+  const c = s?.context;
+  return [weekdayLong(date), c?.is_holiday ? c.holiday_name || "Feriado" : "", c?.is_school_break ? "vacaciones escolares" : ""].filter(Boolean).join(" · ");
+}
+
+export function buildDayView(day: DayKey, input: DayViewInput): DayView {
+  const { asOf, forecast, ayer, hoy, kpis, expiring, outlook } = input;
+  const date = day === "ayer" ? shiftDate(asOf, -1) : day === "hoy" ? asOf : shiftDate(asOf, 1);
+  const point = forecast?.points.find((p) => p.date === date);
+  const od: OutlookDay | undefined = day === "ayer" ? undefined : outlook?.days.find((d) => d.date === date);
+  const sales = od?.net_sales;
+  const expectedValue = sales?.mid ?? point?.forecast;
+  const range = sales ? rangeText(sales.low, sales.high) : point ? rangeText(point.p10, point.p90) : null;
+  const titles = { ayer: "Así cerró ayer", hoy: "Hoy en la sucursal", manana: "Mañana en la sucursal" } as const;
+  const future = day !== "ayer";
+  const lostKpi = kpis?.lost_sales_usd;
+
+  const view: DayView = {
+    title: titles[day],
+    date: cap(longDate(date)),
+    expected: expectedValue == null ? "Sin datos" : usd(expectedValue),
+    range,
+    conf: day === "ayer" ? "Pronóstico cerrado" : "Pronóstico",
+    real: "Pendiente",
+    realNote: day === "hoy" ? "Se registra al cierre" : "Día futuro",
+    realKnown: false,
+    weather: { icon: "partly_cloudy_day", tag: "pronóstico", temp: NO_FORECAST, text: NO_FORECAST, effect: null },
+    traffic: { value: SOON_TEXT, caption: "visitas esperadas" },
+    context: contextText(date, day === "manana" ? null : day === "hoy" ? hoy : ayer),
+    orders: { label: "Pedidos esperados", value: SOON_TEXT },
+    ticket: { value: SOON_TEXT },
+    conversion: { value: SOON_TEXT },
+    waste: { label: "Merma esperada", value: SOON_TEXT, sub: "a costo" },
+    lost: {
+      label: "Venta perdida (7 días)",
+      value: lostKpi?.mid == null ? "Sin datos" : usd(lostKpi.mid),
+      sub: `${rangeText(lostKpi?.low, lostKpi?.high) ?? "Sin datos"} · por falta de producto`,
+    },
+  };
+
+  if (!future) {
+    const t = ayer?.totals;
+    const wx = ayer?.context?.weather;
+    const delta = ayer?.vs_same_weekday_avg?.delta_pct;
+    const rainy = (wx?.precip_mm ?? 0) > 0;
+    view.real = t?.net_sales == null ? "Sin datos" : usd(t.net_sales);
+    view.realKnown = t?.net_sales != null;
+    view.realNote = delta == null ? "Sin comparativo" : `${signedPct(delta)} vs promedio mismo día`;
+    view.weather = {
+      icon: rainy ? "rainy" : "sunny",
+      tag: "observado",
+      temp: wx?.temp_max_c == null || wx.temp_min_c == null ? "Sin datos" : `${Math.round(wx.temp_max_c)}° / ${Math.round(wx.temp_min_c)}°`,
+      text: wx ? (rainy ? `Lluvia ${wx.precip_mm} mm` : "Sin lluvia") : "Sin datos",
+      effect: null,
+    };
+    view.traffic = { value: t?.footfall == null ? "Sin datos" : String(Math.round(t.footfall)), caption: "visitas" };
+    view.orders = { label: "Pedidos", value: t?.transactions == null ? "Sin datos" : String(t.transactions) };
+    view.ticket = { value: t ? avgTicket(t.net_sales, t.transactions) : "Sin datos" };
+    view.conversion = { value: t?.footfall && t.transactions != null ? `${((t.transactions / t.footfall) * 100).toFixed(1)}%` : "Sin datos" };
+    view.waste = { label: "Merma real", value: "Sin datos", sub: kpis?.waste_usd == null ? "Sin datos" : `Últimos 7 días: ${usd(kpis.waste_usd)}` };
+    return view;
+  }
+
+  if (od) {
+    if (od.transactions?.mid != null) view.orders.value = String(Math.round(od.transactions.mid));
+    if (od.ticket?.mid != null) view.ticket.value = usd(od.ticket.mid);
+    const waste: Range3 | null | undefined = od.expected_waste_usd;
+    if (waste?.mid != null) view.waste = { label: "Merma esperada", value: usd(waste.mid), sub: `a costo · ${rangeText(waste.low, waste.high) ?? "Sin datos"}` };
+    const lost = od.expected_lost_sales_usd;
+    if (lost?.mid != null) view.lost = { label: "Venta perdida esperada", value: usd(lost.mid), sub: `${rangeText(lost.low, lost.high) ?? "Sin datos"} · por falta de producto` };
+  }
+  const exp = expiring?.by_day?.find((d) => d.date === date)?.waste_usd;
+  if (view.waste.value === SOON_TEXT && exp?.mid != null) view.waste = { label: "Merma esperada", value: usd(exp.mid), sub: `a costo · ${rangeText(exp.low, exp.high) ?? "Sin datos"}` };
+  return view;
+}
+
+export interface InventoryRow {
+  sku: string;
+  name: string;
+  now: string;
+  out: string;
+  buy: string;
+  cover: string;
+  /** 0..100, current stock against the daily outflow. */
+  fill: number;
+}
+
+const num = (n: number): string => String(Math.round(n * 100) / 100);
+
+export function buildInventoryRows(inv: InventoryResponse | null, plan: OrderPlan | null, limit = 6): InventoryRow[] {
+  return (inv?.items ?? []).slice(0, limit).map((it) => {
+    const line = plan?.lines.find((l) => l.sku === it.sku);
+    const denom = Math.max(it.avg_daily_demand, it.on_hand);
+    return {
+      sku: it.sku,
+      name: it.product_name,
+      now: num(it.on_hand),
+      out: `${num(it.avg_daily_demand)} /día`,
+      buy: line?.qty ? `+${line.qty}${line.expected_delivery ? ` · llega ${weekdayDay(line.expected_delivery)}` : ""}` : "—",
+      cover: it.days_of_cover == null ? "Sin datos" : `${num(it.days_of_cover)} días de cobertura`,
+      fill: denom > 0 ? Math.min(100, Math.round((it.on_hand / denom) * 100)) : 0,
+    };
+  });
+}
+
+export interface ScheduledRow {
+  what: string;
+  who: string;
+  when: string;
+  status: string;
+  tone: "ok" | "warn";
+}
+
+/** Placed purchase orders on the way: late ones first, then the soonest expected. */
+export function buildScheduled(d: DeliveriesResponse | null, limit = 4): ScheduledRow[] {
+  const rows = (d?.days ?? [])
+    .flatMap((day) => day.deliveries)
+    .filter((x) => x.kind === "open_po" && (x.status === "late" || x.status === "expected"))
+    .sort((a, b) => Number(b.status === "late") - Number(a.status === "late") || a.expected_date.localeCompare(b.expected_date));
+  return rows.slice(0, limit).map((x) => {
+    const l = x.lines[0];
+    return {
+      what: l ? `${l.product_name} · ${l.qty}` : x.po_id,
+      who: x.supplier_name,
+      when: weekdayDay(x.expected_date),
+      status: x.status === "late" ? "Atrasado" : "Colocado",
+      tone: x.status === "late" ? "warn" : "ok",
+    };
+  });
 }

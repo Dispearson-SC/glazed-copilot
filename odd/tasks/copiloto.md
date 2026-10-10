@@ -39,8 +39,8 @@ Strict. Runner: `cd frontend && npm test -- --run`; plus `npm run build` and `np
 ## Tasks
 - [x] T1 (dfecad6) Tokens and fonts per the handoff (partition, elevation, card/hero/sheet shadows; Playfair/Plus Jakarta), plus the shared copilot shell: CopilotTopBar, CapsuleNav with badges, AgentOrb, Toast, `/copiloto` route and state store. Route: delegated writer.
 - [x] T2 (e9d9ced) Agente window over useChat (orb, status, pinned context, suggestions, composer, AnalysisCard). Route: delegated writer.
-- [x] T3 Decisiones window (ApprovalCard, TechDecisionCard, ⋯ menu, RejectSheet) wired to proposals/decision. Route: delegated writer.
-- [ ] T4 Sucursal window (Ayer/Hoy/Mañana, sales card, weather, KPIs, inventory, scheduled purchases). Route: delegated writer.
+- [x] T3 (ca8bf87) Decisiones window (ApprovalCard, TechDecisionCard, ⋯ menu, RejectSheet) wired to proposals/decision. Route: delegated writer.
+- [x] T4 Sucursal window (Ayer/Hoy/Mañana, sales card, weather, KPIs, inventory, scheduled purchases). Route: delegated writer.
 - [ ] T5 Memorias and Advertencias windows. Route: delegated writer.
 - [ ] T6 Realign Main, Login and Chat to their `.dc.html`; BottomNav "Chat" → "Copiloto". Route: delegated writer.
 - [ ] T7 390px screenshots vs the designs, README, and the GAP LIST (design field → backend status). Route: delegated writer.
@@ -51,6 +51,8 @@ Strict. Runner: `cd frontend && npm test -- --run`; plus `npm run build` and `np
 - T2 done: RED observed (agent.test, chatHistory ts, useChat display failing), GREEN 235/235 tests, build ok, tsc ok. Adds Issue/OrderPlan/Alert API types, `api.listIssues/getOrderPlan/listAlerts/propose`, decision adapters in `src/data/copilot.ts`, AgentWindow, AnalysisCard; `ChatMessage.ts` (message time); `useChat.send(text, {display})`.
 
 - T3 done: RED observed (CopilotPage.test 11 failing), GREEN 246/246, build ok, tsc ok. Decisiones window (ApprovalCard, TechDecisionCard, ⋯ menu, RejectSheet) wired to `POST /proposals` + `POST /proposals/{id}/decision` with Idempotency-Key; local state changes only after the backend accepts. `useCopilotData`, `useDecide`.
+
+- T4 done: RED observed (branch.test 7 and CopilotBranch.test 9 failing), GREEN 265/265, build ok, tsc ok. Sucursal window (Ayer/Hoy/Mañana) over forecast, day-summary (Ayer), kpis, expiring, inventory, deliveries, order-plan; Hoy/Mañana adapter prefers `/outlook` when it answers. Hoy never shows actual sales. Inventory pill shows days of cover (no invented status).
 
 ## Coordinator decisions applied (2026-10-10)
 - Approvals = `/issues` whose recommended option tier is N2/N3; technical = order-plan lines plus issue options with tier N1. Tiers are the backend's. Order-plan lines without issue/option are read-only with "Disponible pronto".
@@ -72,7 +74,10 @@ Format: design element | needed field/endpoint | current backend status | sugges
 | Expected visits, weather forecast (Hoy/Mañana) | `/forecast?metric=traffic|weather` | missing (Mañana: "Sin pronóstico", permanent) | `/forecast?metric=traffic -> points[{date,value,p10,p90}]` |
 | Expected orders, ticket, conversion (Hoy/Mañana) | forecast of transactions/ticket/conversion | missing | `/forecast?metric=transactions|ticket|conversion` |
 | Forecast confidence "Pronóstico 80%" | forecast confidence | partial (`calibration`, `band_method`, `metrics_to_date` null) | `calibration.coverage` as a number |
-| Expected sales for Hoy / Ayer | forecast point for `as_of` and past dates | missing (points start at `as_of+1`) | include `as_of` day and `?from=` in the past |
+| Expected sales Ayer / Hoy / Mañana | `/forecast?level=store&from=as_of-1&to=as_of+1` | exists (now returns past and as_of points with `actual`; Hoy's actual is never rendered) | none |
+| Hoy/Mañana orders, ticket, waste, lost sales ranges | `GET /cases/{id}/outlook?days=2` | approved, answers 404 today -> "Disponible pronto" (adapter `fetchOutlook`; shape as proposed, unverified) | `{days:[{date, net_sales{low,mid,high}, transactions, ticket, expected_waste_usd, expected_lost_sales_usd, weather:null}]}` |
+| Conversion (Hoy/Mañana) | expected conversion | missing | add `conversion{low,mid,high}` to outlook days |
+| Ayer waste (per day) | real waste of a given day | missing (only 7-day `kpis.waste_usd`) | `/kpis?date_from=&date_to=` already supports a window: expose per-day |
 | Expected waste per day | per-day waste forecast and per-day real waste | partial (`/expiring.by_day` forward; `/kpis.waste_usd` 7-day) | `/kpis?date=` or `/expiring` for a given day |
 | Inventory pill critical/follow-up/ok | status fields | missing (UI shows days of cover instead) | `inventory.items[].status: critical|watch|ok` |
 | Memorias (Proveedores/Demanda/Eventos/Preferencias) | memory store with category, source, case count | missing (only `history.decision_log` and `suppliers/performance`) | `GET /cases/{id}/memories -> [{id, category, text, source, n_cases, confidence, created_at}]` |

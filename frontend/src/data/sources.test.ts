@@ -23,6 +23,16 @@ describe("data sources the backend does not serve yet", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
+  it("treats a 404 on /outlook as 'soon' and passes a 200 through", async () => {
+    const { ApiError } = await import("../api");
+    const ok = { getOutlook: vi.fn(async () => ({ days: [] })) } as unknown as Api;
+    expect(await src.fetchOutlook(ok, "c1")).toEqual({ status: "ok", data: { days: [] } });
+    const nf = { getOutlook: vi.fn(async () => { throw new ApiError(404, "Not Found"); }) } as unknown as Api;
+    expect(await src.fetchOutlook(nf, "c1")).toEqual({ status: "soon" });
+    const boom = { getOutlook: vi.fn(async () => { throw new ApiError(500, "x"); }) } as unknown as Api;
+    await expect(src.fetchOutlook(boom, "c1")).rejects.toThrow("x");
+  });
+
   it("prefixes the chat context into the text until POST /messages accepts a context field", () => {
     expect(src.chatContextText("Analiza: Pedir pavo", { issueId: "S030|x|1", title: "Pedir pavo", mode: "analizar" })).toBe(
       "Contexto: Pedir pavo (S030|x|1).\nAnaliza: Pedir pavo",

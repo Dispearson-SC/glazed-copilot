@@ -53,3 +53,57 @@ export const proposalFor = (issue_id: string, status = "pending"): Proposal => (
   proposal_id: "pp1", case_id: "c1", store_id: "S030", issue_id, action_type: "place_order", params: {}, tier: "N2",
   rationale: "", status, reason: "", agent_id: "", created_at: "2026-07-19T08:00:00Z",
 });
+
+// ---- Sucursal (real shapes, S030 / case date 2026-07-19) ----
+import type { DaySummary, DeliveriesResponse, ExpiringResponse, ForecastResponse, InventoryResponse, Kpis } from "../types";
+
+const fp = (date: string, forecast: number, p10: number, p90: number) => ({ date, forecast, p10, p90, baseline: forecast, actual: null, censored: false });
+export const branchForecast: ForecastResponse = {
+  store_id: "S030", sku: null, level: "store", as_of: "2026-07-19", forecast_origin: "2026-07-19", model: "glm_poisson", model_version: "file", unit: "usd", horizon_days: 2,
+  points: [
+    { ...fp("2026-07-18", 654.4479, 540.1, 790.9), actual: 849.2 },
+    { ...fp("2026-07-19", 868.5446, 700.2, 1100.8), actual: 1135.18 },
+    fp("2026-07-20", 833.3911, 681.7231, 1060.493),
+  ],
+  metrics_to_date: { wape: 0, bias: 0, coverage_p10_p90: 0, wape_baseline: 0, n_days: 0 },
+};
+export const ayerSummary: DaySummary = {
+  store_id: "S030", date: "2026-07-18", as_of: "2026-07-19",
+  totals: { footfall: 734, transactions: 105, units_sold: 171, net_sales: 849.2, staff_hours: 37.6 },
+  context: { weekday: "Sat", is_weekend: true, is_holiday: false, holiday_name: null, is_school_break: true, weather: { temp_max_c: 37.2, temp_min_c: 29.2, precip_mm: 4.6 } },
+  vs_same_weekday_avg: { baseline_net_sales: 677.87, weeks_used: 7, delta_pct: 25.3 },
+};
+export const hoySummary: DaySummary = {
+  store_id: "S030", date: "2026-07-19", as_of: "2026-07-19",
+  totals: { footfall: 965, transactions: 116, units_sold: 216, net_sales: 1135.18, staff_hours: 40.6 },
+  context: { weekday: "Sun", is_weekend: true, is_holiday: false, holiday_name: null, is_school_break: true, weather: { temp_max_c: 35, temp_min_c: 28, precip_mm: 0 } },
+  vs_same_weekday_avg: { baseline_net_sales: 700, weeks_used: 7, delta_pct: 62 },
+};
+export const branchKpis: Kpis = {
+  as_of: "2026-07-19", net_sales: 6450.2, transactions: 751, conversion: 0.1164, waste_usd: 1202.09,
+  lost_sales_usd: { low: 74.93, mid: 534.62, high: 690.63 }, window: { from: "2026-07-13", to: "2026-07-19" },
+};
+export const branchExpiring: ExpiringResponse = {
+  as_of: "2026-07-19", total_waste_usd: { low: 48.18, mid: 60.53, high: 71.9 },
+  by_day: [{ date: "2026-07-20", waste_usd: { low: 10.5, mid: 12.25, high: 15 }, projected: true }, { date: "2026-07-21", waste_usd: { low: 47.49, mid: 59.03, high: 69.82 }, projected: true }],
+};
+export const branchInventory: InventoryResponse = {
+  as_of: "2026-07-19",
+  items: [
+    { sku: "SKU-100263", product_name: "Md Choc Stout C.B. Wsweet Cold Foam", on_hand: 5, avg_daily_demand: 3.23, days_of_cover: 1.5, projected_stockout_date: "2026-07-21" },
+    { sku: "SKU-100014", product_name: "Bagel Twist Sour C And Onion", on_hand: 0, avg_daily_demand: 1.12, days_of_cover: 0, projected_stockout_date: "2026-07-30" },
+  ],
+};
+export const branchDeliveries: DeliveriesResponse = {
+  as_of: "2026-07-19",
+  days: [
+    { date: "2026-07-19", projected: false, deliveries: [
+      { supplier_id: "SUP01", supplier_name: "Northfield Bakery Partners", po_id: "PO1", kind: "open_po", lines: [{ sku: "SKU-100170", product_name: "Croiss-Ant Donuts", qty: 12 }], expected_date: "2026-07-19", status: "on_time" },
+      { supplier_id: "SUP05", supplier_name: "Pioneer Merch & Packaging", po_id: "PO2", kind: "open_po", lines: [{ sku: "SKU-9", product_name: "Vasos 12 oz", qty: 40 }], expected_date: "2026-07-16", status: "late" },
+    ] },
+    { date: "2026-07-21", projected: true, deliveries: [
+      { supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", po_id: "PO3", kind: "open_po", lines: [{ sku: "SKU-100030", product_name: "Southwestern Veggie Burrito", qty: 10 }], expected_date: "2026-07-21", status: "expected", projected: true },
+      { supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", po_id: "S1", kind: "scheduled", lines: [], expected_date: "2026-07-21", status: "expected", projected: true },
+    ] },
+  ],
+};
