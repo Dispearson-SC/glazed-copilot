@@ -116,7 +116,8 @@ export default function HomePage() {
         <span className="light green" data-testid="sem-green">{count("green")}</span> baja
       </div>
       <p>
-        <Link to={`/stores/${storeId}/purchases`}>Ver compras</Link> · <Link to="/alerts">Ver alertas</Link>
+        <Link to={`/stores/${storeId}/purchases`}>Ver compras</Link> · <Link to="/alerts">Ver alertas</Link> ·{" "}
+        <Link to={`/stores/${storeId}/inventory`}>Ver inventario</Link> · <Link to={`/stores/${storeId}/week`}>Ver semana</Link>
       </p>
       {currentCase && (
         <FloatingChat

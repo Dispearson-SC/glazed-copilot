@@ -41,6 +41,8 @@ describe("HomePage", () => {
     open();
     expect(await screen.findByRole("link", { name: "Ver compras" })).toHaveAttribute("href", "/stores/S030/purchases");
     expect(screen.getByRole("link", { name: "Ver alertas" })).toHaveAttribute("href", "/alerts");
+    expect(screen.getByRole("link", { name: "Ver inventario" })).toHaveAttribute("href", "/stores/S030/inventory");
+    expect(screen.getByRole("link", { name: "Ver semana" })).toHaveAttribute("href", "/stores/S030/week");
   });
 
   it("shows an error state when kpis fail", async () => {

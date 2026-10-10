@@ -38,6 +38,16 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Decisiones" })).toBeInTheDocument();
   });
 
+  it("routes /inventory and /week to their store screens", async () => {
+    open("/inventory");
+    expect(await screen.findByRole("heading", { name: "Inventario" })).toBeInTheDocument();
+  });
+
+  it("routes /week to the week screen", async () => {
+    open("/week");
+    expect(await screen.findByRole("heading", { name: "Semana" })).toBeInTheDocument();
+  });
+
   it("renders Home at / with the simulation control in the header", async () => {
     open();
     expect(await screen.findByTestId("loss-waste")).toBeInTheDocument();

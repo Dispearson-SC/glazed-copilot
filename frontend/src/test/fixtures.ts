@@ -195,3 +195,43 @@ export const accuracyA: ForecastAccuracy = {
   groups: { "1": m(0.4243, 176, 18), "2-3": m(0.4889, 571, 121), "4-14": m(1.1736, 27, 1), non_perishable: m(0.6855, 179, 14) },
   overall: m(0.4959, 953, 154),
 };
+
+import type { DeliveriesResponse, ExpiringResponse, InventoryResponse, PromosResponse, StaffingResponse } from "../types";
+export const inventoryA: InventoryResponse = {
+  coverage: { skus_with_inventory: 89, skus_selling: 127 },
+  items: [
+    { sku: "SKU-1", product_name: "Dona glaseada", department: "Bakery", on_hand: 12, avg_daily_demand: 6, days_of_cover: 2, turnover_28d: 14.2,
+      weeks_of_supply: 0.3, inventory_value_usd: 18, last_sale_date: "2026-03-01", slow_mover: false, projected_stockout_date: "2026-03-03" },
+    { sku: "SKU-2", product_name: "Muffin de nuez", department: "Bakery", on_hand: 40, avg_daily_demand: 0.5, days_of_cover: 80, turnover_28d: 0.4,
+      weeks_of_supply: 11.4, inventory_value_usd: 60, last_sale_date: "2026-02-10", slow_mover: true, projected_stockout_date: null },
+  ],
+};
+export const expiringA: ExpiringResponse = {
+  items: [{ sku: "SKU-1", product_name: "Dona glaseada", expiring_units: 8, expiry_date: "2026-03-03", shelf_life_days: 2,
+    waste_usd: { low: 4, mid: 10, high: 16 }, lot_age_inferred: true }],
+  by_day: [{ date: "2026-03-03", waste_usd: 10 }],
+  total_waste_usd: { low: 4, mid: 10, high: 16 },
+};
+export const deliveriesA: DeliveriesResponse = {
+  days: [
+    { date: "2026-03-02", deliveries: [{ supplier_id: "SUP1", supplier_name: "Panificadora Norte", po_id: "PO-7", kind: "open_po",
+      lines: [{ sku: "SKU-1", product_name: "Dona glaseada", qty: 48 }], value_usd: 120, status: "late" }] },
+    { date: "2026-03-03", deliveries: [] },
+  ],
+};
+export const promosA: PromosResponse = {
+  items: [
+    { promo_id: "pr1", name: "2x1 donas", department: "Bakery", discount_pct: 50, start_date: "2026-02-20", end_date: "2026-02-27", status: "past",
+      audit_verdict: "engañosa", evaluation: { uplift_pct: 12.5 } },
+    { promo_id: "pr2", name: "Café combo", department: "Beverage", discount_pct: 20, start_date: "2026-03-05", end_date: "2026-03-10", status: "upcoming",
+      audit_verdict: null, evaluation: { uplift_pct: 99 } },
+  ],
+};
+export const staffingA: StaffingResponse = {
+  benchmark: { format: "Shop-in-Shop", tx_per_staff_hour_p50: 3.1 },
+  days: [
+    { date: "2026-03-02", forecast_transactions: 93, recommended_staff_hours: 30, planned_staff_hours: 36, gap_hours: 6, basis: "daily" },
+    { date: "2026-03-03", forecast_transactions: 80, recommended_staff_hours: 26, planned_staff_hours: null, gap_hours: null, basis: "daily" },
+  ],
+  note: "Estimación diaria con el benchmark del formato.",
+};

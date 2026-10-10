@@ -408,3 +408,92 @@ export interface TurnRecord {
   still_running?: boolean;
   reply_meta?: ReplyMeta | null;
 }
+
+// ---- Manager-day: Wave 12 (inventory, expiring, deliveries, promos, staffing). Contracts agreed with Core. ----
+export interface InventoryItem {
+  sku: string;
+  product_name: string;
+  department: string;
+  on_hand: number;
+  avg_daily_demand: number;
+  days_of_cover: number | null;
+  turnover_28d: number | null;
+  weeks_of_supply: number | null;
+  inventory_value_usd: number;
+  last_sale_date: string | null;
+  slow_mover: boolean;
+  projected_stockout_date: string | null;
+}
+
+export type InventorySort = "days_of_cover" | "turnover" | "slow";
+
+export interface InventoryResponse {
+  as_of?: string;
+  coverage: { skus_with_inventory: number; skus_selling: number };
+  items: InventoryItem[];
+}
+
+export interface ExpiringItem {
+  sku: string;
+  product_name: string;
+  expiring_units: number;
+  expiry_date: string;
+  shelf_life_days: number;
+  waste_usd: Range3;
+  lot_age_inferred: boolean;
+}
+
+export interface ExpiringResponse {
+  as_of?: string;
+  items: ExpiringItem[];
+  by_day: { date: string; waste_usd: number }[];
+  total_waste_usd: number | Range3;
+}
+
+export interface DeliveryEntry {
+  supplier_id: string;
+  supplier_name: string;
+  po_id: string | null;
+  kind: "open_po" | "scheduled";
+  lines: { sku: string; product_name: string; qty: number }[];
+  value_usd: number;
+  status: "on_time" | "late" | "expected";
+}
+
+export interface DeliveriesResponse {
+  as_of?: string;
+  days: { date: string; deliveries: DeliveryEntry[] }[];
+}
+
+export interface Promo {
+  promo_id: string;
+  name: string;
+  department: string;
+  discount_pct: number;
+  start_date: string;
+  end_date: string;
+  status: "active" | "upcoming" | "past";
+  audit_verdict: string | null;
+  evaluation: { uplift_pct: number } | null;
+}
+
+export interface PromosResponse {
+  as_of?: string;
+  items: Promo[];
+}
+
+export interface StaffingDay {
+  date: string;
+  forecast_transactions: number;
+  recommended_staff_hours: number;
+  planned_staff_hours: number | null;
+  gap_hours: number | null;
+  basis: "daily";
+}
+
+export interface StaffingResponse {
+  as_of?: string;
+  benchmark: { format: string; tx_per_staff_hour_p50: number };
+  days: StaffingDay[];
+  note: string;
+}

@@ -58,6 +58,11 @@ export function fakeApi(over: Partial<Record<keyof Api, unknown>> = {}): Api {
     getForecast: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
     getForecastAccuracy: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
     listTurns: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getInventory: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getExpiring: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getDeliveries: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getPromos: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getStaffing: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
     getDecisions: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
     proposeOption: vi.fn(async () => ({ ...proposalA, proposal_id: "p9", issue_id: issueA.issue_id })),
   };
