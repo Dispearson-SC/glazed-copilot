@@ -90,7 +90,9 @@ class DuckDBMetrics:
     def stores(self) -> list[dict[str, Any]]:
         return self._rows("SELECT s.store_id, s.store_name AS name, s.format, s.site_id, si.region,"
                           " si.site_name, si.site_type,"
-                          " coalesce(si.site_name || ' · ', '') || s.store_name AS display_name"
+                          " coalesce(si.site_name || ' · ', '') || s.store_name AS display_name,"
+                          " strftime(s.opened_date, '%Y-%m-%d') AS opened_on, strftime(s.closed_date, '%Y-%m-%d') AS closed_on,"
+                          " s.opening_time, s.closing_time"
                           " FROM stores s LEFT JOIN sites si ON si.site_id=s.site_id ORDER BY s.store_id")
 
     # -- KPIs --------------------------------------------------------------------
