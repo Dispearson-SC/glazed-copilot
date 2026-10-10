@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { ApiProvider } from "./ApiContext";
 import App from "./App";
 import { SessionProvider } from "./SessionContext";
+import { splitStoreName } from "./format";
 import { fakeApi } from "./test/helpers";
 
 const open = (path = "/", api = fakeApi()) =>
@@ -42,6 +43,21 @@ describe("App routes", () => {
   );
 });
 
+describe("top bar title", () => {
+  it("falls back to the full name and the page subtitle when there is no separator", async () => {
+    const plain = { store_id: "S030", name: "Tienda Única", format: "mall", site_id: "X", region: "N", display_name: "Tienda Única" };
+    open("/", fakeApi({ listStores: async () => [plain] }));
+    const bar = await screen.findByRole("banner");
+    expect(await within(bar).findByText("Tienda Única")).toBeInTheDocument();
+    expect(within(bar).getByText("Resumen")).toBeInTheDocument();
+  });
+
+  it("splits only on the first separator", () => {
+    expect(splitStoreName("A · B · C")).toEqual(["A", "B · C"]);
+    expect(splitStoreName("Solo")).toEqual(["Solo", null]);
+  });
+});
+
 describe("App shell", () => {
   it("links only the three remaining screens in the bottom navigation", async () => {
     open();
@@ -53,8 +69,10 @@ describe("App shell", () => {
   it("shows the store display name in the top bar and links to the picker", async () => {
     open();
     const bar = await screen.findByRole("banner");
-    expect(await screen.findByText("Aeropuerto Norte · Glazed Centro", { selector: "header span" })).toBeInTheDocument();
-    expect(bar).toBeInTheDocument();
+    expect(await within(bar).findByText("Aeropuerto Norte")).toBeInTheDocument();
+    expect(within(bar).getByText("Glazed Centro")).toBeInTheDocument();
+    expect(within(bar).queryByText("Resumen")).toBeNull();
+    expect(within(bar).queryByText(/·/)).toBeNull();
     expect(screen.getByRole("link", { name: "Cambiar sucursal" })).toHaveAttribute("href", "/login");
   });
 

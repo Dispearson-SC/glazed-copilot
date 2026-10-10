@@ -37,3 +37,9 @@ export const initials = (name: string): string => {
   const words = name.split(/\s+/).filter((w) => /^\p{L}/u.test(w));
   return (words.length ? words : name.split(/\s+/)).slice(0, 2).map((w) => w.charAt(0).toUpperCase()).join("");
 };
+
+/** "Site · Store" -> [site, store]; without a separator the whole name is the title. */
+export const splitStoreName = (name: string): [string, string | null] => {
+  const i = name.indexOf(" · ");
+  return i < 0 ? [name, null] : [name.slice(0, i), name.slice(i + 3)];
+};
