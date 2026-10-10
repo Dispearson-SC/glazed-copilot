@@ -1,0 +1,4 @@
+[submodule "vendor/dataset-road2tech"]
+	path = vendor/dataset-road2tech
+	url = https://github.com/ams-innovation/dataset-hacktahton-road2tech.git
+	branch = master
