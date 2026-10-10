@@ -52,3 +52,4 @@ Strict. Runner: `cd frontend && npm test -- --run`; plus `npm run build`.
 - T3 commit 2e04877.
 - T4 commit 30607e5.
 - T5 commit 88a0d22 (also holds the chart actuals fix, tests and README).
+- Coordinator fixes (2026-10-10): 77d4ee6 Playfair fonts; 602456e as_of is today + capped projections; 394df0f short delta pill + design labels; 839224d top bar title/branch split; 99085b4 sanitized GFM markdown. 184 tests, build ok.
