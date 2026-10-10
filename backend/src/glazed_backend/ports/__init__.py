@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Protocol
 
-from ..domain import Alert, AlertState, BacktestRun, Case, Execution, Proposal, TraceEvent
+from ..domain import Alert, AlertState, BacktestRun, Case, Execution, Experience, Proposal, TraceEvent
 
 
 class MetricsPort(Protocol):
@@ -76,3 +76,15 @@ class TracePort(Protocol):
 
 class Clock(Protocol):
     def now(self) -> datetime: ...
+
+
+class ExperienceMemoryPort(Protocol):
+    """Per-store experience memory. Writes come only from code, never from an agent's free text."""
+
+    def recall(self, store_id: str, query: str, limit: int = 5) -> list["Experience"]: ...
+    def remember(self, store_id: str, experience: "Experience") -> None: ...
+
+
+class AssistantRepository(Protocol):
+    def get(self, store_id: str) -> str | None: ...
+    def set(self, store_id: str, assistant_id: str) -> None: ...

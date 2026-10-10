@@ -42,6 +42,10 @@ class BacktestBody(BaseModel):
     policy: str = "simple_v0"
 
 
+class OutcomeBody(BaseModel):
+    summary: str
+
+
 class TransitionBody(BaseModel):
     state: str
 
@@ -128,8 +132,12 @@ def build_public_router(c: Any) -> APIRouter:
 
     @r.post("/proposals/{proposal_id}/decision")
     def decide(proposal_id: str, b: DecisionBody):
-        return jsonable_encoder(uc.DecideProposal(c.cases, c.proposals, c.executions, c.alerts)
+        return jsonable_encoder(uc.DecideProposal(c.cases, c.proposals, c.executions, c.alerts, c.memory)
                                 .execute(proposal_id, b.approved, b.reason))
+
+    @r.post("/proposals/{proposal_id}/outcome", status_code=201)
+    def outcome(proposal_id: str, b: OutcomeBody):
+        return jsonable_encoder(uc.RecordOutcome(c.proposals, c.cases, c.memory).execute(proposal_id, b.summary))
 
     @r.get("/cases/{case_id}/executions")
     def executions(case_id: str):

@@ -11,3 +11,5 @@ up:
 	docker compose -f infra/docker-compose.yml up -d db
 down:
 	docker compose -f infra/docker-compose.yml down
+seed-memory:
+	cd backend && PYTHONPATH=.deps:src $(PY) scripts/seed_experiences.py --stores $(or $(STORES),S030)

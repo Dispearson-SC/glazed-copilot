@@ -226,3 +226,17 @@ class TraceEvent:
 
 class CoreError(DomainError):
     """Agent-Core unreachable or returned an unexpected response."""
+
+
+class MemoryUnavailable(DomainError):
+    """Experience memory is not configured or the provider failed. Callers degrade, never fail."""
+
+
+@dataclass
+class Experience:
+    text: str
+    kind: str  # decision | outcome | promo_evaluation | ...
+    store_id: str
+    decision_id: str | None = None
+    created_at: datetime = field(default_factory=utcnow)
+    score: float | None = None

@@ -1,13 +1,14 @@
 """Use cases. Each class takes the ports it needs; none touches I/O directly."""
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from ..domain import (Alert, AlertState, BacktestRun, Case, DomainError, Execution, FutureDate, NotFound,
+from ..domain import (Alert, AlertState, BacktestRun, Case, DomainError, Execution, Experience, FutureDate, NotFound,
                       Proposal, TraceEvent, alert_type_for_kind, new_id)
 from ..ports import (AlertRepository, BacktestRepository, CaseRepository, Clock, CorePort,
-                     ExecutionRepository, MetricsPort, ProposalRepository, TracePort)
+                     ExecutionRepository, ExperienceMemoryPort, MetricsPort, ProposalRepository, TracePort)
 
 
 def _case(cases: CaseRepository, case_id: str) -> Case:
@@ -165,8 +166,9 @@ class SubmitProposal:
 
 class DecideProposal:
     def __init__(self, cases: CaseRepository, proposals: ProposalRepository, executions: ExecutionRepository,
-                 alerts: AlertRepository) -> None:
+                 alerts: AlertRepository, memory: ExperienceMemoryPort | None = None) -> None:
         self.cases, self.proposals, self.executions, self.alerts = cases, proposals, executions, alerts
+        self.memory = memory
 
     def execute(self, proposal_id: str, approved: bool, reason: str = "") -> Execution:
         proposal = self.proposals.get(proposal_id)
@@ -186,7 +188,58 @@ class DecideProposal:
             if approved:
                 alert.advance(AlertState.EJECUTADA)
             self.alerts.update(alert)
+        self._remember(proposal)
         return execution
+
+    def _remember(self, p: Proposal) -> None:
+        if self.memory is None:
+            return
+        case = self.cases.get(p.case_id)
+        parts = p.issue_id.split("|")
+        kind, key = (parts[1], parts[2]) if len(parts) >= 3 else ("issue", p.issue_id)
+        when = case.sim_today.isoformat() if case else ""
+        verdict = "APPROVED" if p.status == "approved" else "REJECTED"
+        text = (f"[{p.store_id} · {kind} · {key} · {when}] {p.action_type} {verdict}. {p.reason or 'no reason given'}. "
+                f"Simulated option: {json.dumps(p.params, sort_keys=True)}. tier={p.tier}. decision_id={p.proposal_id}")
+        try:
+            self.memory.remember(p.store_id, Experience(text, "decision", p.store_id, p.proposal_id))
+        except Exception:  # noqa: BLE001 - memory is best-effort, never blocks a decision
+            pass
+
+
+class RecordOutcome:
+    """Write the measured result of a decision into the store's experience memory (from code only)."""
+
+    def __init__(self, proposals: ProposalRepository, cases: CaseRepository, memory: ExperienceMemoryPort | None) -> None:
+        self.proposals, self.cases, self.memory = proposals, cases, memory
+
+    def execute(self, proposal_id: str, summary: str) -> Experience:
+        p = self.proposals.get(proposal_id)
+        if p is None:
+            raise NotFound(f"proposal {proposal_id!r} not found")
+        exp = Experience(f"[{p.store_id} · outcome · {p.action_type}] measured: {summary}. decision_id={p.proposal_id}",
+                         "outcome", p.store_id, p.proposal_id)
+        if self.memory is not None:
+            try:
+                self.memory.remember(p.store_id, exp)
+            except Exception:  # noqa: BLE001
+                pass
+        return exp
+
+
+class RecallExperiences:
+    """Returns (experiences, warning). Never raises: memory problems degrade to ([], warning)."""
+
+    def __init__(self, memory: ExperienceMemoryPort | None) -> None:
+        self.memory = memory
+
+    def execute(self, store_id: str, query: str, limit: int = 5) -> tuple[list[Experience], str | None]:
+        if self.memory is None:
+            return [], "experience memory not configured"
+        try:
+            return self.memory.recall(store_id, query, limit), None
+        except Exception as exc:  # noqa: BLE001
+            return [], str(exc)
 
 
 class RunBacktest:

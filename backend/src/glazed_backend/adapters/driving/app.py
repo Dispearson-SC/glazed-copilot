@@ -25,6 +25,7 @@ class Container:
     backtests: Any
     trace: Any
     clock: Any
+    memory: Any = None
     storage: str = "memory"
     core_status: str = "configured"
 
@@ -57,7 +58,7 @@ def create_app(c: Container) -> FastAPI:
 def build_container(env: dict[str, str] | None = None) -> Container:
     from ..driven.duckdb_metrics import DuckDBMetrics
     from ..driven.memory import (InMemoryAlerts, InMemoryBacktests, InMemoryCases, InMemoryExecutions,
-                                 InMemoryProposals, InMemoryTrace, SystemClock)
+                                 InMemoryProposals, InMemoryTrace, SystemClock, InMemoryAssistants)
     env = dict(os.environ if env is None else env)
     path = env.get("GLAZED_DUCKDB_PATH")
     if not path or not os.path.exists(path):
@@ -69,15 +70,19 @@ def build_container(env: dict[str, str] | None = None) -> Container:
         core: Any = AgentCoreHttp(core_url, env.get("GLAZED_CORE_PROFILE", "orchestrator"))
     else:
         core = _NoCore()
+    key = env.get("BACKBOARD_API_KEY", "")
+    from ..driven.backboard_memory import BackboardMemory
     if env.get("GLAZED_STORAGE", "memory") == "postgres":
         from ..driven.postgres import PostgresStore
         store = PostgresStore(env["GLAZED_DATABASE_URL"])
         store.migrate()
         return Container(metrics, core, store.cases, store.alerts, store.proposals, store.executions,
-                         store.backtests, store.trace, SystemClock(), "postgres",
+                         store.backtests, store.trace, SystemClock(),
+                         BackboardMemory(key, store.assistants), "postgres",
                          "configured" if core_url else "missing")
     return Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
-                     InMemoryBacktests(), InMemoryTrace(), SystemClock(), "memory",
+                     InMemoryBacktests(), InMemoryTrace(), SystemClock(),
+                     BackboardMemory(key, InMemoryAssistants()), "memory",
                      "configured" if core_url else "missing")
 
 

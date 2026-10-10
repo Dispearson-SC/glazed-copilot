@@ -155,3 +155,18 @@ def test_trace_is_ordered_by_ts(env):
         client.post("/internal/v1/events", headers=h, json={"from_agent": "a", "to_agent": "b", "kind": k})
     ts = [e["ts"] for e in client.get("/api/v1/trace", params={"store_id": "S030"}).json()]
     assert ts == sorted(ts) and len(ts) == 3
+
+
+def test_internal_experiences_returns_list_and_degrades(env):
+    client, c = env
+    case = mkcase(client)
+    h = {"X-Glazed-Case": case["case_id"]}
+    r = client.get("/internal/v1/experiences", headers=h, params={"query": "x"})
+    assert r.status_code == 200 and r.json() == [] and "BACKBOARD" in r.headers["x-glazed-warning"] or r.json() == []
+    from glazed_backend.adapters.driven.memory import InMemoryExperienceMemory
+    from glazed_backend.domain import Experience
+    c.memory = InMemoryExperienceMemory()
+    c.memory.remember("S030", Experience("promo uplift was low", "promo_evaluation", "S030", "d7"))
+    got = client.get("/internal/v1/experiences", headers=h, params={"query": "promo", "limit": 3}).json()
+    assert got[0].keys() >= {"text", "decision_id", "kind", "created_at", "score"} and got[0]["decision_id"] == "d7"
+    assert client.get("/internal/v1/experiences").status_code == 400

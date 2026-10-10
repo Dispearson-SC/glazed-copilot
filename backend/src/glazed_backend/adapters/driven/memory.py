@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
 from datetime import datetime, timezone
 
 from ...domain import Alert, AlertState, BacktestRun, Case, Execution, Proposal, TraceEvent
@@ -110,3 +111,35 @@ class InMemoryTrace:
 class SystemClock:
     def now(self) -> datetime:
         return datetime.now(timezone.utc)
+
+
+class InMemoryAssistants:
+    def __init__(self) -> None:
+        self._d: dict[str, str] = {}
+
+    def get(self, store_id: str) -> str | None:
+        return self._d.get(store_id)
+
+    def set(self, store_id: str, assistant_id: str) -> None:
+        self._d[store_id] = assistant_id
+
+
+class InMemoryExperienceMemory:
+    """Keyword-overlap recall; isolated per store."""
+
+    def __init__(self) -> None:
+        self._d: dict[str, list] = {}
+
+    def remember(self, store_id: str, experience) -> None:
+        self._d.setdefault(store_id, []).append(experience)
+
+    def recall(self, store_id: str, query: str, limit: int = 5) -> list:
+        words = {w.lower() for w in query.split() if w}
+        scored = []
+        for e in self._d.get(store_id, []):
+            hay = e.text.lower() + " " + e.kind
+            s = sum(1 for w in words if w in hay)
+            if s or not words:
+                scored.append((s, e))
+        scored.sort(key=lambda x: -x[0])
+        return [dataclasses.replace(e, score=float(s)) for s, e in scored[:limit]]

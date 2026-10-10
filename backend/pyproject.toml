@@ -2,7 +2,7 @@
 name = "glazed-backend"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["fastapi", "uvicorn", "httpx", "duckdb", "psycopg[binary]>=3.1", "pydantic>=2"]
+dependencies = ["fastapi", "uvicorn", "httpx", "backboard-sdk", "duckdb", "psycopg[binary]>=3.1", "pydantic>=2"]
 
 [project.optional-dependencies]
 dev = ["pytest"]

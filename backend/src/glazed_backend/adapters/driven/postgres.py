@@ -11,7 +11,7 @@ from psycopg.types.json import Jsonb
 
 from ...domain import Alert, AlertState, BacktestRun, Case, Execution, Proposal, TraceEvent
 
-_TABLES = ("trace_events", "backtests", "executions", "proposals", "alerts", "cases")
+_TABLES = ("store_assistants", "trace_events", "backtests", "executions", "proposals", "alerts", "cases")
 
 
 class PostgresStore:
@@ -24,6 +24,7 @@ class PostgresStore:
         self.cases, self.alerts = _Cases(self), _Alerts(self)
         self.proposals, self.executions = _Proposals(self), _Executions(self)
         self.backtests, self.trace = _Backtests(self), _Trace(self)
+        self.assistants = _Assistants(self)
 
     def migrate(self) -> None:
         files = sorted(f for f in resources.files("glazed_backend.migrations").iterdir() if f.name.endswith(".sql"))
@@ -179,3 +180,13 @@ class _Trace(_Repo):
                         " AND (%s::text IS NULL OR store_id=%s) ORDER BY ts", (case_id, case_id, store_id, store_id))
         return [TraceEvent(r["case_id"], r["store_id"], r["ts"], r["from_agent"], r["to_agent"], r["kind"],
                            r["payload"], r["event_id"]) for r in rows]
+
+
+class _Assistants(_Repo):
+    def get(self, store_id: str) -> str | None:
+        r = self._one("SELECT assistant_id FROM glazed.store_assistants WHERE store_id=%s", (store_id,))
+        return r["assistant_id"] if r else None
+
+    def set(self, store_id: str, assistant_id: str) -> None:
+        self.s.q("INSERT INTO glazed.store_assistants VALUES (%s,%s) ON CONFLICT (store_id) DO UPDATE"
+                 " SET assistant_id=EXCLUDED.assistant_id", [store_id, assistant_id])

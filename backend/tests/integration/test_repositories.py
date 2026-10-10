@@ -85,3 +85,11 @@ def test_trace_is_upserted_by_event_id_and_filtered(repos):
     repos.trace.record(TraceEvent("c2", "S001", datetime(2026, 3, 2, tzinfo=timezone.utc), "a", "b", "tool_call", {}, "e2"))
     assert repos.trace.list(case_id="c1") == [t]
     assert len(repos.trace.list(store_id="S001")) == 1 and len(repos.trace.list()) == 2
+
+
+def test_assistant_repository_roundtrip():
+    from glazed_backend.adapters.driven.memory import InMemoryAssistants
+    for repo in (InMemoryAssistants(), _pg().assistants):
+        assert repo.get("S030") is None
+        repo.set("S030", "a1"); repo.set("S030", "a2")
+        assert repo.get("S030") == "a2"

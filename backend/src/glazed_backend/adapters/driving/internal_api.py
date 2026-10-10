@@ -6,7 +6,7 @@ The store and the as-of date are never parameters: they come from the case named
 from datetime import date, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Response
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
@@ -74,6 +74,15 @@ def build_internal_router(c: Any) -> APIRouter:
     @r.get("/history")
     def history(case: Ctx):
         return c.metrics.history(case.store_id, case.sim_today)
+
+    @r.get("/experiences")
+    def experiences(case: Ctx, response: Response, query: str = "", limit: int = 5):
+        found, warning = uc.RecallExperiences(getattr(c, "memory", None)).execute(
+            case.store_id, query, max(1, min(limit, 20)))
+        if warning:
+            response.headers["X-Glazed-Warning"] = warning.replace("\n", " ")[:200]
+        return [{"text": e.text, "decision_id": e.decision_id, "kind": e.kind,
+                 "created_at": e.created_at.isoformat(), "score": e.score} for e in found]
 
     @r.post("/proposals", status_code=201)
     def post_proposal(case: Ctx, b: ProposalBody, x_glazed_agent: Annotated[str | None, Header()] = None):
