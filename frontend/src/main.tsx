@@ -5,7 +5,6 @@ import { registerSW } from "virtual:pwa-register";
 import { SessionProvider } from "./SessionContext";
 import App from "./App";
 import "./index.css";
-import "./legacy.css";
 
 registerSW({ immediate: true });
 

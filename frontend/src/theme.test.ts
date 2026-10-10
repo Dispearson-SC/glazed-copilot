@@ -33,3 +33,14 @@ describe("Artisanal Roast theme", () => {
       expect(() => readFileSync(`public/${f}`)).not.toThrow();
   });
 });
+
+describe("legacy pages restyle", () => {
+  it("uses theme tokens instead of the old hard-coded palette", () => {
+    const css = readFileSync("src/index.css", "utf8");
+    expect(css).not.toContain("#c2185b");
+    expect(css).toMatch(/\.card[\s\S]*@apply[^;]*bg-surface-container-lowest/);
+    expect(css).toMatch(/\.badge[\s\S]*@apply/);
+    expect(css).toMatch(/button[\s\S]*@apply[^;]*rounded-full/);
+    expect(() => readFileSync("src/legacy.css")).toThrow();
+  });
+});
