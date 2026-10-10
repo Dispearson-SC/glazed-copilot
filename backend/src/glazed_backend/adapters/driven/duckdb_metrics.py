@@ -22,6 +22,7 @@ from ...metrics.replay import calibrate
 from ...metrics.losses import lost_sales_window
 from ...metrics.confidence import realized_add_net, realized_reduce_net
 from ...metrics.demand import uncensor
+from ...metrics.forecast import same_weekday_dates
 from ...metrics.inventory import is_short_life
 from ...metrics.sentinel import HORIZON_DAYS
 from ...metrics.calendar_effect import calendar_issue, event_effect
@@ -83,7 +84,7 @@ class DuckDBMetrics:
         return r[0][0] or as_of
 
     def _same_weekday_dates(self, d: date, n: int = 8, include_d: bool = False) -> list[date]:
-        return [d - timedelta(days=7 * k) for k in range(0 if include_d else 1, n + 1)]
+        return same_weekday_dates(d, n, include_d)  # shared with the forecast baseline
 
     def stores(self) -> list[dict[str, Any]]:
         return self._rows("SELECT s.store_id, s.store_name AS name, s.format, s.site_id, si.region,"
