@@ -16,10 +16,17 @@ describe("CasesPage", () => {
     expect(api.listCases).toHaveBeenCalledWith({ store_id: "S030" });
   });
 
+  it("defaults the simulated date to the pinned default", async () => {
+    open();
+    await screen.findByText("Caso uno");
+    expect(screen.getByLabelText("Fecha simulada")).toHaveValue("2026-07-19");
+  });
+
   it("creates a case with the form values", async () => {
     const api = fakeApi();
     open(api);
     await screen.findByText("Caso uno");
+    await userEvent.clear(screen.getByLabelText("Fecha simulada"));
     await userEvent.type(screen.getByLabelText("Fecha simulada"), "2026-03-05");
     await userEvent.type(screen.getByLabelText("Título"), "Prueba");
     await userEvent.click(screen.getByRole("button", { name: "Crear caso" }));

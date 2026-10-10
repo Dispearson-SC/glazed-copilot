@@ -46,6 +46,15 @@ describe("LoginPage (store and case picker)", () => {
     expect(store2.store_id).toBe("S031");
   });
 
+  it("preselects the live case at the default simulation date", async () => {
+    const api = fakeApi({
+      listCases: async () => [caseA, { ...caseA, case_id: "cd", title: "Demo", sim_today: "2026-07-19" }],
+    });
+    open(api);
+    await screen.findByRole("option", { name: "Demo" });
+    expect(screen.getByLabelText("Caso")).toHaveValue("cd");
+  });
+
   it("stores the choice in the session and goes home", async () => {
     open();
     await screen.findByRole("option", { name: "Caso uno" });
