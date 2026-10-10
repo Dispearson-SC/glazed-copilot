@@ -340,6 +340,11 @@ def build_public_router(c: Any) -> APIRouter:
     def staffing(case_id: str, days: int | None = None):
         return uc_manager.StaffingView(c.metrics, names, c.flow_forecaster).execute(case_of(case_id), days)
 
+    @r.get("/cases/{case_id}/inbox-counts")
+    def inbox_counts(case_id: str):
+        return uc_copilot.InboxCounts(uc_copilot.PendingDecisions(c.metrics, c.proposals, c.served, names), c.alerts).execute(
+            case_of(case_id))
+
     @r.get("/cases/{case_id}/memories")
     def memories(case_id: str, category: str | None = None, q: str | None = None):
         return uc_copilot.ListMemories(c.cases, c.proposals, c.metrics, c.memory, c.decision_memories, c.clock).execute(

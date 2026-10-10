@@ -268,3 +268,17 @@ class AgentsStatus:
                 for a in AGENT_IDS]}
             self._at = now
         return self._cached
+
+
+class InboxCounts:
+    """Badges of the manager inbox: pending approvals, pending technical items and open alerts of this case."""
+
+    OPEN = ("nueva", "vista", "en_analisis")
+
+    def __init__(self, pending: PendingDecisions, alerts: Any) -> None:
+        self.pending, self.alerts = pending, alerts
+
+    def execute(self, case: Case) -> dict[str, int]:
+        approvals, technical = self.pending.items(case)
+        open_alerts = [a for a in self.alerts.list(case.store_id) if a.case_id == case.case_id and a.state.value in self.OPEN]
+        return {"approvals": len(approvals), "technical": len(technical), "alerts": len(open_alerts)}
