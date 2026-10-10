@@ -25,6 +25,188 @@ describe("useChat", () => {
     expect(api.getTrace).toHaveBeenCalledWith("S030", "c1");
   });
 
+  it("loads the history from the stored turns when the route exists, without reading the trace", async () => {
+    const api = fakeApi({
+      listTurns: vi.fn(async () => [{ turn_id: "t9", ts: "2026-03-01T10:00:00Z", user_text: "hola", reply: "buenas", status: "done" }]),
+      getTrace: vi.fn(async () => []),
+    });
+    const { result } = setup(api);
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+    expect(result.current.messages[1]).toMatchObject({ role: "assistant", text: "buenas", turnId: "t9" });
+    expect(api.listTurns).toHaveBeenCalledWith("c1");
+    expect(api.getTrace).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the trace when the turns route answers an empty list", async () => {
+    const api = fakeApi({
+      listTurns: vi.fn(async () => []),
+      getTrace: vi.fn(async () => [ev("2026-03-01T10:00:00Z", "manager", "orchestrator", "message", { text: "hola" })]),
+    });
+    const { result } = setup(api);
+    await waitFor(() => expect(result.current.messages).toHaveLength(1));
+  });
+
+  it("falls back to the trace parser when the turns route answers 404", async () => {
+    const api = fakeApi({
+      listTurns: vi.fn(async () => { throw new ApiError(404, "nf"); }),
+      getTrace: vi.fn(async () => [ev("2026-03-01T10:00:00Z", "manager", "orchestrator", "message", { text: "hola" })]),
+    });
+    const { result } = setup(api);
+    await waitFor(() => expect(result.current.messages).toHaveLength(1));
+    expect(api.getTrace).toHaveBeenCalledWith("S030", "c1");
+  });
+
+  describe("pending turns loaded from history", () => {
+    const pendingTurn = { turn_id: "t7", ts: "2026-03-01T10:00:00Z", user_text: "hola", reply: null, status: "pending" as const };
+
+    it("resumes polling and replaces the working bubble with the parsed reply, then loads proposals", async () => {
+      const getTurn = vi
+        .fn()
+        .mockResolvedValueOnce({ turn_id: "t7", status: "pending", still_running: true })
+        .mockResolvedValue({ turn_id: "t7", status: "done", reply: "Listo, ya quedó" });
+      const listProposals = vi.fn(async () => [proposalA]);
+      const api = fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn, listProposals });
+      const { result } = setup(api);
+      await waitFor(() => expect(result.current.messages[1]?.text).toBe("Listo, ya quedó"));
+      expect(getTurn).toHaveBeenCalledWith("c1", "t7");
+      expect(getTurn.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(result.current.messages).toHaveLength(2);
+      await waitFor(() => expect(listProposals.mock.calls.length).toBeGreaterThanOrEqual(2));
+      await waitFor(() => expect(result.current.proposals).toHaveLength(1));
+    });
+
+    it("turns the bubble into a retryable error when the turn fails", async () => {
+      const getTurn = vi.fn(async () => ({ turn_id: "t7", status: "failed" as const, error: "se cayó" }));
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(result.current.messages.map((m) => m.role)).toEqual(["user", "error"]));
+      expect(result.current.messages[1]).toMatchObject({ text: "se cayó", retryText: "hola" });
+    });
+
+    it("stops polling after unmount", async () => {
+      const getTurn = vi.fn(async () => ({ turn_id: "t7", status: "pending" as const }));
+      const { unmount, result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(getTurn).toHaveBeenCalled());
+      unmount();
+      const n = getTurn.mock.calls.length;
+      await new Promise((r) => setTimeout(r, 60));
+      expect(getTurn.mock.calls.length).toBeLessThanOrEqual(n + 1);
+      expect(result.current.messages[1]?.text).toBe("El copiloto sigue trabajando…");
+    });
+
+    it("does not poll turns that are already done", async () => {
+      const getTurn = vi.fn();
+      const done = { turn_id: "t9", ts: "2026-03-01T10:00:00Z", user_text: "hola", reply: "buenas", status: "done" as const };
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [done]), getTurn }));
+      await waitFor(() => expect(result.current.messages).toHaveLength(2));
+      await new Promise((r) => setTimeout(r, 30));
+      expect(getTurn).not.toHaveBeenCalled();
+    });
+
+    it.each([["empty", ""], ["whitespace", "   "], ["literal None", "None"]])(
+      "replaces the working bubble with a neutral message when the turn finishes with %s reply",
+      async (_n, reply) => {
+        const getTurn = vi
+          .fn()
+          .mockResolvedValueOnce({ turn_id: "t7", status: "pending", still_running: true })
+          .mockResolvedValue({ turn_id: "t7", status: "done", reply });
+        const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+        await waitFor(() => expect(result.current.messages[1]?.text).toContain("terminó sin respuesta de texto"));
+        expect(result.current.messages[1]).toMatchObject({ role: "assistant", turnId: "t7" });
+        expect(result.current.messages[1]?.text).toContain("terminó sin respuesta de texto");
+        expect(result.current.messages[1]?.text).not.toContain("None");
+        expect(result.current.stillRunning).toBe(false);
+      },
+    );
+
+    it("does not poll a done turn with an empty reply from history", async () => {
+      const getTurn = vi.fn();
+      const done = { turn_id: "t9", ts: "2026-03-01T10:00:00Z", user_text: "hola", reply: "", status: "done" as const };
+      setup(fakeApi({ listTurns: vi.fn(async () => [done]), getTurn }));
+      await new Promise((r) => setTimeout(r, 40));
+      expect(getTurn).not.toHaveBeenCalled();
+    });
+
+    it("keeps the working bubble through one 500 and then shows the reply with no error", async () => {
+      const getTurn = vi
+        .fn()
+        .mockRejectedValueOnce(new ApiError(500, "boom"))
+        .mockResolvedValue({ turn_id: "t7", status: "done", reply: "Listo" });
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(result.current.messages[1]?.text).toBe("Listo"));
+      expect(result.current.messages.map((m) => m.role)).toEqual(["user", "assistant"]);
+      expect(getTurn).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries network errors (status 0) too", async () => {
+      const getTurn = vi
+        .fn()
+        .mockRejectedValueOnce(new ApiError(0, "sin red"))
+        .mockResolvedValue({ turn_id: "t7", status: "done", reply: "Listo" });
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(result.current.messages[1]?.text).toBe("Listo"));
+    });
+
+    it("resets the error counter after a successful poll", async () => {
+      const e = () => new ApiError(500, "boom");
+      const pend = { turn_id: "t7", status: "pending" as const };
+      const getTurn = vi
+        .fn()
+        .mockRejectedValueOnce(e()).mockRejectedValueOnce(e()).mockRejectedValueOnce(e()).mockRejectedValueOnce(e())
+        .mockResolvedValueOnce(pend)
+        .mockRejectedValueOnce(e()).mockRejectedValueOnce(e()).mockRejectedValueOnce(e()).mockRejectedValueOnce(e())
+        .mockResolvedValue({ turn_id: "t7", status: "done", reply: "Listo" });
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(result.current.messages[1]?.text).toBe("Listo"));
+    });
+
+    it("shows a non-retry error once repeated 500s exhaust the budget, keeping the bubble until then", async () => {
+      const getTurn = vi.fn().mockRejectedValue(new ApiError(500, "boom"));
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(result.current.messages[1]?.text).toBe("El copiloto sigue trabajando…"));
+      await waitFor(() => expect(result.current.messages[1]?.role).toBe("error"));
+      expect(result.current.messages[1]?.text).toBe("No pude confirmar el estado; vuelve a cargar");
+      expect(result.current.messages[1]?.retryText).toBeUndefined();
+      expect(getTurn).toHaveBeenCalledTimes(5);
+    });
+
+    it("fails immediately, with retry, on a non-404 4xx", async () => {
+      const getTurn = vi.fn().mockRejectedValue(new ApiError(400, "malo"));
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(result.current.messages[1]?.role).toBe("error"));
+      expect(result.current.messages[1]).toMatchObject({ text: "malo", retryText: "hola" });
+      expect(getTurn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("live turn polling errors", () => {
+    it("survives one 500 and shows the reply", async () => {
+      const getTurn = vi
+        .fn()
+        .mockRejectedValueOnce(new ApiError(500, "boom"))
+        .mockResolvedValue({ turn_id: "t1", status: "done", reply: "Pide 40" });
+      const { result } = setup(fakeApi({ getTurn }));
+      await act(async () => { await result.current.send("hola"); });
+      expect(result.current.messages.map((m) => m.role)).toEqual(["user", "assistant"]);
+    });
+
+    it("shows a non-retry error when repeated 500s exhaust the budget", async () => {
+      const getTurn = vi.fn().mockRejectedValue(new ApiError(500, "boom"));
+      const { result } = setup(fakeApi({ getTurn }));
+      await act(async () => { await result.current.send("hola"); });
+      expect(result.current.messages.at(-1)).toMatchObject({ role: "error", text: "No pude confirmar el estado; vuelve a cargar" });
+      expect(result.current.messages.at(-1)?.retryText).toBeUndefined();
+      expect(result.current.status).toBe("idle");
+    });
+
+    it("fails immediately on a 400", async () => {
+      const getTurn = vi.fn().mockRejectedValue(new ApiError(400, "malo"));
+      const { result } = setup(fakeApi({ getTurn }));
+      await act(async () => { await result.current.send("hola"); });
+      expect(result.current.messages.at(-1)).toMatchObject({ role: "error", text: "malo", retryText: "hola" });
+      expect(getTurn).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("tolerates a 404 right after the POST, then shows the reply", async () => {
     const getTurn = vi
       .fn()

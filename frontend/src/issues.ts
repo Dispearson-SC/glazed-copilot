@@ -61,3 +61,9 @@ export function severityCell(a: { severity_usd: number; issue: { category?: unkn
   if (integrity && typeof exp === "number") return `Exposición ${usd(exp)}`;
   return a.severity_usd.toFixed(2);
 }
+
+/** Backends differ: a plain number or {low,mid,high}. Normalizes to a range. */
+export const asRange = (v: number | Range3): Range3 => (typeof v === "number" ? { low: v, mid: v, high: v } : v);
+
+/** One value when the range is degenerate, otherwise "low – high". */
+export const rangeOrValue = (r: Range3): string => (r.low === r.high ? usd(r.mid) : rangeText(r));

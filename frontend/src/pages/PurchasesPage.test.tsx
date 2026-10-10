@@ -69,3 +69,12 @@ describe("PurchasesPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("plan caído");
   });
 });
+
+describe("PurchasesPage with the live order-plan shape", () => {
+  it("renders range waste/lost sales and an object min-order warning without crashing", async () => {
+    const { planLive } = await import("../test/fixtures");
+    renderPage(fakeApi({ getOrderPlan: async () => planLive }), "/stores/S030/purchases", "/stores/:storeId/purchases", <PurchasesPage />);
+    expect(await screen.findByTestId("line-SKU-1")).toBeInTheDocument();
+    expect(screen.getByTestId("min-warning")).toHaveTextContent("$106.10");
+  });
+});

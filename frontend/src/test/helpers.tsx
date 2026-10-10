@@ -2,7 +2,7 @@ import { render } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { vi } from "vitest";
 import { ApiProvider } from "../ApiContext";
-import type { Api } from "../api";
+import { ApiError, type Api } from "../api";
 import { SessionProvider } from "../SessionContext";
 import { briefingA, daySummaryA, issueA, kpisA, planA } from "./fixtures";
 import type { Alert, Case, Proposal, Store, TraceEvent } from "../types";
@@ -55,6 +55,15 @@ export function fakeApi(over: Partial<Record<keyof Api, unknown>> = {}): Api {
     getKpis: vi.fn(async () => kpisA),
     getCompliance: vi.fn(async () => []),
     inject: vi.fn(async () => ({})),
+    getForecast: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getForecastAccuracy: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    listTurns: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getInventory: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getExpiring: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getDeliveries: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getPromos: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getStaffing: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getDecisions: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
     proposeOption: vi.fn(async () => ({ ...proposalA, proposal_id: "p9", issue_id: issueA.issue_id })),
   };
   return { ...base, ...over } as unknown as Api;

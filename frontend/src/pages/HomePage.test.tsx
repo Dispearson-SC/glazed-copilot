@@ -41,6 +41,8 @@ describe("HomePage", () => {
     open();
     expect(await screen.findByRole("link", { name: "Ver compras" })).toHaveAttribute("href", "/stores/S030/purchases");
     expect(screen.getByRole("link", { name: "Ver alertas" })).toHaveAttribute("href", "/alerts");
+    expect(screen.getByRole("link", { name: "Ver inventario" })).toHaveAttribute("href", "/stores/S030/inventory");
+    expect(screen.getByRole("link", { name: "Ver semana" })).toHaveAttribute("href", "/stores/S030/week");
   });
 
   it("shows an error state when kpis fail", async () => {
@@ -149,5 +151,55 @@ describe("HomePage dashboard", () => {
     open(fakeApi({ getBriefing: async () => { throw new Error("sin briefing"); } }));
     expect(await screen.findByTestId("hero")).toBeInTheDocument();
     expect(await screen.findByText(/sin briefing/)).toBeInTheDocument();
+  });
+});
+
+describe("HomePage Lo que viene", () => {
+  it("renders the upcoming card from briefing and order plan", async () => {
+    const { briefingLive, planLive } = await import("../test/fixtures");
+    open(fakeApi({ getBriefing: async () => briefingLive, getOrderPlan: async () => planLive }));
+    expect(await screen.findByTestId("upcoming")).toHaveTextContent("Lo que viene");
+    expect(await screen.findByTestId("upcoming-stockouts")).toHaveTextContent("Cold Foam");
+  });
+
+  it("keeps the rest of Home when the order plan fails", async () => {
+    open(fakeApi({ getOrderPlan: async () => { throw new Error("plan caído"); } }));
+    expect(await screen.findByTestId("hero")).toBeInTheDocument();
+    expect(await screen.findByText(/plan caído/)).toBeInTheDocument();
+  });
+});
+
+describe("HomePage forecast overlay", () => {
+  it("falls back to the plain 7-day trend, quietly, when the forecast route is missing", async () => {
+    open();
+    await screen.findByTestId("trend-bar-2026-03-10");
+    expect(screen.queryByTestId("forecast-chart")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows the forecast chart when the route answers", async () => {
+    const { forecastA } = await import("../test/fixtures");
+    open(fakeApi({ getForecast: async () => forecastA }));
+    expect(await screen.findByTestId("forecast-chart")).toBeInTheDocument();
+    expect(screen.getByTestId("forecast-model")).toHaveTextContent("baseline-weekday-8w");
+  });
+
+  it("asks for the 7 days before and after the simulated today", async () => {
+    const api = fakeApi();
+    open(api);
+    await screen.findByTestId("hero");
+    const call = (api.getForecast as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
+    expect(call).toEqual(["c1", { from: "2026-02-22", to: "2026-03-08", level: "store" }]);
+  });
+
+  it("shows the accuracy table under the chart when the route answers, and stays quiet otherwise", async () => {
+    const { forecastA, accuracyA } = await import("../test/fixtures");
+    const { unmount } = open(fakeApi({ getForecast: async () => forecastA, getForecastAccuracy: async () => accuracyA }));
+    expect(await screen.findByTestId("accuracy")).toBeInTheDocument();
+    unmount();
+    open(fakeApi({ getForecast: async () => forecastA }));
+    await screen.findByTestId("forecast-chart");
+    expect(screen.queryByTestId("accuracy")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

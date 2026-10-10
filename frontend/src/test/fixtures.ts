@@ -1,4 +1,4 @@
-import type { Briefing, DaySummary, Issue, Kpis, Option, OrderPlan } from "../types";
+import type { Briefing, DaySummary, ForecastResponse, Issue, Kpis, Option, OrderPlan } from "../types";
 
 const base = {
   cost_usd: 0,
@@ -97,4 +97,141 @@ export const briefingA: Briefing = {
     { key: "lost_sales", text: "Venta perdida estimada $40–$565", value: 430.77, unit: "USD", low: 39.62, high: 565.38 },
   ],
   suggested_focus: ["i1", "i2"],
+};
+
+// Shapes captured from the live backend (case at 2026-07-19, store S030).
+export const briefingLive: Briefing = {
+  snapshot: {
+    as_of: "2026-07-19",
+    order_plan: {
+      due_today: [
+        { sku: "SKU-1", name: "Cold Foam", supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", qty: 10, cases: 1, est_cost_usd: 14.6,
+          expected_delivery: "2026-07-21", projected_stockout_date: "2026-07-21", order_deadline: "2026-07-19", order_deadline_status: "ok",
+          stockout_risk_without_order: 0.9971, below_min_order: true },
+        { sku: "SKU-2", name: "Sand", supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", qty: 10, cases: 1, est_cost_usd: 19.7,
+          expected_delivery: "2026-07-21", projected_stockout_date: "2026-07-22", order_deadline: "2026-07-19", order_deadline_status: "ok",
+          stockout_risk_without_order: 0.84, below_min_order: true },
+      ],
+      due_tomorrow: [
+        { sku: "SKU-3", name: "Coffee Beans", supplier_id: "SUP06", supplier_name: "Evergreen Coffee Roasters", qty: 5, cases: 1, est_cost_usd: 16.5,
+          expected_delivery: "2026-07-22", projected_stockout_date: "2026-07-23", order_deadline: "2026-07-20", order_deadline_status: "ok",
+          stockout_risk_without_order: 0.5, below_min_order: true },
+      ],
+      top_lines: [],
+      total_lines: 3,
+      deadline_passed: 0,
+    },
+    suppliers: [
+      { supplier_id: "SUP01", supplier_name: "Northfield Bakery Partners", on_time_pct: 92.7, fill_pct: 100, next_delivery: "2026-07-20" },
+      { supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", on_time_pct: 90.1, fill_pct: 99.9, next_delivery: "2026-07-21" },
+    ],
+  },
+  headline: [
+    { key: "orders_due_today", text: "2 pedidos vencen hoy", value: 2, unit: "pedidos" },
+    { key: "worst_supplier", text: "Proveedor con menor puntualidad: Pioneer Merch & Packaging (85.7%)", value: 85.7, unit: "%" },
+  ],
+  suggested_focus: [],
+};
+
+export const planLive: OrderPlan = {
+  case_id: "c1", store_id: "S030", as_of: "2026-07-19",
+  suppliers: [
+    { supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", order_value_usd: 106.1, min_order_value: 300 },
+    { supplier_id: "SUP06", supplier_name: "Evergreen Coffee Roasters", order_value_usd: 16.5, min_order_value: 350 },
+  ],
+  lines: [
+    { sku: "SKU-1", name: "Cold Foam", supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", qty: 10, cases: 1, case_size: 10,
+      service_level_target: 0.68, est_cost_usd: 14.6, expected_delivery: "2026-07-21", order_deadline: "2026-07-19", order_deadline_status: "ok",
+      projected_stockout_date: "2026-07-21", stockout_risk_without_order: 0.9971, stockout_risk_with_order: 0.4001,
+      expected_waste_usd: { low: 0.29, mid: 0.96, high: 2.38 }, expected_lost_sales_usd: { low: 4.84, mid: 10.63, high: 18.78 },
+      vs_current_practice: { received_to_sold: 1.25, qty_delta: 0 },
+      min_order_warning: { min_order_value: 300, order_value_usd: 106.1, suggestion: "Below the supplier minimum" } },
+    { sku: "SKU-2", name: "Sand", supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", qty: 10, cases: 1, case_size: 10,
+      service_level_target: 0.7, est_cost_usd: 19.7, expected_delivery: "2026-07-21", order_deadline: "2026-07-19", order_deadline_status: "ok",
+      projected_stockout_date: "2026-07-22", stockout_risk_without_order: 0.84, stockout_risk_with_order: 0.3,
+      expected_waste_usd: { low: 0.1, mid: 0.5, high: 1 }, expected_lost_sales_usd: { low: 1, mid: 2, high: 3 },
+      vs_current_practice: { received_to_sold: 1, qty_delta: 0 }, min_order_warning: null },
+    { sku: "SKU-9", name: "Never runs out", supplier_id: "SUP06", supplier_name: "Evergreen Coffee Roasters", qty: 5, cases: 1, case_size: 5,
+      service_level_target: 0.9, est_cost_usd: 16.5, expected_delivery: "2026-07-22", order_deadline: "2026-07-20", order_deadline_status: "ok",
+      projected_stockout_date: null, stockout_risk_without_order: 0.01, stockout_risk_with_order: 0,
+      expected_waste_usd: { low: 0, mid: 0, high: 0 }, expected_lost_sales_usd: { low: 0, mid: 0, high: 0 },
+      vs_current_practice: { received_to_sold: 1, qty_delta: 0 }, min_order_warning: null },
+  ],
+};
+
+export const forecastA: ForecastResponse = {
+  store_id: "S030", sku: null, level: "store", as_of: "2026-03-01", forecast_origin: "2026-03-01",
+  model: "baseline-weekday-8w", model_version: "1", unit: "USD", horizon_days: 7,
+  points: [
+    { date: "2026-02-27", forecast: 90, p10: 70, p90: 110, baseline: 88, actual: 95, censored: false },
+    { date: "2026-02-28", forecast: 100, p10: 80, p90: 120, baseline: 98, actual: 60, censored: true, stockout_hours: 5 },
+    { date: "2026-03-01", forecast: 110, p10: 90, p90: 130, baseline: 105, actual: 112, censored: false },
+    { date: "2026-03-02", forecast: 120, p10: 95, p90: 150, baseline: 115, actual: null, censored: false },
+    { date: "2026-03-03", forecast: 80, p10: 60, p90: 100, baseline: 82, actual: 999, censored: false },
+  ],
+  metrics_to_date: { wape: 0.123, bias: -0.021, coverage_p10_p90: 0.8, wape_baseline: 0.2, n_days: 28, n_censored: 3 },
+};
+
+import type { DecisionRow } from "../types";
+export const decisionsA: DecisionRow[] = [
+  { decision_id: "p1", ts: "2026-02-20T08:00:00Z", kind: "proposal", status: "proposed", issue_id: "i1", action_type: "place_order", sku: "DONUT-GLZ", supplier: "SUP1", qty: 48, deadline: "2026-02-21" },
+  { decision_id: "p1", ts: "2026-02-20T09:00:00Z", kind: "decision", status: "approved", issue_id: "i1", action_type: "place_order", sku: "DONUT-GLZ", reason: "Va la promo" },
+  { decision_id: "p1", ts: "2026-02-20T09:00:01Z", kind: "execution", status: "executed", issue_id: "i1", action_type: "place_order", sku: "DONUT-GLZ" },
+  { decision_id: "p1", ts: "2026-02-28T00:00:00Z", kind: "outcome", status: "measured", as_of: "2026-02-27", issue_id: "i1", action_type: "place_order", sku: "DONUT-GLZ",
+    outcome: { observed: { net_usd: 55 }, simulated: { net_usd_mid: 80, net_usd_low: 20, net_usd_high: 160, label: "backtest" }, label: "backtest",
+      score: { within_expected_range: true, error_vs_mid_usd: -25, diagnosis: "within_range" } } },
+  { decision_id: "p2", ts: "2026-02-25T08:00:00Z", kind: "proposal", status: "proposed", issue_id: "i2", action_type: "skip_order", sku: "MUFFIN" },
+  { decision_id: "p2", ts: "2026-02-25T08:30:00Z", kind: "skip_order", status: "approved", issue_id: "i2", action_type: "skip_order", sku: "MUFFIN" },
+  { decision_id: "p3", ts: "2026-02-26T08:00:00Z", kind: "proposal", status: "proposed", issue_id: "i3", action_type: "run_promo" },
+  { decision_id: "p3", ts: "2026-02-26T08:10:00Z", kind: "decision", status: "rejected", issue_id: "i3", action_type: "run_promo", reason: "Sin presupuesto" },
+  { decision_id: "p4", ts: "2026-03-05T08:00:00Z", kind: "outcome", status: "measured", as_of: "2026-03-04", issue_id: "i4", action_type: "place_order",
+    outcome: { observed: { net_usd: 999 }, simulated: { net_usd_mid: 10 }, label: "backtest" } },
+];
+
+import type { ForecastAccuracy } from "../types";
+const m = (wape: number, n_days: number, n_censored: number) => ({ wape, bias: -0.1, coverage_p10_p90: 0.78, wape_baseline: wape, n_days, n_censored });
+export const accuracyA: ForecastAccuracy = {
+  store_id: "S030", by: "shelf_life", as_of: "2026-03-01", window: { from: "2026-02-01", to: "2026-03-01" }, unit: "units", model: "baseline-weekday-8w",
+  groups: { "1": m(0.4243, 176, 18), "2-3": m(0.4889, 571, 121), "4-14": m(1.1736, 27, 1), non_perishable: m(0.6855, 179, 14) },
+  overall: m(0.4959, 953, 154),
+};
+
+import type { DeliveriesResponse, ExpiringResponse, InventoryResponse, PromosResponse, StaffingResponse } from "../types";
+export const inventoryA: InventoryResponse = {
+  coverage: { skus_with_inventory: 89, skus_selling: 127 },
+  items: [
+    { sku: "SKU-1", product_name: "Dona glaseada", department: "Bakery", on_hand: 12, avg_daily_demand: 6, days_of_cover: 2, turnover_28d: 14.2,
+      weeks_of_supply: 0.3, inventory_value_usd: 18, last_sale_date: "2026-03-01", slow_mover: false, projected_stockout_date: "2026-03-03" },
+    { sku: "SKU-2", product_name: "Muffin de nuez", department: "Bakery", on_hand: 40, avg_daily_demand: 0.5, days_of_cover: 80, turnover_28d: 0.4,
+      weeks_of_supply: 11.4, inventory_value_usd: 60, last_sale_date: "2026-02-10", slow_mover: true, projected_stockout_date: null },
+  ],
+};
+export const expiringA: ExpiringResponse = {
+  items: [{ sku: "SKU-1", product_name: "Dona glaseada", expiring_units: 8, expiry_date: "2026-03-03", shelf_life_days: 2,
+    waste_usd: { low: 4, mid: 10, high: 16 }, lot_age_inferred: true }],
+  by_day: [{ date: "2026-03-03", waste_usd: 10 }],
+  total_waste_usd: { low: 4, mid: 10, high: 16 },
+};
+export const deliveriesA: DeliveriesResponse = {
+  days: [
+    { date: "2026-03-02", deliveries: [{ supplier_id: "SUP1", supplier_name: "Panificadora Norte", po_id: "PO-7", kind: "open_po",
+      lines: [{ sku: "SKU-1", product_name: "Dona glaseada", qty: 48 }], value_usd: 120, status: "late" }] },
+    { date: "2026-03-03", deliveries: [] },
+  ],
+};
+export const promosA: PromosResponse = {
+  items: [
+    { promo_id: "pr1", name: "2x1 donas", department: "Bakery", discount_pct: 50, start_date: "2026-02-20", end_date: "2026-02-27", status: "past",
+      audit_verdict: "engañosa", evaluation: { uplift_pct: 12.5 } },
+    { promo_id: "pr2", name: "Café combo", department: "Beverage", discount_pct: 20, start_date: "2026-03-05", end_date: "2026-03-10", status: "upcoming",
+      audit_verdict: null, evaluation: { uplift_pct: 99 } },
+  ],
+};
+export const staffingA: StaffingResponse = {
+  benchmark: { format: "Shop-in-Shop", tx_per_staff_hour_p50: 3.1 },
+  days: [
+    { date: "2026-03-02", forecast_transactions: 93, recommended_staff_hours: 30, planned_staff_hours: 36, gap_hours: 6, basis: "daily" },
+    { date: "2026-03-03", forecast_transactions: 80, recommended_staff_hours: 26, planned_staff_hours: null, gap_hours: null, basis: "daily" },
+  ],
+  note: "Estimación diaria con el benchmark del formato.",
 };

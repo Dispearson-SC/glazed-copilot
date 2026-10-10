@@ -7,11 +7,15 @@ import ContextChips from "../dashboard/ContextChips";
 import Hero from "../dashboard/Hero";
 import MetricCards from "../dashboard/MetricCards";
 import TopProducts from "../dashboard/TopProducts";
+import ForecastAccuracy from "../dashboard/ForecastAccuracy";
+import ForecastChart from "../dashboard/ForecastChart";
+import UpcomingCard from "../dashboard/UpcomingCard";
 import TrendChart from "../dashboard/TrendChart";
-import { lastSevenDays } from "../dashboard/format";
+import { lastSevenDays, shiftDate } from "../dashboard/format";
 import { rangeText, usd, wasteMid } from "../issues";
 import { useSession } from "../SessionContext";
 import { useCurrentCase } from "../useCurrentCase";
+import { useOptionalPolling } from "../useOptionalPolling";
 import { usePolling } from "../usePolling";
 
 const CLOSED = ["resuelta", "descartada", "cerrada"];
@@ -43,6 +47,20 @@ export default function HomePage() {
     [caseId, day, session.refreshKey],
   );
   const briefing = usePolling(() => (caseId ? api.getBriefing(caseId) : Promise.resolve(null)), 60_000, true, [caseId, session.refreshKey]);
+  const plan = usePolling(() => (caseId ? api.getOrderPlan(caseId) : Promise.resolve(null)), 60_000, true, [caseId, session.refreshKey]);
+  const simToday = currentCase?.sim_today;
+  const forecast = useOptionalPolling(
+    () => (caseId && simToday ? api.getForecast(caseId, { from: shiftDate(simToday, -7), to: shiftDate(simToday, 7), level: "store" }) : Promise.resolve(null)),
+    60_000,
+    false,
+    [caseId, simToday, session.refreshKey],
+  );
+  const accuracy = useOptionalPolling(
+    () => (caseId && forecast.data ? api.getForecastAccuracy(caseId, "shelf_life") : Promise.resolve(null)),
+    300_000,
+    false,
+    [caseId, simToday, session.refreshKey, Boolean(forecast.data)],
+  );
   const error = storesError ?? caseError ?? kpis.error ?? alerts.error;
   const summaryError = summary.error;
   const open = (alerts.data ?? []).filter((a) => !CLOSED.includes(a.state));
@@ -59,11 +77,19 @@ export default function HomePage() {
           <Hero summary={summary.data} />
           <ContextChips context={summary.data.context} />
           <MetricCards summary={summary.data} />
-          <TrendChart days={trend.data} selected={summary.data.date} error={trend.error} />
+          {forecast.data ? (
+            <>
+              <ForecastChart forecast={forecast.data} />
+              {accuracy.data && <ForecastAccuracy accuracy={accuracy.data} />}
+            </>
+          ) : (
+            <TrendChart days={trend.data} selected={summary.data.date} error={trend.error} />
+          )}
           <TopProducts summary={summary.data} />
         </div>
       )}
       {currentCase && <BriefingCard briefing={briefing.data} error={briefing.error} />}
+      {currentCase && <UpcomingCard briefing={briefing.data} plan={plan.data} error={plan.error} />}
       {!error && !loading && !currentCase && <p className="muted">Sin caso activo para esta sucursal</p>}
       {kpis.data && (
         <>
@@ -90,7 +116,8 @@ export default function HomePage() {
         <span className="light green" data-testid="sem-green">{count("green")}</span> baja
       </div>
       <p>
-        <Link to={`/stores/${storeId}/purchases`}>Ver compras</Link> · <Link to="/alerts">Ver alertas</Link>
+        <Link to={`/stores/${storeId}/purchases`}>Ver compras</Link> · <Link to="/alerts">Ver alertas</Link> ·{" "}
+        <Link to={`/stores/${storeId}/inventory`}>Ver inventario</Link> · <Link to={`/stores/${storeId}/week`}>Ver semana</Link>
       </p>
       {currentCase && (
         <FloatingChat

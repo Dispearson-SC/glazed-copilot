@@ -28,6 +28,26 @@ describe("App", () => {
     expect(await screen.findByRole("link", { name: "Compras" })).toHaveAttribute("href", "/purchases");
   });
 
+  it("links Decisiones in the navigation and redirects to the store timeline", async () => {
+    open();
+    expect(await screen.findByRole("link", { name: "Decisiones" })).toHaveAttribute("href", "/decisions");
+  });
+
+  it("redirects /decisions to the store decisions screen", async () => {
+    open("/decisions");
+    expect(await screen.findByRole("heading", { name: "Decisiones" })).toBeInTheDocument();
+  });
+
+  it("routes /inventory and /week to their store screens", async () => {
+    open("/inventory");
+    expect(await screen.findByRole("heading", { name: "Inventario" })).toBeInTheDocument();
+  });
+
+  it("routes /week to the week screen", async () => {
+    open("/week");
+    expect(await screen.findByRole("heading", { name: "Semana" })).toBeInTheDocument();
+  });
+
   it("renders Home at / with the simulation control in the header", async () => {
     open();
     expect(await screen.findByTestId("loss-waste")).toBeInTheDocument();

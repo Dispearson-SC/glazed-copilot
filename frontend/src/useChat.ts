@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApi } from "./ApiContext";
 import { ApiError } from "./api";
-import { buildHistory, type ChatMessage } from "./chatHistory";
+import { buildHistory, buildTurnHistory, type ChatMessage } from "./chatHistory";
+import { parseTraceMessage } from "./parseTraceMessage";
 import { sanitizeReply } from "./sanitize";
-import type { Proposal } from "./types";
+import type { Proposal, TurnRecord } from "./types";
 
 export type ChatStatus = "idle" | "working" | "waiting_approval";
 
@@ -14,12 +15,44 @@ export interface UseChatOptions {
   pollMs?: number;
   /** How long a 404 on a fresh turn is treated as "still queued". */
   notFoundGraceMs?: number;
+  /** How long consecutive transient errors (network, 5xx) are tolerated before giving up. */
+  errorWindowMs?: number;
 }
+
+const MAX_POLL_ERRORS = 5;
+const MAX_BACKOFF_MS = 10_000;
+const UNCONFIRMED_TEXT = "No pude confirmar el estado; vuelve a cargar";
+
+const isTransient = (e: unknown) => e instanceof ApiError && (e.status === 0 || e.status >= 500);
+
+/** Counts consecutive transient poll errors: hit() returns the backoff delay, or null once the budget is spent. */
+const errorBudget = (pollMs: number, windowMs: number) => {
+  let count = 0;
+  let firstAt = 0;
+  return {
+    reset: () => {
+      count = 0;
+      firstAt = 0;
+    },
+    hit: (): number | null => {
+      const now = Date.now();
+      if (count === 0) firstAt = now;
+      count++;
+      if (count >= MAX_POLL_ERRORS || now - firstAt >= windowMs) return null;
+      return Math.min(pollMs * 2 ** (count - 1), MAX_BACKOFF_MS);
+    },
+  };
+};
+
+/** A finished turn is never pending, whatever its reply: only the backend status says it is still running. */
+const isPendingTurn = (t: TurnRecord) => t.status === "pending";
+
+const NO_TEXT_REPLY = "El copiloto terminó sin respuesta de texto. Revisa el razonamiento.";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function useChat(caseId: string, opts: UseChatOptions = {}) {
-  const { storeId = "", enabled = true, pollMs = 2500, notFoundGraceMs = 30_000 } = opts;
+  const { storeId = "", enabled = true, pollMs = 2500, notFoundGraceMs = 30_000, errorWindowMs = 30_000 } = opts;
   const api = useApi();
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [local, setLocal] = useState<ChatMessage[]>([]);
@@ -50,13 +83,74 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
     setProposals([]);
     if (!enabled || !caseId) return;
     let alive = true;
-    api.getTrace(storeId, caseId).then((ev) => alive && setHistory(buildHistory(ev))).catch(() => {});
+    const patch = (id: string, next: ChatMessage) => setHistory((h) => h.map((m) => (m.id === id ? next : m)));
+    // A pending stored turn has no live poller after a reload: resume it like a fresh one.
+    const resumeTurn = async (turn: TurnRecord) => {
+      const startedAt = Date.now();
+      const id = `s-${turn.turn_id}-a`;
+      const userText = parseTraceMessage(turn.user_text ?? "").text;
+      const fail = (msg: string) => {
+        setStillRunning(false);
+        patch(id, { id: `s-${turn.turn_id}-e`, role: "error", text: msg, retryText: userText });
+      };
+      // Exhausted retries: the turn may still be running, so no resend is offered.
+      const unconfirmed = () => {
+        setStillRunning(false);
+        patch(id, { id: `s-${turn.turn_id}-e`, role: "error", text: UNCONFIRMED_TEXT });
+      };
+      const budget = errorBudget(pollMs, errorWindowMs);
+      while (alive) {
+        let delay = pollMs;
+        try {
+          const t = await api.getTurn(caseId, turn.turn_id);
+          if (!alive) return;
+          budget.reset();
+          if (t.status === "pending") {
+            setStillRunning(Boolean(t.still_running));
+          } else {
+            setStillRunning(false);
+            if (t.status === "failed") return fail(t.error || "El copiloto no pudo responder.");
+            const raw = t.reply?.trim();
+            if (raw && raw !== "None") {
+              const reply = parseTraceMessage(raw);
+              patch(id, { id, role: "assistant", text: reply.text, turnId: turn.turn_id, meta: t.reply_meta, ...(reply.truncated ? { truncated: true } : {}) });
+            } else {
+              patch(id, { id, role: "assistant", text: NO_TEXT_REPLY, turnId: turn.turn_id, meta: t.reply_meta });
+            }
+            await refreshProposals();
+            return;
+          }
+        } catch (e) {
+          const queued = e instanceof ApiError && e.status === 404 && Date.now() - startedAt < notFoundGraceMs;
+          if (!alive) return;
+          if (!queued) {
+            if (!isTransient(e)) return fail((e as Error).message);
+            const backoff = budget.hit();
+            if (backoff === null) return unconfirmed();
+            delay = backoff;
+          }
+        }
+        await sleep(delay);
+      }
+    };
+    // Stored turns carry the full replies; the trace parser is the fallback while the route is missing or empty.
+    api
+      .listTurns(caseId)
+      .then((turns) => {
+        if (turns.length === 0) throw new Error("no stored turns");
+        if (!alive) return;
+        setHistory(buildTurnHistory(turns));
+        turns.filter(isPendingTurn).forEach((t) => void resumeTurn(t));
+      })
+      .catch(() =>
+        api.getTrace(storeId, caseId).then((ev) => alive && setHistory(buildHistory(ev))).catch(() => {}),
+      );
     void refreshProposals();
     return () => {
       alive = false;
       run.current++;
     };
-  }, [api, caseId, storeId, enabled, refreshProposals]);
+  }, [api, caseId, storeId, enabled, refreshProposals, pollMs, notFoundGraceMs, errorWindowMs]);
 
   const addLocal = (m: Omit<ChatMessage, "id">) => setLocal((l) => [...l, { ...m, id: `l-${++seq.current}` }]);
 
@@ -68,10 +162,19 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
         setStatus("idle");
         setStillRunning(false);
       };
+      // Exhausted retries: the turn may still be running, so no resend is offered.
+      const unconfirmed = () => {
+        addLocal({ role: "error", text: UNCONFIRMED_TEXT });
+        setStatus("idle");
+        setStillRunning(false);
+      };
+      const budget = errorBudget(pollMs, errorWindowMs);
       while (run.current === token) {
+        let delay = pollMs;
         try {
           const t = await api.getTurn(caseId, turnId);
           if (run.current !== token) return;
+          budget.reset();
           if (t.status === "pending") {
             setStillRunning(Boolean(t.still_running));
           } else {
@@ -84,12 +187,18 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
           }
         } catch (e) {
           const queued = e instanceof ApiError && e.status === 404 && Date.now() - startedAt < notFoundGraceMs;
-          if (!queued) return run.current === token ? fail((e as Error).message) : undefined;
+          if (run.current !== token) return;
+          if (!queued) {
+            if (!isTransient(e)) return fail((e as Error).message);
+            const backoff = budget.hit();
+            if (backoff === null) return unconfirmed();
+            delay = backoff;
+          }
         }
-        await sleep(pollMs);
+        await sleep(delay);
       }
     },
-    [api, caseId, pollMs, notFoundGraceMs, refreshProposals],
+    [api, caseId, pollMs, notFoundGraceMs, errorWindowMs, refreshProposals],
   );
 
   const submit = useCallback(
@@ -115,7 +224,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
   );
 
   const send = useCallback((text: string) => submit(text, false), [submit]);
-  const retry = useCallback(() => submit(lastText.current, true), [submit]);
+  const retry = useCallback((text?: string) => submit(text ?? lastText.current, true), [submit]);
 
   const decide = useCallback(
     async (proposalId: string, approved: boolean, reason?: string) => {

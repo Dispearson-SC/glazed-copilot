@@ -1,4 +1,4 @@
-import type { AdvanceResult, Alert, Briefing, Case, CaseMode, ComplianceRecord, DaySummary, Execution, InjectBody, Kpis, OrderPlan, Proposal, Store, TraceEvent, Turn } from "./types";
+import type { AccuracyBy, DeliveriesResponse, ExpiringResponse, InventoryResponse, InventorySort, PromosResponse, StaffingResponse, AdvanceResult, ForecastAccuracy, Alert, Briefing, Case, CaseMode, ComplianceRecord, DaySummary, DecisionRow, Execution, ForecastResponse, InjectBody, Kpis, OrderPlan, Proposal, Store, TraceEvent, Turn, TurnRecord } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -18,6 +18,9 @@ function qs(query?: Query): string {
   const s = p.toString();
   return s ? `?${s}` : "";
 }
+
+/** The route is not deployed yet (404) or not implemented (501). */
+export const isUnavailable = (e: unknown): boolean => e instanceof ApiError && (e.status === 404 || e.status === 501);
 
 export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fetch(...a)) {
   const base = baseUrl.replace(/\/$/, "");
@@ -57,6 +60,8 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
       request<Case>(`/cases/${caseId}/fork`, send("POST", b)),
     sendMessage: (caseId: string, text: string) =>
       request<{ turn_id: string }>(`/cases/${caseId}/messages`, send("POST", { text })),
+    /** Wave 11 route; may answer 404/501 until deployed. */
+    listTurns: (caseId: string) => request<TurnRecord[]>(`/cases/${caseId}/turns`),
     getTurn: (caseId: string, turnId: string) => request<Turn>(`/cases/${caseId}/turns/${turnId}`),
     listAlerts: (query: { store_id?: string; state?: string }) => request<Alert[]>("/alerts", {}, query),
     setAlertState: (alertId: string, state: string) =>
@@ -72,6 +77,20 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
     getDaySummary: (caseId: string, date?: string) =>
       request<DaySummary>(`/cases/${caseId}/day-summary`, {}, { date }),
     getBriefing: (caseId: string) => request<Briefing>(`/cases/${caseId}/briefing`),
+    /** Wave 11 route; may answer 404/501 until deployed. */
+    getForecast: (caseId: string, q: { sku?: string; from?: string; to?: string; level?: "sku" | "store" } = {}) =>
+      request<ForecastResponse>(`/cases/${caseId}/forecast`, {}, q),
+    getForecastAccuracy: (caseId: string, by: AccuracyBy) =>
+      request<ForecastAccuracy>(`/cases/${caseId}/forecast/accuracy`, {}, { by }),
+    // Wave 12 routes; may answer 404/501 until deployed.
+    getInventory: (caseId: string, q: { sort?: InventorySort; limit?: string } = {}) =>
+      request<InventoryResponse>(`/cases/${caseId}/inventory`, {}, q),
+    getExpiring: (caseId: string, q: { days?: string } = {}) => request<ExpiringResponse>(`/cases/${caseId}/expiring`, {}, q),
+    getDeliveries: (caseId: string, q: { days?: string } = {}) => request<DeliveriesResponse>(`/cases/${caseId}/deliveries`, {}, q),
+    getPromos: (caseId: string, q: { status?: string; days?: string } = {}) => request<PromosResponse>(`/cases/${caseId}/promos`, {}, q),
+    getStaffing: (caseId: string, q: { days?: string } = {}) => request<StaffingResponse>(`/cases/${caseId}/staffing`, {}, q),
+    getDecisions: (caseId: string, q: { from?: string; to?: string } = {}) =>
+      request<DecisionRow[]>(`/cases/${caseId}/decisions`, {}, q),
     advance: (caseId: string, days = 1) => request<AdvanceResult>(`/cases/${caseId}/advance`, send("POST", { days })),
     // REQUIRED backend routes (not in the public API yet).
     getOrderPlan: (caseId: string) => request<OrderPlan>(`/cases/${caseId}/order-plan`),

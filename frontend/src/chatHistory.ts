@@ -1,6 +1,7 @@
+import { sanitizeReply } from "./sanitize";
 import { parseTraceMessage } from "./parseTraceMessage";
 import { sortByTs } from "./trace";
-import type { ReplyMeta, TraceEvent } from "./types";
+import type { ReplyMeta, TraceEvent, TurnRecord } from "./types";
 
 export interface ChatMessage {
   id: string;
@@ -61,5 +62,29 @@ export function buildHistory(events: TraceEvent[]): ChatMessage[] {
       ...(steps.length ? { steps } : {}),
     });
   });
+  return out;
+}
+
+export const WORKING_TEXT = "El copiloto sigue trabajando…";
+
+/** Rebuilds the conversation from the stored turns (full replies, ordered by ts). Back-filled rows may carry serialized envelopes. */
+export function buildTurnHistory(turns: TurnRecord[]): ChatMessage[] {
+  const out: ChatMessage[] = [];
+  for (const t of [...turns].sort((a, b) => a.ts.localeCompare(b.ts))) {
+    const user = parseTraceMessage(t.user_text ?? "");
+    out.push({ id: `s-${t.turn_id}-u`, role: "user", text: user.text, ...(user.truncated ? { truncated: true } : {}) });
+    if (t.status === "failed") {
+      out.push({ id: `s-${t.turn_id}-e`, role: "error", text: t.error || "El copiloto no pudo responder.", retryText: user.text });
+      continue;
+    }
+    const raw = t.reply?.trim();
+    const hasReply = t.status !== "pending" && !!raw && raw !== "None";
+    if (!hasReply) {
+      if (t.status === "pending") out.push({ id: `s-${t.turn_id}-a`, role: "assistant", text: WORKING_TEXT, turnId: t.turn_id });
+      continue;
+    }
+    const reply = parseTraceMessage(raw!);
+    out.push({ id: `s-${t.turn_id}-a`, role: "assistant", text: reply.text, turnId: t.turn_id, meta: t.reply_meta, ...(reply.truncated ? { truncated: true } : {}) });
+  }
   return out;
 }
