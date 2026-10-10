@@ -72,7 +72,7 @@ def detect_issues(snap: StoreSnapshot, store_id: str, as_of: date, ref: date, cf
                   _ev("stockout_risk_without_order", line["stockout_risk_without_order"], "probability", "until next delivery",
                       "glazed_metrics"),
                   _ev("projected_stockout_date", line["projected_stockout_date"], "date", "14-day horizon", "glazed_metrics"),
-                  _ev("lead_time_p90", state.supplier.lead_p90, "days", "last 180 days", "purchase_orders")]
+                  _ev("lead_time_p90", round(state.supplier.lead_p90, 2), "days", "last 180 days", "purchase_orders")]
             out.append(_issue(store_id, "stockout_risk", sku, as_of, ref, dn["cost_usd"], ev, base_cav + line["data_caveats"],
                               opts, rec, sku=sku, product_name=p.name, supplier_id=p.supplier_id))
         over = overstock_candidate(state, cfg)
