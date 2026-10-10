@@ -45,6 +45,13 @@ class DecisionBody(BaseModel):
     reason: str = ""
 
 
+class CaseDecisionBody(BaseModel):
+    issue_id: str
+    option_id: str
+    approved: bool
+    reason: str = ""
+
+
 class BacktestBody(BaseModel):
     date_from: date
     date_to: date
@@ -253,6 +260,16 @@ def build_public_router(c: Any) -> APIRouter:
     @r.get("/cases/{case_id}/decisions/pending")
     def decisions_pending(case_id: str):
         return uc_copilot.PendingDecisions(c.metrics, c.proposals, c.served, names).execute(case_of(case_id))
+
+    @r.post("/cases/{case_id}/decisions", status_code=201)
+    def post_decision(case_id: str, b: CaseDecisionBody, response: Response,
+                      idempotency_key: Annotated[str | None, Header()] = None):
+        out, created = uc_copilot.RecordDecision(c.cases, c.proposals, c.executions, c.alerts, c.metrics, c.served,
+                                                 c.memory, c.classifier, getattr(c, "rejections", None), c.clock).execute(
+            case_id, b.issue_id, b.option_id, b.approved, b.reason, idempotency_key)
+        if not created:
+            response.status_code = 200
+        return jsonable_encoder(out)
 
     @r.get("/cases/{case_id}/forecast")
     def forecast(case_id: str, sku: str | None = None, date_from: Annotated[date | None, Query(alias="from")] = None,

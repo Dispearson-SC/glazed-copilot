@@ -115,3 +115,53 @@ class PendingDecisions:
         return {"as_of": case.sim_today.isoformat(), "store_id": case.store_id,
                 "store_display_name": self.names.of(case.store_id), "source": self.SOURCE,
                 "approvals": approvals, "technical": technical}
+
+
+class RecordDecision:
+    """Proposal + decision in one call. The proposal comes from the option (action, params and tier are copied from
+    code); a pending proposal an agent already made for the same option is reused. An Idempotency-Key replays the
+    original outcome and never decides twice."""
+
+    def __init__(self, cases: Any, proposals: Any, executions: Any, alerts: Any, metrics: Any, served: dict,
+                 memory: Any = None, classifier: Any = None, rejections: Any = None, clock: Any = None) -> None:
+        self.cases, self.proposals, self.executions, self.alerts = cases, proposals, executions, alerts
+        self.metrics, self.served, self.memory, self.classifier = metrics, served, memory, classifier
+        self.rejections, self.clock = rejections, clock
+
+    @staticmethod
+    def _out(p: Any, replay: bool) -> dict[str, Any]:
+        out = {"decision_id": p.proposal_id, "proposal_id": p.proposal_id, "status": p.status}
+        if p.reason_category:
+            out["reason_category"] = p.reason_category
+        if replay:
+            out["idempotent_replay"] = True
+        return out
+
+    def execute(self, case_id: str, issue_id: str, option_id: str, approved: bool, reason: str = "",
+                idempotency_key: str | None = None) -> tuple[dict[str, Any], bool]:
+        from . import DecideProposal, ProposeOption, _case
+        from ..domain import InvalidTransition
+        case = _case(self.cases, case_id)
+        if idempotency_key:
+            prior = self.proposals.find_by_idempotency_key(case.case_id, idempotency_key)
+            if prior is not None and prior.status != "pending":
+                return self._out(prior, True), False
+        issue = require_issue(self.alerts, self.metrics, self.served, case, issue_id)
+        if not any(o.get("option_id") == option_id for o in issue["options"]):
+            raise DomainError(f"unknown option {option_id!r} for issue {issue_id!r}")
+        if not approved and not reason.strip():
+            raise DomainError("a reason is required to reject a proposal")
+        mine = [p for p in self.proposals.list(case_id=case.case_id)
+                if p.issue_id == issue_id and (p.params or {}).get("option_id") == option_id]
+        if any(p.status != "pending" for p in mine):
+            raise InvalidTransition(f"option {option_id!r} of issue {issue_id!r} was already decided in this case")
+        proposal = next((p for p in mine if p.status == "pending"), None)
+        if proposal is None:
+            proposal, _ = ProposeOption(self.cases, self.proposals, self.alerts, self.metrics, self.served).execute_keyed(
+                case.case_id, issue_id, option_id, "Decided by the manager", idempotency_key=idempotency_key)
+        DecideProposal(self.cases, self.proposals, self.executions, self.alerts, self.memory, self.classifier).execute(
+            proposal.proposal_id, approved, reason)
+        decided = self.proposals.get(proposal.proposal_id)
+        if not approved and self.rejections is not None:
+            self.rejections.remember_rejection(case, decided, issue)
+        return self._out(decided, False), True
