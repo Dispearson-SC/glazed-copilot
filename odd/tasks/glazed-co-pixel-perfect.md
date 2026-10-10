@@ -41,10 +41,11 @@ Strict. Runner: `cd frontend && npm test -- --run`; plus `npm run build`.
 ## Tasks
 - [x] T1 Remove legacy screens, components, routes, CSS and their tests; app still builds, remaining tests green. Route: delegated writer. Evidence: RED 28 failed (legacy.test, App.test, theme.test); GREEN 157 tests / 16 files; `npm run build` ok.
 - [x] T2 Dashboard pixel perfect with real data (all components above). Route: delegated writer. Evidence: RED (DashboardPage suite import failure + font parity test); GREEN 164 tests / 15 files; build ok. Forecast model caption added per coordinator note.
-- [ ] T3 Login pixel perfect as store/case picker. Route: delegated writer.
+- [x] T3 Login pixel perfect as store/case picker. Route: delegated writer. Evidence: RED 1 failed (design-parity test); GREEN 165 tests; build ok.
 - [ ] T4 Chat page + FloatingChat pixel perfect over the existing chat logic. Route: delegated writer.
 - [ ] T5 Visual check vs `screen.png` at 422px width with a headless screenshot; README update. Route: delegated writer.
 
 ## Progress
 - 2026-10-10: worktree created from feat/foundation 924750f.
 - T1 commit c2039a0.
+- T2 commit c3be50f.

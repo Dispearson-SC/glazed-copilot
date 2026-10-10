@@ -66,4 +66,17 @@ describe("LoginPage (store and case picker)", () => {
     open(fakeApi({ listStores: async () => { throw new Error("sin red"); } }));
     expect(await screen.findByRole("alert")).toHaveTextContent("sin red");
   });
+
+  it("follows the design: icon hero, pill fields with icons, back link and proxy note", async () => {
+    open();
+    await screen.findByRole("option", { name: "Caso uno" });
+    expect(screen.getByRole("heading", { name: "Elige tu sucursal" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Volver al resumen/ })).toHaveAttribute("href", "/");
+    for (const label of ["Sucursal", "Caso"]) {
+      const pill = screen.getByLabelText(label).parentElement!;
+      expect(pill.className).toContain("rounded-full");
+      expect(pill.querySelector(".material-symbols-outlined")).not.toBeNull();
+    }
+    expect(screen.getByText(/proxy/i)).toBeInTheDocument();
+  });
 });
