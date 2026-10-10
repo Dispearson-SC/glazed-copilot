@@ -39,7 +39,7 @@ Mode: strict (project mode, source: Core / project config). Runner: `cd frontend
 - [x] T2 Shell: TopBar + BottomNav layout, LoginPage as store/case picker (`/login`), existing routes preserved. Route: delegated writer. Evidence: RED (LoginPage missing, 2 shell tests failed), GREEN 115 tests, build ok. SimControl kept in a strip under the top bar; SessionContext gained caseId; pickCase prefers the chosen case.
 - [x] T3 Dashboard (HomePage) with real data: hero, metric cards, 7-day trend, top products, briefing headline + lost-sales range, empty/error states. Route: delegated writer. Evidence: RED (10 new tests failed), GREEN 125 tests, build ok, dev server on :8100 proxy served / and /api. Applied coordinator contract: Sin datos keyed on totals===null, HTTP errors = error state, avg ticket guard, no staff_hours, weather labelled 'Clima observado'. Legacy KPI cards/semaphore kept (existing tests) below the dashboard.
 - [x] T4 Restyle Alerts, Cases, Purchases, Trace with theme tokens (no behavior change). Route: delegated writer. Evidence: RED (theme test on legacy palette failed), GREEN 126 tests, build ok. Done by keeping class names and moving legacy.css into a Tailwind @apply components layer in index.css; no page markup or assertions changed. Not visually inspected in a browser.
-- [ ] T5 Docs: frontend README (env, ports, pages, data mapping). Route: delegated writer.
+- [x] T5 Docs: frontend README (env, ports, pages, data mapping). Route: delegated writer. Evidence: docs only, structural readback; final run 126 tests, build ok.
 
 ## Acceptance
 - `npm test -- --run` and `npm run build` green; new tests cover dashboard mapping, missing-day state, range rendering, login picker.
@@ -53,3 +53,4 @@ Strategy: ask-on-risk. Forecast ~1,500 authored lines (UI port) → exceeds the 
 - T1 commit 807ec47
 - T2 commit dbfc06a
 - T3 commit acdc876
+- T4 commit e6f134c
