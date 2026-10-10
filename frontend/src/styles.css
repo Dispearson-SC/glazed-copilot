@@ -25,3 +25,23 @@ pre { background: #f3f3f3; padding: 8px; overflow: auto; font-size: 12px; }
 .lane.orchestrator { border: 2px solid #c2185b; background: #fce4ec; }
 .lane-item { border-top: 1px solid #eee; padding: 4px 0; font-size: 12px; }
 .reply { white-space: pre-wrap; background: #e8f5e9; padding: 8px; border-radius: 4px; }
+header nav { flex: 1; }
+.sim { font-size: 13px; }
+.sim button { margin-left: 6px; }
+.losses { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.loss { min-width: 200px; }
+.big { font-size: 28px; font-weight: 600; }
+.light { display: inline-block; min-width: 28px; text-align: center; border-radius: 14px; padding: 2px 8px; color: #fff; margin: 0 4px 0 12px; }
+.light.red { background: #c62828; } .light.yellow { background: #f9a825; } .light.green { background: #2e7d32; }
+.option.best { border: 2px solid #2e7d32; background: #f1f8e9; }
+.badge-best { background: #2e7d32; color: #fff; }
+.badge-warn { background: #fff3e0; color: #e65100; }
+.badge-soft { background: #fffde7; color: #795548; }
+.tier-n0 { background: #ffcdd2; } .tier-n1 { background: #c8e6c9; } .tier-n2 { background: #bbdefb; } .tier-n3 { background: #e1bee7; }
+.bar { background: #e0e0e0; height: 8px; border-radius: 4px; width: 160px; }
+.bar-fill { background: #1976d2; height: 100%; border-radius: 4px; }
+.caveats { background: #fff8e1; padding: 4px 12px; border-radius: 4px; }
+.deadline-today, .deadline-overdue { background: #ffebee; color: #b71c1c; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
+.deadline-tomorrow { background: #fff3e0; color: #e65100; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
+.minibar { display: flex; width: 140px; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+.seg-waste { background: #fb8c00; } .seg-lost { background: #c62828; }

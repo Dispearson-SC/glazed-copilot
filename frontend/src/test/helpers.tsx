@@ -3,6 +3,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { vi } from "vitest";
 import { ApiProvider } from "../ApiContext";
 import type { Api } from "../api";
+import { SessionProvider } from "../SessionContext";
+import { issueA, kpisA, planA } from "./fixtures";
 import type { Alert, Case, Proposal, Store, TraceEvent } from "../types";
 
 export const store: Store = { store_id: "S030", name: "Glazed Centro", format: "mall", site_id: "X", region: "N",
@@ -45,6 +47,11 @@ export function fakeApi(over: Partial<Record<keyof Api, unknown>> = {}): Api {
     listProposals: vi.fn(async () => [proposalA]),
     decide: vi.fn(async () => ({})),
     getTrace: vi.fn(async () => []),
+    getCase: vi.fn(async () => caseA),
+    advance: vi.fn(async () => ({ sim_today: "2026-03-02", new_alerts: [] })),
+    getOrderPlan: vi.fn(async () => planA),
+    getKpis: vi.fn(async () => kpisA),
+    proposeOption: vi.fn(async () => ({ ...proposalA, proposal_id: "p9", issue_id: issueA.issue_id })),
   };
   return { ...base, ...over } as unknown as Api;
 }
@@ -52,11 +59,13 @@ export function fakeApi(over: Partial<Record<keyof Api, unknown>> = {}): Api {
 export function renderPage(api: Api, path: string, routePattern: string, element: React.ReactElement) {
   return render(
     <ApiProvider api={api}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path={routePattern} element={element} />
-        </Routes>
-      </MemoryRouter>
+      <SessionProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path={routePattern} element={element} />
+          </Routes>
+        </MemoryRouter>
+      </SessionProvider>
     </ApiProvider>,
   );
 }

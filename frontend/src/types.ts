@@ -33,7 +33,7 @@ export interface Alert {
   case_id: string;
   severity_usd: number;
   state: string;
-  issue: Record<string, unknown>;
+  issue: Partial<Issue> & Record<string, unknown>;
   issue_key: string;
   as_of: string;
   created_at: string;
@@ -84,4 +84,91 @@ export interface TraceEvent {
   to_agent: string;
   kind: TraceKind;
   payload: Record<string, unknown>;
+}
+
+// ---- Wave 5: deterministic issues and options ----
+export interface Range3 {
+  low: number;
+  mid: number;
+  high: number;
+}
+
+export type Tier = "N0" | "N1" | "N2" | "N3";
+
+export interface Evidence {
+  metric: string;
+  value: number | string;
+  unit: string;
+  period: string;
+  source: string;
+}
+
+export interface Option {
+  option_id: string;
+  action_type: string;
+  params: Record<string, unknown>;
+  expected_benefit_usd: Range3;
+  cost_usd: number;
+  net_usd_mid: number;
+  loss_impact: { waste_usd_delta: number; lost_sales_usd_delta: number };
+  confidence: { score: number; n_backtest: number; method: string };
+  tier: Tier;
+  tier_reasons: string[];
+  urgency: { deadline_date?: string | null; reason: string };
+  risk: string[];
+  if_act: string | null;
+  if_not: string | null;
+}
+
+export interface Issue {
+  issue_id: string;
+  kind: string;
+  sku?: string;
+  supplier_id?: string;
+  store_id: string;
+  store_display_name: string;
+  as_of: string;
+  severity_usd: number;
+  evidence: Evidence[];
+  data_caveats: string[];
+  options: Option[];
+}
+
+export interface OrderLine {
+  sku: string;
+  name?: string;
+  supplier_id: string;
+  supplier_name?: string;
+  qty: number;
+  qty_low?: number;
+  qty_high?: number;
+  case_size?: number;
+  cases?: number;
+  service_level_target: number;
+  order_deadline: string | null;
+  projected_stockout_date: string | null;
+  stockout_risk_without_order: number;
+  vs_current_practice: { received_to_sold: number; qty_delta: number };
+  min_order_warning: string | null;
+  expected_waste_usd?: number;
+  expected_lost_sales_usd?: number;
+  issue?: Issue;
+}
+
+export interface OrderPlan {
+  case_id: string;
+  store_id: string;
+  as_of: string;
+  lines: OrderLine[];
+}
+
+export interface Kpis {
+  waste_usd: number | Range3;
+  lost_sales_usd: Range3;
+  window?: { from: string; to: string };
+}
+
+export interface AdvanceResult {
+  sim_today: string;
+  new_alerts: Alert[];
 }
