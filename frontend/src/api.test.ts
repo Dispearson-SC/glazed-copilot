@@ -21,7 +21,7 @@ describe("api client", () => {
   it("uses a relative base when the base url is empty", async () => {
     const api = createApi("", fetchFn as unknown as typeof fetch);
     await api.listStores();
-    expect(fetchFn.mock.calls[0][0]).toBe("/api/v1/stores");
+    expect((fetchFn.mock.calls[0] as unknown as [string])[0]).toBe("/api/v1/stores");
   });
 
   it("PATCHes alert state as JSON", async () => {
