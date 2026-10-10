@@ -58,7 +58,7 @@ class _NoCore:
     def _fail(self, *a: Any, **k: Any) -> Any:
         raise CoreError("GLAZED_CORE_URL is not configured")
 
-    create_conversation = send_turn = get_turn = list_transcript = _fail
+    create_conversation = send_turn = get_turn = list_transcript = health = _fail
 
 
 def create_app(c: Container) -> FastAPI:

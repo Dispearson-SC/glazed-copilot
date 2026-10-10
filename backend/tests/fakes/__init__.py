@@ -171,6 +171,9 @@ class FakeCore:
     def list_transcript(self, conversation_id, store_id):
         return list(self.transcript)
 
+    def health(self):
+        return {"ok": True, "latency_ms": 5.0}
+
 
 def make_series(sku: str, price: float, start: date, end: date, units, shelf_life=None, stockout=lambda d: 0.0,
                 closing=lambda d: 5, received=lambda d: 0) -> SkuSeries:

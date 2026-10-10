@@ -112,6 +112,7 @@ def alert_view(alert: Any) -> dict[str, Any]:
 def build_public_router(c: Any) -> APIRouter:
     r = APIRouter(prefix="/api/v1")
     names = StoreNames(c.metrics)
+    agents = uc_copilot.AgentsStatus(lambda: c.core, c.clock)
 
     def checker() -> sentinel.CheckCompliance:
         return sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace)
@@ -122,6 +123,10 @@ def build_public_router(c: Any) -> APIRouter:
     @r.get("/health")
     def health() -> dict[str, Any]:
         return {"status": "ok", "storage": c.storage, "core": c.core_status}
+
+    @r.get("/agents/status")
+    def agents_status():
+        return agents.execute()
 
     @r.get("/stores")
     def stores():

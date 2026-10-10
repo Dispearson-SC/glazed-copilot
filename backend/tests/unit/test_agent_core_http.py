@@ -89,3 +89,22 @@ def test_core_down_raises_core_error():
         raise httpx.ConnectError("down")
     with pytest.raises(CoreError):
         make(boom).send_turn("c", "S", "x")
+
+
+def test_health_probes_the_schema_route_and_reports_latency():
+    seen = {}
+
+    def h(req: httpx.Request):
+        seen["path"] = req.url.path
+        return httpx.Response(200, json={"openapi": "3.1.0"})
+
+    out = make(h).health()
+    assert seen["path"] == "/openapi.json" and out["ok"] is True and out["latency_ms"] >= 0
+
+
+def test_health_raises_core_error_when_unreachable():
+    def h(req: httpx.Request):
+        raise httpx.ConnectError("refused")
+
+    with pytest.raises(CoreError):
+        make(h).health()

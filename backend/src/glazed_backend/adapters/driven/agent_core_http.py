@@ -6,6 +6,7 @@ Routes used: POST /turns (202), GET /turns/{id}, GET /admin/conversations/{sessi
 """
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import httpx
@@ -48,6 +49,16 @@ class AgentCoreHttp:
         if resp.status_code >= 400:
             raise CoreError(f"Agent-Core {resp.status_code} on {method} {url}: {resp.text[:200]}")
         return resp
+
+    PROBE_PATH, PROBE_TIMEOUT_S = "/openapi.json", 2.0  # the Core has no /health or /profiles route: its schema is the cheap probe
+
+    def health(self) -> dict[str, Any]:
+        t0 = time.monotonic()
+        try:
+            resp = self._c.get(self.PROBE_PATH, timeout=self.PROBE_TIMEOUT_S)
+        except httpx.HTTPError as exc:
+            raise CoreError(f"Agent-Core unreachable: {exc}") from exc
+        return {"ok": resp.status_code < 500, "latency_ms": round((time.monotonic() - t0) * 1000, 1)}
 
     def create_conversation(self, case_id: str, store_id: str) -> str:
         return case_id  # the Core creates the session lazily on the first turn

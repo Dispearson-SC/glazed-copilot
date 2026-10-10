@@ -238,3 +238,33 @@ class ListMemories:
         return {"memory_id": memory_id, "category": category, "text": text, "source": source, "cases_count": 1,
                 "verified": verified, "created_at": created_at.isoformat(), "new": self.clock.now() - created_at < self.NEW_FOR,
                 "_key": key, "_case": case_id}
+
+
+class AgentsStatus:
+    """Is the Agent-Core reachable, and so are its agents? The Core has no per-agent health route, so every agent
+    shares the Core's state: up (reachable, answered fast), degraded (slower than SLOW_MS) or down (unreachable).
+    The probe has a short timeout and its answer is cached for about CACHE_S seconds."""
+
+    CACHE_S, SLOW_MS = 15.0, 2000.0
+
+    def __init__(self, core_of: Any, clock: Any) -> None:
+        self.core_of, self.clock = core_of, clock
+        self._at: Any = None
+        self._cached: dict[str, Any] | None = None
+
+    def execute(self) -> dict[str, Any]:
+        from ..domain.models import AGENT_IDS
+        from .reply_sanitizer import role_name_es
+        now = self.clock.now()
+        if self._cached is None or self._at is None or (now - self._at).total_seconds() >= self.CACHE_S:
+            try:
+                got = self.core_of().health()
+                connected = bool(got.get("ok"))
+                state = ("degraded" if float(got.get("latency_ms") or 0) > self.SLOW_MS else "up") if connected else "down"
+            except Exception:  # noqa: BLE001 - unreachable, not configured or broken: all down
+                connected, state = False, "down"
+            self._cached = {"connected": connected, "agents": [
+                {"agent_id": a, "display_name_es": role_name_es(a), "status": state}
+                for a in AGENT_IDS]}
+            self._at = now
+        return self._cached
