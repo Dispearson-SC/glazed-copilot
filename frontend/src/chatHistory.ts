@@ -16,6 +16,8 @@ export interface ChatMessage {
   steps?: string[];
   /** The backend clipped the stored message. */
   truncated?: boolean;
+  /** ISO time: the stored turn timestamp, or the moment a local message was created. */
+  ts?: string;
 }
 
 const MANAGER = "manager";
@@ -72,7 +74,7 @@ export function buildTurnHistory(turns: TurnRecord[]): ChatMessage[] {
   const out: ChatMessage[] = [];
   for (const t of [...turns].sort((a, b) => a.ts.localeCompare(b.ts))) {
     const user = parseTraceMessage(t.user_text ?? "");
-    out.push({ id: `s-${t.turn_id}-u`, role: "user", text: user.text, ...(user.truncated ? { truncated: true } : {}) });
+    out.push({ id: `s-${t.turn_id}-u`, role: "user", text: user.text, ts: t.ts, ...(user.truncated ? { truncated: true } : {}) });
     if (t.status === "failed") {
       out.push({ id: `s-${t.turn_id}-e`, role: "error", text: t.error || "El copiloto no pudo responder.", retryText: user.text });
       continue;
@@ -84,7 +86,7 @@ export function buildTurnHistory(turns: TurnRecord[]): ChatMessage[] {
       continue;
     }
     const reply = parseTraceMessage(raw!);
-    out.push({ id: `s-${t.turn_id}-a`, role: "assistant", text: reply.text, turnId: t.turn_id, meta: t.reply_meta, ...(reply.truncated ? { truncated: true } : {}) });
+    out.push({ id: `s-${t.turn_id}-a`, role: "assistant", text: reply.text, ts: t.ts, turnId: t.turn_id, meta: t.reply_meta, ...(reply.truncated ? { truncated: true } : {}) });
   }
   return out;
 }

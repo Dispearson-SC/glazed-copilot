@@ -71,7 +71,7 @@ function Bubble({ m, compact, onRetry }: { m: ChatMessage; compact: boolean; onR
   );
 }
 
-function ProposalCard({ p, onDecide }: { p: Proposal; onDecide: Chat["decide"] }) {
+export function ProposalCard({ p, onDecide }: { p: Proposal; onDecide: Chat["decide"] }) {
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);

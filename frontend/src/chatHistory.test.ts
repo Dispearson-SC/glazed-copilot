@@ -125,3 +125,11 @@ describe("buildTurnHistory", () => {
     expect(h.filter((m) => m.role === "user")).toHaveLength(2);
   });
 });
+
+describe("message time", () => {
+  it("carries the stored turn timestamp on both bubbles", () => {
+    const [u, a] = buildTurnHistory([{ turn_id: "t1", ts: "2026-03-01T10:00:00Z", user_text: "hola", reply: "buenas", status: "done" }]);
+    expect(u.ts).toBe("2026-03-01T10:00:00Z");
+    expect(a.ts).toBe("2026-03-01T10:00:00Z");
+  });
+});

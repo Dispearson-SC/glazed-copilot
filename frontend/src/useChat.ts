@@ -152,7 +152,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
     };
   }, [api, caseId, storeId, enabled, refreshProposals, pollMs, notFoundGraceMs, errorWindowMs]);
 
-  const addLocal = (m: Omit<ChatMessage, "id">) => setLocal((l) => [...l, { ...m, id: `l-${++seq.current}` }]);
+  const addLocal = (m: Omit<ChatMessage, "id">) => setLocal((l) => [...l, { ts: new Date().toISOString(), ...m, id: `l-${++seq.current}` }]);
 
   const pollTurn = useCallback(
     async (turnId: string, text: string, token: number) => {
@@ -202,13 +202,13 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
   );
 
   const submit = useCallback(
-    async (text: string, isRetry: boolean) => {
+    async (text: string, isRetry: boolean, display?: string) => {
       const clean = text.trim();
       if (!clean || !caseId) return;
       const token = ++run.current;
       lastText.current = clean;
       setLocal((l) => l.filter((m) => m.role !== "error"));
-      if (!isRetry) addLocal({ role: "user", text: clean });
+      if (!isRetry) addLocal({ role: "user", text: display?.trim() || clean });
       setStatus("working");
       setStillRunning(false);
       try {
@@ -223,7 +223,8 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
     [api, caseId, pollTurn],
   );
 
-  const send = useCallback((text: string) => submit(text, false), [submit]);
+  /** `display` is the short text shown in the user bubble when `text` carries extra context. */
+  const send = useCallback((text: string, opts?: { display?: string }) => submit(text, false, opts?.display), [submit]);
   const retry = useCallback((text?: string) => submit(text ?? lastText.current, true), [submit]);
 
   const decide = useCallback(

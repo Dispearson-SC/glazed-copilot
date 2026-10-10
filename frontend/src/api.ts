@@ -1,4 +1,4 @@
-import type { Case, CaseMode, DaySummary, Execution, ForecastResponse, Proposal, Store, TraceEvent, Turn, TurnRecord } from "./types";
+import type { AlertRecord, Case, CaseMode, DaySummary, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, TraceEvent, Turn, TurnRecord } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -63,6 +63,16 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
       request<Proposal[]>("/proposals", {}, query),
     decide: (proposalId: string, b: { approved: boolean; reason?: string }, opts: { idempotencyKey?: string } = {}) =>
       request<Execution>(`/proposals/${proposalId}/decision`, {
+        ...send("POST", b),
+        ...(opts.idempotencyKey ? { headers: { "Idempotency-Key": opts.idempotencyKey } } : {}),
+      }),
+    listIssues: (caseId: string, q: { limit?: string; category?: string; kind?: string } = {}) =>
+      request<Issue[]>(`/cases/${caseId}/issues`, {}, q),
+    getOrderPlan: (caseId: string) => request<OrderPlan>(`/cases/${caseId}/order-plan`),
+    listAlerts: (q: { store_id?: string; state?: string }) => request<AlertRecord[]>("/alerts", {}, q),
+    /** Step 1 of a decision: turns (issue, option) into a pending proposal. Repeating the key returns the same proposal. */
+    propose: (b: { case_id: string; issue_id: string; option_id: string; rationale?: string }, opts: { idempotencyKey?: string } = {}) =>
+      request<Proposal>("/proposals", {
         ...send("POST", b),
         ...(opts.idempotencyKey ? { headers: { "Idempotency-Key": opts.idempotencyKey } } : {}),
       }),

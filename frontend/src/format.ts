@@ -45,3 +45,12 @@ export const splitStoreName = (name: string): [string, string | null] => {
   const i = name.indexOf(" · ");
   return i < 0 ? [name, null] : [name.slice(0, i), name.slice(i + 3)];
 };
+
+/** "mar 21": short weekday and day of month. */
+export const weekdayDay = (iso: string): string => `${weekdayShort(iso).replace(".", "")} ${Number(iso.slice(8, 10))}`;
+
+/** "14:05" in the viewer's time zone; "" for a missing or invalid timestamp. */
+export const clockTime = (ts: string | undefined): string => {
+  const d = ts ? new Date(ts) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+};

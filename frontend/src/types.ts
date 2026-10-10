@@ -169,3 +169,92 @@ export interface TurnRecord {
   still_running?: boolean;
   reply_meta?: ReplyMeta | null;
 }
+
+// ---- Copilot: issues, order plan, alerts (public API, case scoped) ----
+export interface Range3 {
+  low?: number | null;
+  mid?: number | null;
+  high?: number | null;
+}
+
+export interface IssueOption {
+  option_id: string;
+  action_type: string;
+  params: Record<string, unknown>;
+  expected_benefit_usd?: Range3 | null;
+  cost_usd?: number | null;
+  net_usd_mid?: number | null;
+  loss_impact?: { waste_usd_delta?: number | null; lost_sales_usd_delta?: number | null } | null;
+  confidence?: { score: number; n_backtest?: number; method?: string } | null;
+  tier: string;
+  tier_reasons?: string[];
+  urgency?: { deadline_date: string | null; reason?: string } | null;
+  risk?: string[];
+  if_act?: string | null;
+  if_not?: string | null;
+  cost_of_inaction_usd?: { mid?: number | null } | null;
+}
+
+export interface IssueEvidence {
+  metric: string;
+  value: number | string;
+  unit?: string;
+  period?: string;
+}
+
+export interface Issue {
+  issue_id: string;
+  kind: string;
+  sku?: string | null;
+  product_name?: string | null;
+  supplier_id?: string | null;
+  as_of?: string;
+  severity_usd?: number | null;
+  category?: string;
+  integrity?: boolean;
+  evidence?: IssueEvidence[];
+  options?: IssueOption[];
+  recommended_option_id?: string | null;
+}
+
+export interface OrderLine {
+  sku: string;
+  product_name?: string;
+  name?: string;
+  supplier_id?: string;
+  supplier_name?: string;
+  qty?: number;
+  cases?: number;
+  case_size?: number;
+  est_cost_usd?: number | null;
+  expected_delivery?: string | null;
+  usable_stock?: number | null;
+  projected_stockout_date?: string | null;
+  order_deadline?: string | null;
+  stockout_risk_without_order?: number | null;
+  stockout_risk_with_order?: number | null;
+  min_order_warning?: { min_order_value: number; order_value_usd: number } | null;
+  /** The decidable issue of this line; absent = the line cannot go through proposals. */
+  issue?: Issue | null;
+}
+
+export interface OrderPlan {
+  store_id: string;
+  as_of: string;
+  total_lines: number;
+  lines: OrderLine[];
+  case_id?: string;
+}
+
+export interface AlertRecord {
+  alert_id: string;
+  alert_type: number;
+  store_id: string;
+  case_id: string;
+  severity_usd?: number | null;
+  state: string;
+  as_of?: string;
+  created_at?: string;
+  issue_key?: string;
+  issue?: (Partial<Issue> & { options?: IssueOption[] }) | null;
+}

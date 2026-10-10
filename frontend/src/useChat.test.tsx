@@ -334,3 +334,14 @@ describe("useChat", () => {
     await waitFor(() => expect(result.current.messages.at(-1)?.meta).toEqual(meta));
   });
 });
+
+describe("useChat send with display text", () => {
+  it("shows the short text in the bubble but sends the full text with its context", async () => {
+    const api = fakeApi();
+    const { result } = setup(api);
+    await act(async () => { await result.current.send("Contexto: X (i1).\nAnaliza: X", { display: "Analiza: X" }); });
+    expect(api.sendMessage).toHaveBeenCalledWith("c1", "Contexto: X (i1).\nAnaliza: X");
+    expect(result.current.messages.find((m) => m.role === "user")).toMatchObject({ text: "Analiza: X" });
+    expect(result.current.messages.find((m) => m.role === "user")?.ts).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+});
