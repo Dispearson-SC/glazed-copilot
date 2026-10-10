@@ -79,7 +79,7 @@ def scenario_losses(rec: Recommendation, qty: float, price: float, unit_cost: fl
     return {"waste_usd": srt(waste), "lost_sales_usd": srt(lost)}
 
 
-def _service(state: SkuState, cfg: Config) -> float:
+def service_for(state: SkuState, cfg: Config) -> float:
     p = state.product
     cr = critical_ratio(p.price, p.unit_cost)
     return cr if is_short_life(p.shelf_life_days) else max(cr, cfg.non_perishable_service)
@@ -101,7 +101,7 @@ def recommended_qty(state: SkuState, service: float) -> tuple[Recommendation, in
 def plan_line(state: SkuState, cfg: Config, typical_qty: float | None, window_received: float,
               window_sold: float) -> dict | None:
     p = state.product
-    service = _service(state, cfg)
+    service = service_for(state, cfg)
     rec, qty = recommended_qty(state, service)
     if qty <= 0:
         return None

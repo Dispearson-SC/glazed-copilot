@@ -5,6 +5,7 @@ date <= as_of, except backtest_day which reads next-day outcomes on purpose.
 """
 from __future__ import annotations
 
+import copy
 import math
 import threading
 from datetime import date, timedelta
@@ -13,6 +14,8 @@ from typing import Any
 import duckdb
 
 from ...domain import FutureDate, NotFound
+from ...metrics.issues import detect_issues
+from ...metrics.replay import calibrate
 from ...metrics.losses import lost_sales_window
 from ...metrics.plan import apply_min_order, plan_line
 from ...metrics.schedule import parse_delivery_days
@@ -42,6 +45,8 @@ class DuckDBMetrics:
         self._con = duckdb.connect(path, read_only=True)
         self._lock = threading.Lock()
         self._snaps: dict[tuple[str, date], StoreSnapshot] = {}
+        self._calib: dict[tuple[str, date], Any] = {}
+        self._issues: dict[tuple[str, date], list[dict[str, Any]]] = {}
         self.config = Config()
 
     # -- helpers -----------------------------------------------------------------
@@ -155,66 +160,30 @@ class DuckDBMetrics:
         }
 
     # -- Issues ------------------------------------------------------------------
-    def issues(self, store_id: str, as_of: date, limit: int = 5) -> list[dict[str, Any]]:
-        ref = self._ref_date(store_id, as_of)
-        out: list[dict[str, Any]] = []
-        w0 = ref - timedelta(days=27)
-        stock = self._rows(
-            "WITH dem AS (SELECT sku, sum(units_sold)/28.0 AS avg_d, sum(received_qty) rec28, sum(units_sold) sold28,"
-            "  sum(CASE WHEN date>? THEN waste_cost ELSE 0 END) waste14"
-            "  FROM v_inventory_waste WHERE store_id=? AND date BETWEEN ? AND ? GROUP BY sku),"
-            " cur AS (SELECT sku, closing_qty FROM inventory_daily WHERE store_id=? AND date=?),"
-            " transit AS (SELECT sku, sum(qty_ordered) qty, min(expected_date) eta FROM purchase_orders"
-            "  WHERE store_id=? AND order_date<=? AND (received_date IS NULL OR received_date>?) GROUP BY sku)"
-            " SELECT p.sku, p.product_name, p.supplier_id, p.unit_cost, p.list_price_base price, p.shelf_life_days,"
-            "  coalesce(s.standard_lead_time_days,1) lead, d.avg_d, d.rec28, d.sold28, d.waste14, c.closing_qty,"
-            "  coalesce(t.qty,0) transit_qty, t.eta"
-            " FROM cur c JOIN dem d USING (sku) JOIN products p USING (sku) LEFT JOIN suppliers s USING (supplier_id)"
-            " LEFT JOIN transit t USING (sku)",
-            [ref - timedelta(days=14), store_id, w0, ref, store_id, ref, store_id, as_of, as_of])
-        for r in stock:
-            avg_d = r["avg_d"] or 0.0
-            if avg_d >= 1.0:
-                cover = (r["closing_qty"] or 0) / avg_d
-                arrives_in_time = r["transit_qty"] > 0 and r["eta"] is not None and (r["eta"] - ref).days <= max(r["lead"], 1)
-                if cover < r["lead"] and not arrives_in_time:
-                    sev = (r["lead"] - cover) * avg_d * (r["price"] or 0)
-                    out.append(self._issue(store_id, "stockout_risk", r["sku"], ref, sev, {
-                        "sku": r["sku"], "product_name": r["product_name"], "supplier_id": r["supplier_id"],
-                        "closing_qty": r["closing_qty"], "avg_daily_demand": _f(avg_d),
-                        "days_of_cover": _f(cover), "lead_time_days": r["lead"]}))
-            sold, rec, waste = r["sold28"] or 0, r["rec28"] or 0, r["waste14"] or 0
-            if waste >= 5 and rec > 1.3 * max(sold, 1):
-                out.append(self._issue(store_id, "overstock_waste", r["sku"], ref, waste, {
-                    "sku": r["sku"], "product_name": r["product_name"], "waste_usd_14d": _f(waste),
-                    "received_28d": rec, "sold_28d": sold}))
-            elif (r["shelf_life_days"] or 99) <= 3 and avg_d > 0:
-                surplus = (r["closing_qty"] or 0) - avg_d * r["shelf_life_days"]
-                if surplus >= 5:
-                    out.append(self._issue(store_id, "expiring", r["sku"], ref, surplus * (r["unit_cost"] or 0), {
-                        "sku": r["sku"], "product_name": r["product_name"], "surplus_units": _f(surplus),
-                        "shelf_life_days": r["shelf_life_days"]}))
-        late = self._rows(
-            "SELECT supplier_id, count(*) lines, sum(qty_ordered*unit_cost) val, max(ref_gap) max_days_late FROM ("
-            " SELECT *, date_diff('day', expected_date, ?::DATE) ref_gap FROM purchase_orders"
-            " WHERE store_id=? AND order_date<=? AND (received_date IS NULL OR received_date>?) AND expected_date<?)"
-            " GROUP BY 1", [as_of, store_id, as_of, as_of, as_of])
-        for r in late:
-            out.append(self._issue(store_id, "late_delivery", r["supplier_id"], ref, r["val"] or 0, {
-                "supplier_id": r["supplier_id"], "overdue_lines": r["lines"], "max_days_late": r["max_days_late"]}))
-        out.sort(key=lambda i: (-i["severity_usd"], i["issue_id"]))
-        return out[:limit]
+    def _calibration(self, store_id: str, as_of: date):
+        key = (store_id, as_of)
+        if key not in self._calib:
+            ref = self._ref_date(store_id, as_of)
+            self._calib[key] = calibrate(self._snapshot(store_id, as_of), ref, self.config)
+            if len(self._calib) > 16:
+                self._calib.pop(next(iter(self._calib)))
+        return self._calib[key]
 
-    @staticmethod
-    def _issue(store_id: str, kind: str, key: str, as_of: date, severity: float, evidence: dict[str, Any]) -> dict[str, Any]:
-        issue = {"issue_id": f"{store_id}|{kind}|{key}", "store_id": store_id, "kind": kind,
-                 "as_of_date": as_of.isoformat(), "severity_usd": _f(severity), "evidence": evidence,
-                 "engine_version": METHOD}
-        if kind != "late_delivery":
-            issue["sku"] = key
-        else:
-            issue["supplier_id"] = key
-        return issue
+    def _all_issues(self, store_id: str, as_of: date) -> list[dict[str, Any]]:
+        key = (store_id, as_of)
+        if key not in self._issues:
+            ref = self._ref_date(store_id, as_of)
+            self._issues[key] = detect_issues(self._snapshot(store_id, as_of), store_id, as_of, ref, self.config,
+                                              self._calibration(store_id, as_of), limit=10_000)
+            name = next((x.get("display_name") or x["name"] for x in self.stores() if x["store_id"] == store_id), store_id)
+            for iss in self._issues[key]:
+                iss["store_display_name"] = name
+            if len(self._issues) > 16:
+                self._issues.pop(next(iter(self._issues)))
+        return self._issues[key]
+
+    def issues(self, store_id: str, as_of: date, limit: int = 5) -> list[dict[str, Any]]:
+        return copy.deepcopy(self._all_issues(store_id, as_of)[:limit])
 
     # -- Inventory projection ----------------------------------------------------
     def _weekday_demand(self, store_id: str, sku: str, ref: date) -> tuple[dict[int, float], float]:
@@ -310,6 +279,12 @@ class DuckDBMetrics:
     def order_plan(self, store_id: str, as_of: date) -> dict[str, Any]:
         snap = self._snapshot(store_id, as_of)
         lines = self._plan_lines(snap, store_id, as_of)
+        by_sku: dict[str, dict[str, Any]] = {}
+        for iss in self._all_issues(store_id, as_of):
+            if iss.get("sku") and (iss["sku"] not in by_sku or iss["kind"] == "stockout_risk"):
+                by_sku[iss["sku"]] = iss
+        for ln in lines:
+            ln["issue"] = copy.deepcopy(by_sku.get(ln["sku"]))
         totals: dict[str, float] = {}
         for ln in lines:
             totals[ln["supplier_id"]] = totals.get(ln["supplier_id"], 0.0) + ln["est_cost_usd"]

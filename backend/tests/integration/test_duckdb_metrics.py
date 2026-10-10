@@ -56,6 +56,42 @@ def test_issues_are_sorted_stable_and_keyed(m):
         assert i["kind"] in {"stockout_risk", "overstock_waste", "expiring", "late_delivery"}
 
 
+def test_issues_follow_the_wave5_contract_with_deterministic_options(m):
+    issues = m.issues(S, AS_OF, limit=20)
+    assert issues and issues == m.issues(S, AS_OF, limit=20)
+    seen_kinds = set()
+    for i in issues:
+        seen_kinds.add(i["kind"])
+        assert {"issue_id", "kind", "store_id", "as_of", "severity_usd", "evidence", "data_caveats", "options"} <= i.keys()
+        assert i["store_display_name"].endswith("Gate Area West") or " · " in i["store_display_name"]
+        assert i["as_of"] == "2026-03-10" and isinstance(i["evidence"], list) and i["evidence"]
+        assert all({"metric", "value", "unit", "period", "source"} <= e.keys() for e in i["evidence"])
+        opts = i["options"]
+        assert 1 <= len(opts) <= 5 and opts[-1]["action_type"] == "do_nothing"
+        assert len({o["option_id"] for o in opts}) == len(opts)
+        assert i["recommended_option_id"] in {o["option_id"] for o in opts}
+        for o in opts:
+            assert o["action_type"] in {"place_order", "adjust_order_qty", "skip_order", "markdown_end_of_day",
+                                        "run_promo", "transfer_stock", "shift_staff_hours", "do_nothing"}
+            assert o["tier"] in {"N0", "N1", "N2", "N3"} and o["tier_reasons"]
+            assert set(o["expected_benefit_usd"]) == {"low", "mid", "high"} and o["if_act"] is None and o["if_not"] is None
+            assert set(o["loss_impact"]) == {"waste_usd_delta", "lost_sales_usd_delta"}
+            assert {"score", "n_backtest", "method"} <= o["confidence"].keys() and 0 <= o["confidence"]["score"] <= 1
+            assert "deadline_date" in o["urgency"] and o["urgency"]["reason"] and isinstance(o["risk"], list)
+            if o["action_type"] == "markdown_end_of_day":
+                assert o["data_caveat"] == "assumed elasticity" and o["tier"] in {"N2", "N3", "N0"}
+            if o["tier"] == "N1":
+                assert o["confidence"]["score"] >= 0.85 and o["confidence"]["n_backtest"] >= 30 and o["net_usd_mid"] > 0
+        assert opts[-1]["cost_usd"] >= 0
+    assert "stockout_risk" in seen_kinds
+
+
+def test_order_plan_lines_embed_their_issue(m):
+    plan = m.order_plan(S, AS_OF)
+    embedded = [l for l in plan["lines"] if l.get("issue")]
+    assert embedded and all(l["issue"]["options"] and l["issue"]["sku"] == l["sku"] for l in embedded)
+
+
 def test_inventory_projection(m):
     sku = m.issues(S, AS_OF, 50)[0].get("sku") or "SKU-100014"
     p = m.inventory_projection(S, AS_OF, sku, horizon=7)

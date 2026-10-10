@@ -62,7 +62,7 @@ def calibrate(snap: StoreSnapshot, ref: date, cfg: Config) -> dict[tuple[str, st
                     q_typ = snap.typical_order_qty(sku, t)
                     q_typ = float(q_typ) if q_typ is not None else sum(r.received for r in state.rows) / len(state.rows)
                     for kind in kinds:
-                        if kind == "overstock_waste" and q_typ > q_plan:
+                        if kind == "overstock_waste" and 0 < q_plan < q_typ:
                             nets.setdefault((kind, "adjust_order_qty"), []).append(
                                 realized_reduce_net(win, q_typ - q_plan, prod.price, prod.unit_cost))
                         if q_typ > 0:
