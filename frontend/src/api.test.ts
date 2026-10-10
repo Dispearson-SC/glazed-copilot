@@ -142,3 +142,17 @@ describe("resolveBase", () => {
     expect(resolveBase("http://localhost:8100/", "https://x")).toBe("http://localhost:8100/");
   });
 });
+
+describe("forecast api", () => {
+  it("GETs the forecast with sku/from/to/level and detects unavailable routes", async () => {
+    const f = vi.fn(async () => new Response("{}", { status: 200 }));
+    const api = createApi("", f as unknown as typeof fetch);
+    await api.getForecast("c1", { from: "2026-02-23", to: "2026-03-08", level: "store" });
+    expect((f.mock.calls[0] as unknown as [string])[0]).toBe("/api/v1/cases/c1/forecast?from=2026-02-23&to=2026-03-08&level=store");
+    const { isUnavailable } = await import("./api");
+    expect(isUnavailable(new ApiError(404, "x"))).toBe(true);
+    expect(isUnavailable(new ApiError(501, "x"))).toBe(true);
+    expect(isUnavailable(new ApiError(500, "x"))).toBe(false);
+    expect(isUnavailable(new Error("x"))).toBe(false);
+  });
+});

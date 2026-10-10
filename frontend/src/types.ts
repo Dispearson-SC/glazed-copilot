@@ -311,3 +311,39 @@ export interface Briefing {
   headline?: HeadlineItem[];
   suggested_focus?: string[];
 }
+
+// ---- Manager-day: forecast (Wave 11). Contract agreed with Core; route may not be deployed. ----
+export interface ForecastPoint {
+  date: string;
+  forecast: number;
+  p10: number;
+  p90: number;
+  baseline: number;
+  /** null for dates after as_of: the UI never shows actuals past as_of. */
+  actual: number | null;
+  censored: boolean;
+  stockout_hours?: number;
+}
+
+export interface ForecastMetrics {
+  wape: number;
+  bias: number;
+  coverage_p10_p90: number;
+  wape_baseline: number;
+  n_days: number;
+}
+
+export interface ForecastResponse {
+  store_id: string;
+  sku: string | null;
+  level: "sku" | "store";
+  as_of: string;
+  forecast_origin: string;
+  model: string;
+  model_version: string;
+  unit: string;
+  horizon_days: number;
+  points: ForecastPoint[];
+  metrics_to_date: ForecastMetrics;
+  projected?: boolean;
+}

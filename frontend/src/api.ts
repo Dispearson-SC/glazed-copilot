@@ -1,4 +1,4 @@
-import type { AdvanceResult, Alert, Briefing, Case, CaseMode, ComplianceRecord, DaySummary, Execution, InjectBody, Kpis, OrderPlan, Proposal, Store, TraceEvent, Turn } from "./types";
+import type { AdvanceResult, Alert, Briefing, Case, CaseMode, ComplianceRecord, DaySummary, Execution, ForecastResponse, InjectBody, Kpis, OrderPlan, Proposal, Store, TraceEvent, Turn } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -18,6 +18,9 @@ function qs(query?: Query): string {
   const s = p.toString();
   return s ? `?${s}` : "";
 }
+
+/** The route is not deployed yet (404) or not implemented (501). */
+export const isUnavailable = (e: unknown): boolean => e instanceof ApiError && (e.status === 404 || e.status === 501);
 
 export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fetch(...a)) {
   const base = baseUrl.replace(/\/$/, "");
@@ -72,6 +75,9 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
     getDaySummary: (caseId: string, date?: string) =>
       request<DaySummary>(`/cases/${caseId}/day-summary`, {}, { date }),
     getBriefing: (caseId: string) => request<Briefing>(`/cases/${caseId}/briefing`),
+    /** Wave 11 route; may answer 404/501 until deployed. */
+    getForecast: (caseId: string, q: { sku?: string; from?: string; to?: string; level?: "sku" | "store" } = {}) =>
+      request<ForecastResponse>(`/cases/${caseId}/forecast`, {}, q),
     advance: (caseId: string, days = 1) => request<AdvanceResult>(`/cases/${caseId}/advance`, send("POST", { days })),
     // REQUIRED backend routes (not in the public API yet).
     getOrderPlan: (caseId: string) => request<OrderPlan>(`/cases/${caseId}/order-plan`),

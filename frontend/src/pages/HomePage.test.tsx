@@ -166,3 +166,27 @@ describe("HomePage Lo que viene", () => {
     expect(await screen.findByText(/plan caído/)).toBeInTheDocument();
   });
 });
+
+describe("HomePage forecast overlay", () => {
+  it("falls back to the plain 7-day trend, quietly, when the forecast route is missing", async () => {
+    open();
+    await screen.findByTestId("trend-bar-2026-03-10");
+    expect(screen.queryByTestId("forecast-chart")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows the forecast chart when the route answers", async () => {
+    const { forecastA } = await import("../test/fixtures");
+    open(fakeApi({ getForecast: async () => forecastA }));
+    expect(await screen.findByTestId("forecast-chart")).toBeInTheDocument();
+    expect(screen.getByTestId("forecast-model")).toHaveTextContent("baseline-weekday-8w");
+  });
+
+  it("asks for the 7 days before and after the simulated today", async () => {
+    const api = fakeApi();
+    open(api);
+    await screen.findByTestId("hero");
+    const call = (api.getForecast as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
+    expect(call).toEqual(["c1", { from: "2026-02-22", to: "2026-03-08", level: "store" }]);
+  });
+});
