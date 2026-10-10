@@ -83,3 +83,33 @@ describe("api client", () => {
     await expect(api.listStores()).rejects.toMatchObject({ status: 0 });
   });
 });
+
+describe("api client (Wave 5)", () => {
+  it("GETs order plan and kpis for a case", async () => {
+    const fetchFn = mockFetch({});
+    const api = createApi("", fetchFn as unknown as typeof fetch);
+    await api.getOrderPlan("c1");
+    await api.getKpis("c1");
+    const urls = fetchFn.mock.calls.map((c) => (c as unknown as [string])[0]);
+    expect(urls).toEqual(["/api/v1/cases/c1/order-plan", "/api/v1/cases/c1/kpis"]);
+  });
+
+  it("POSTs advance with a default of one day", async () => {
+    const fetchFn = mockFetch({ sim_today: "2026-03-02", new_alerts: [] });
+    const api = createApi("", fetchFn as unknown as typeof fetch);
+    await api.advance("c1");
+    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/v1/cases/c1/advance");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ days: 1 });
+  });
+
+  it("proposes an option by id only (backend copies params and tier)", async () => {
+    const fetchFn = mockFetch({});
+    const api = createApi("", fetchFn as unknown as typeof fetch);
+    await api.proposeOption({ case_id: "c1", issue_id: "i1", option_id: "o1", rationale: "x" });
+    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/v1/proposals");
+    expect(JSON.parse(init.body as string)).toEqual({ case_id: "c1", issue_id: "i1", option_id: "o1", rationale: "x" });
+  });
+});
