@@ -1,14 +1,14 @@
 """Public API /api/v1/* for the CLI and the frontend."""
 
 from datetime import date, timedelta
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Header, Query, Response
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
-from ...application import decisions as uc_decisions, forecast as uc_forecast, manager as uc_manager, sentinel
+from ...application import copilot as uc_copilot, decisions as uc_decisions, forecast as uc_forecast, manager as uc_manager, sentinel
 from ...domain import AlertState, DomainError, NotFound
 from .store_names import StoreNames
 
@@ -24,8 +24,15 @@ class ForkBody(BaseModel):
     title: str = ""
 
 
+class AskContext(BaseModel):
+    issue_id: str
+    option_id: str | None = None
+    mode: Literal["analizar", "dialogo"]
+
+
 class AskBody(BaseModel):
     text: str
+    context: AskContext | None = None
 
 
 class AdvanceBody(BaseModel):
@@ -123,7 +130,10 @@ def build_public_router(c: Any) -> APIRouter:
 
     @r.post("/cases/{case_id}/messages", status_code=202)
     def ask(case_id: str, b: AskBody):
-        return {"turn_id": uc.AskAgent(c.cases, c.core, c.turn_tracker, c.clock, c.turns).execute(case_id, b.text)}
+        def lookup(case, issue_id):
+            return uc_copilot.require_issue(c.alerts, c.metrics, c.served, case, issue_id)
+        ctx = b.context.model_dump() if b.context else None
+        return {"turn_id": uc.AskAgent(c.cases, c.core, c.turn_tracker, c.clock, c.turns).execute(case_id, b.text, ctx, lookup)}
 
     def turn_getter() -> uc.GetTurn:
         return uc.GetTurn(c.cases, c.core, c.turn_tracker, c.clock, c.turn_timeout_s, turns=c.turns)

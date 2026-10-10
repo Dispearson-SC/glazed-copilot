@@ -93,18 +93,29 @@ class AskAgent:
                  clock: Clock | None = None, turns: TurnRepository | None = None) -> None:
         self.cases, self.core, self.tracker, self.clock, self.turns = cases, core, tracker, clock, turns
 
-    def execute(self, case_id: str, text: str) -> str:
+    def execute(self, case_id: str, text: str, context: dict[str, Any] | None = None,
+                lookup: Any = None) -> str:
+        """`context` = {issue_id, option_id?, mode}: validated against the case, pinned in front of the message sent to
+        the Core (computed by code) and echoed in reply_meta.context. The stored user_text is the manager's text only."""
         if not text.strip():
             raise DomainError("message text is required")
         case = _case(self.cases, case_id)
+        sent, echo = text, None
+        if context:
+            from . import copilot
+            issue = lookup(case, context["issue_id"])
+            copilot.validate_context(issue, context.get("option_id"), context["mode"])
+            sent = copilot.context_block(issue, context.get("option_id"), context["mode"]) + text
+            echo = {k: v for k, v in context.items() if v is not None}
         if case.core_conversation_id is None:
             case.core_conversation_id = self.core.create_conversation(case.case_id, case.store_id)
             self.cases.update(case)
-        turn_id = self.core.send_turn(case.core_conversation_id, case.store_id, text)
+        turn_id = self.core.send_turn(case.core_conversation_id, case.store_id, sent)
         if self.tracker and self.clock:
             self.tracker.started(turn_id, self.clock.now())
         if self.turns is not None and self.clock:
-            self.turns.add(TurnRecord(turn_id, case.case_id, case.store_id, self.clock.now(), text))
+            self.turns.add(TurnRecord(turn_id, case.case_id, case.store_id, self.clock.now(), text,
+                                      reply_meta={"context": echo} if echo else None))
         return turn_id
 
 
@@ -141,6 +152,9 @@ class GetTurn:
         meta: dict[str, Any] = {}
         out = self._poll(case, turn_id, meta)
         self._persist(turn_id, out, meta)
+        ctx = ((rec.reply_meta or {}).get("context")) if rec is not None else None
+        if ctx:  # the pinned issue context is echoed on every read of the turn
+            out["reply_meta"] = {**out.get("reply_meta", {}), "context": ctx}
         return out
 
     @staticmethod
@@ -148,6 +162,8 @@ class GetTurn:
         out: dict[str, Any] = {"turn_id": turn_id, "status": "done", "reply": rec.reply}
         if rec.reply_meta and rec.reply_meta.get("rewritten"):
             out["reply_meta"] = {"rewritten": True, "sanitized": True}
+        if rec.reply_meta and rec.reply_meta.get("context"):
+            out["reply_meta"] = {**out.get("reply_meta", {}), "context": rec.reply_meta["context"]}
         return out
 
     def _persist(self, turn_id: str, out: dict[str, Any], meta: dict[str, Any]) -> None:
@@ -400,14 +416,8 @@ class ProposeOption:
         self.served = served if served is not None else {}
 
     def _issue(self, case: Case, issue_id: str) -> dict[str, Any] | None:
-        issue = self.served.get((case.case_id, issue_id))
-        if issue is None:
-            alert = self.alerts.get_by_issue_key(issue_id)
-            issue = alert.issue if alert is not None and alert.store_id == case.store_id else None
-        if issue is None or not issue.get("options"):
-            issue = next((i for i in self.metrics.issues(case.store_id, case.sim_today, 1000)
-                          if i.get("issue_id") == issue_id), None)
-        return issue
+        from .copilot import find_issue
+        return find_issue(self.alerts, self.metrics, self.served, case, issue_id)
 
     def execute(self, case_id: str, issue_id: str, option_id: str | None, rationale: str = "",
                 agent_id: str = "", idempotency_key: str | None = None) -> Proposal:
