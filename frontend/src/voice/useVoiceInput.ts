@@ -150,7 +150,8 @@ export function useVoiceInput({ config: cfg, onTranscript, onNotice, onPress }: 
       stream.getTracks().forEach((t) => t.stop());
       return;
     }
-    const mime = ["audio/ogg;codecs=opus", "audio/webm;codecs=opus", "audio/mp4"].find((m) => MediaRecorder.isTypeSupported?.(m));
+    // The provider accepts ogg/opus and m4a but rejects Chromium's webm, so webm is the last resort.
+    const mime = ["audio/ogg;codecs=opus", "audio/mp4", "audio/webm;codecs=opus"].find((m) => MediaRecorder.isTypeSupported?.(m));
     try {
       const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
       s.stream = stream;

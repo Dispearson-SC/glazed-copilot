@@ -30,3 +30,5 @@ Delegated direct (writer trigger: 4+ non-trivial files).
 - Checks (frontend/): `npx tsc -b` clean; `npx vitest run` 38 files / 461 tests pass (voice.test.tsx 23 tests with fake MediaRecorder/getUserMedia/Audio/SpeechRecognition/speechSynthesis); `npx vite build` ok.
 - Assumptions: mic shown while config loads (optimistic), hidden once settled with no usable backend STT or Web Speech; transcribe error switches later holds to Web Speech when present; test setup stubs MediaRecorder/mediaDevices/media play for jsdom.
 - Core contract update applied: ogg>webm>mp4 with .ogg/.webm/.m4a names, language=es, 400 toast without fallback, 503/502 fallback to browser, "Preparando voz…" while speak is in flight.
+- Live check (2026-10-10, headless Chromium, mic stream = real speech): Chromium webm/opus → transcribe 502 "voice provider error (HTTP 400)"; audio/mp4 → 200 exact transcript, sent as a message, reply auto-spoken (orb "Hablando"). Mime order changed to ogg → mp4 → webm. Full suite 38 files / 461 tests pass; build ok.
+- Pending: send the voice flag on push-to-talk messages once Core confirms the field name (planned `"voice": true`).

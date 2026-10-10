@@ -142,8 +142,8 @@ describe("push-to-talk (backend STT)", () => {
     expect(trackStop).toHaveBeenCalled();
   });
 
-  it("falls back to audio/mp4 when webm is unsupported", async () => {
-    FakeRecorder.isTypeSupported.mockImplementation((m) => m === "audio/mp4");
+  it("prefers audio/mp4 over webm (the provider rejects webm)", async () => {
+    FakeRecorder.isTypeSupported.mockImplementation((m) => m === "audio/mp4" || m === "audio/webm;codecs=opus");
     const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "hola" })) });
     await ready(api);
     await hold();
