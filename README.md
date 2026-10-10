@@ -147,3 +147,7 @@ git pull --recurse-submodules && make data && make up
 ```
 
 `make data` is only needed when the ETL, the forecast job or the dataset changed.
+
+## License
+
+MIT. See [LICENSE](LICENSE). Agent-Core (submodule) is also MIT; the raw dataset belongs to its organizers (see vendor/README.md).
