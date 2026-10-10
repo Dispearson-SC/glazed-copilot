@@ -1,6 +1,7 @@
 """Auth routes (/api/v1/auth/*) and the guard applied to the rest of /api/v1."""
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -8,8 +9,14 @@ from pydantic import BaseModel
 
 from ... import application as uc
 from ...application.auth import Login, ResolveSession, expires_iso
+from ...domain import DomainError, InvalidCredentials, normalize_email
 
 COOKIE = "glazed_session"
+log = logging.getLogger("glazed.auth")
+
+
+class DemoLoginBody(BaseModel):
+    email: str
 
 
 class LoginBody(BaseModel):
@@ -76,6 +83,30 @@ def build_auth_router(c: Any, guard: AuthGuard) -> APIRouter:
         user = login_uc.execute(b.email, b.password, client)
         token, exp = c.sessions.issue(user.user_id)
         response.set_cookie(value=token, max_age=c.sessions.ttl_s, **cookie)
+        return {"user": user.public(), "expires_at": expires_iso(exp)}
+
+    def demo_enabled() -> None:
+        if not c.demo_login:
+            raise HTTPException(404, "not found")
+
+    @r.get("/demo-users")
+    def demo_users():
+        demo_enabled()
+        return [{k: u.public()[k] for k in ("email", "name", "role", "store_ids")} for u in c.users.list() if u.active]
+
+    @r.post("/demo-login")
+    def demo_login(b: DemoLoginBody, request: Request, response: Response):
+        """Passwordless session for the demo picker. Independent of the password-login throttle."""
+        demo_enabled()
+        try:
+            user = c.users.get_by_email(normalize_email(b.email))
+        except DomainError:
+            user = None
+        if user is None or not user.active:
+            raise InvalidCredentials("invalid credentials")
+        token, exp = c.sessions.issue(user.user_id)
+        response.set_cookie(value=token, max_age=c.sessions.ttl_s, **cookie)
+        log.warning("DEMO LOGIN user=%s role=%s client=%s", user.email, user.role, request.client.host if request.client else "?")
         return {"user": user.public(), "expires_at": expires_iso(exp)}
 
     @r.post("/logout")

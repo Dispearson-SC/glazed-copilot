@@ -48,6 +48,7 @@ class Container:
     decision_memories: Any = field(default_factory=InMemoryDecisionMemories)  # preferences kept from rejection reasons
     users: Any = field(default_factory=InMemoryUsers)  # UserRepository
     auth_required: bool = False  # GLAZED_AUTH_REQUIRED: every /api/v1 route but health, login, logout and me needs a session
+    demo_login: bool = False  # GLAZED_DEMO_LOGIN: passwordless user picker (/auth/demo-users, /auth/demo-login); demo only
     cookie_secure: bool = False  # GLAZED_COOKIE_SECURE: the session cookie carries the Secure attribute (behind HTTPS)
     sessions: Any = None  # SessionTokens; a random-secret instance is built when not given
     hasher: Any = field(default_factory=PasswordHasher)
@@ -159,6 +160,7 @@ def _flag(env: dict[str, str], name: str) -> bool:
 def _with_auth(c: Container, env: dict[str, str]) -> Container:
     """Auth settings from the environment, plus the optional GLAZED_ADMIN_EMAIL/PASSWORD bootstrap."""
     c.auth_required = _flag(env, "GLAZED_AUTH_REQUIRED")
+    c.demo_login = _flag(env, "GLAZED_DEMO_LOGIN")
     c.cookie_secure = _flag(env, "GLAZED_COOKIE_SECURE")
     c.sessions = SessionTokens.from_env(env)
     ensure_admin(c.users, c.hasher, env)

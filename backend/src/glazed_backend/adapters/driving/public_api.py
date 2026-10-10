@@ -139,7 +139,8 @@ def build_public_router(c: Any, guard: AuthGuard) -> APIRouter:
 
     @open_r.get("/health")
     def health() -> dict[str, Any]:
-        return {"status": "ok", "storage": c.storage, "core": c.core_status, "auth_required": c.auth_required}
+        return {"status": "ok", "storage": c.storage, "core": c.core_status, "auth_required": c.auth_required,
+                "demo_login": c.demo_login}
 
     @r.get("/agents/status")
     def agents_status():

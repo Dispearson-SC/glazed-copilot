@@ -218,3 +218,47 @@ def test_users_cli_reads_password_from_stdin_and_lists_without_hashes(capsys):
     assert "g@x.io" in lst.getvalue() and "scrypt" not in lst.getvalue()
     with pytest.raises(SystemExit):  # the password is never an argument
         users_cli.main(["add", "--email", "a@b.c", "--name", "A", "--role", "admin", "--password", "x"], repo=repo)
+
+
+def demo(client_args=None, flag=True):
+    c, client = make(required=True)
+    c.demo_login = flag
+    return c, client
+
+
+def test_demo_endpoints_are_404_when_flag_off():
+    _, client = demo(flag=False)
+    assert client.get("/api/v1/auth/demo-users").status_code == 404
+    assert client.post("/api/v1/auth/demo-login", json={"email": "admin@glazed.demo"}).status_code == 404
+    assert client.get("/api/v1/health").json()["demo_login"] is False
+
+
+def test_demo_users_lists_active_users_without_secrets():
+    c, client = demo()
+    c.users.get_by_email("m01@glazed.demo").active = False
+    c.users.add(c.users.get_by_email("m01@glazed.demo"))
+    r = client.get("/api/v1/auth/demo-users")
+    assert r.status_code == 200 and client.get("/api/v1/health").json()["demo_login"] is True
+    rows = r.json()
+    assert {u["email"] for u in rows} == {"admin@glazed.demo", "m30@glazed.demo"}
+    assert all(set(u) == {"email", "name", "role", "store_ids"} for u in rows)
+    assert "scrypt" not in r.text
+
+
+def test_demo_login_sets_session_and_me_returns_that_user():
+    _, client = demo()
+    r = client.post("/api/v1/auth/demo-login", json={"email": "M30@glazed.demo"})
+    assert r.status_code == 200 and "glazed_session" in r.cookies
+    assert r.json()["user"]["email"] == "m30@glazed.demo" and r.json()["expires_at"]
+    assert client.get("/api/v1/auth/me").json()["user"]["store_ids"] == ["S030"]
+
+
+def test_demo_login_rejects_unknown_and_inactive_without_touching_the_throttle():
+    c, client = demo()
+    for _ in range(7):
+        assert client.post("/api/v1/auth/demo-login", json={"email": "ghost@glazed.demo"}).status_code == 401
+    u = c.users.get_by_email("m01@glazed.demo")
+    u.active = False
+    c.users.add(u)
+    assert client.post("/api/v1/auth/demo-login", json={"email": "m01@glazed.demo"}).status_code == 401
+    assert login(client, "m30@glazed.demo").status_code == 200

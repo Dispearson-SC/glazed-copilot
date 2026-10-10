@@ -53,6 +53,8 @@ services:
       MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
       # Login. Values come from the git-ignored .env; GLAZED_AUTH_REQUIRED=false keeps /api/v1 open until the UI integrates.
       GLAZED_AUTH_REQUIRED: ${GLAZED_AUTH_REQUIRED:-false}
+      # Demo only: passwordless user picker. Never enable on a real deployment.
+      GLAZED_DEMO_LOGIN: ${GLAZED_DEMO_LOGIN:-false}
       GLAZED_COOKIE_SECURE: ${GLAZED_COOKIE_SECURE:-false}
       GLAZED_SESSION_SECRET: ${GLAZED_SESSION_SECRET:-}
       GLAZED_ADMIN_EMAIL: ${GLAZED_ADMIN_EMAIL:-}
