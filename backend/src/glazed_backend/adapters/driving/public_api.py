@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from ... import application as uc
 from ...application import copilot as uc_copilot, decisions as uc_decisions, forecast as uc_forecast, manager as uc_manager, sentinel
 from ...domain import AlertState, DomainError, NotFound
+from ...domain.models import alert_agent, alert_category
 from .store_names import StoreNames
 
 
@@ -100,6 +101,14 @@ class TransitionBody(BaseModel):
     state: str
 
 
+def alert_view(alert: Any) -> dict[str, Any]:
+    """An alert as the UI reads it: category (operacion|integridad|automatica), owning agent and ts."""
+    out = jsonable_encoder(alert)
+    kind = (alert.issue or {}).get("kind")
+    return {**out, "category": alert_category(kind, (alert.issue or {}).get("category")), "agent_id": alert_agent(kind),
+            "ts": out["created_at"]}
+
+
 def build_public_router(c: Any) -> APIRouter:
     r = APIRouter(prefix="/api/v1")
     names = StoreNames(c.metrics)
@@ -165,7 +174,7 @@ def build_public_router(c: Any) -> APIRouter:
         b = b or AdvanceBody()
         res = uc.AdvanceSimClock(c.cases, c.alerts, c.metrics, compliance=checker()).execute(case_id, b.days, b.to)
         c.briefings.refresh_async(uc.ResumeCase(c.cases).execute(case_id))
-        return {"sim_today": res["sim_today"], "new_alerts": names.tag(jsonable_encoder(res["alerts"]))}
+        return {"sim_today": res["sim_today"], "new_alerts": names.tag([alert_view(a) for a in res["alerts"]])}
 
     @r.get("/cases/{case_id}/briefing")
     def briefing(case_id: str):
@@ -200,7 +209,7 @@ def build_public_router(c: Any) -> APIRouter:
             st = AlertState(state) if state else None
         except ValueError:
             raise DomainError(f"unknown alert state {state!r}") from None
-        return names.tag(jsonable_encoder(uc.ListAlerts(c.alerts).execute(store_id, st)))
+        return names.tag([alert_view(a) for a in uc.ListAlerts(c.alerts).execute(store_id, st)])
 
     @r.patch("/alerts/{alert_id}")
     def transition(alert_id: str, b: TransitionBody):
@@ -213,7 +222,7 @@ def build_public_router(c: Any) -> APIRouter:
             raise DomainError(f"unknown alert state {b.state!r}") from None
         alert.advance(target)
         c.alerts.update(alert)
-        return names.tag(jsonable_encoder(alert))
+        return names.tag(alert_view(alert))
 
     @r.get("/proposals")
     def proposals(case_id: str | None = None, store_id: str | None = None, status: str | None = None):

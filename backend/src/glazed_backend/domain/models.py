@@ -41,6 +41,26 @@ _KIND_TO_ALERT_TYPE = {
 }
 
 
+_INTEGRITY_KINDS = ("sku_key_mismatch", "orphan_sku")
+_AGENT_BY_KIND = {"sku_key_mismatch": "auditor", "orphan_sku": "auditor", "compliance_deviation": "sentinel",
+                  "stockout_risk": "supply", "late_delivery": "supply", "supplier_variability": "supply",
+                  "short_shipment": "supply", "min_order": "supply", "inflated_order": "supply",
+                  "overstock_waste": "present", "expiring": "present", "calendar_uplift": "present", "staffing": "present",
+                  "misleading_promo": "strategist", "promo": "strategist"}
+
+
+def alert_category(kind: str | None, issue_category: str | None = None) -> str:
+    """operacion (store operations), integridad (data integrity) or automatica (Sentinel's automatic compliance checks)."""
+    if issue_category == "integrity" or kind in _INTEGRITY_KINDS:
+        return "integridad"
+    return "automatica" if kind == "compliance_deviation" else "operacion"
+
+
+def alert_agent(kind: str | None) -> str:
+    """The agent that owns the detector behind an alert kind."""
+    return _AGENT_BY_KIND.get(kind or "", "orchestrator")
+
+
 class DomainError(ValueError):
     pass
 
