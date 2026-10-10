@@ -124,3 +124,14 @@ describe("api client (Wave 5)", () => {
     expect(JSON.parse(init.body as string)).toEqual({ case_id: "c1", issue_id: "i1", option_id: "o1", rationale: "x" });
   });
 });
+
+describe("resolveBase", () => {
+  it("turns a same-origin base into the page origin without embedded credentials", async () => {
+    const { resolveBase } = await import("./api");
+    expect(resolveBase("", "https://glazed.farone.cloud")).toBe("https://glazed.farone.cloud");
+  });
+  it("keeps an explicit API URL", async () => {
+    const { resolveBase } = await import("./api");
+    expect(resolveBase("http://localhost:8100/", "https://x")).toBe("http://localhost:8100/");
+  });
+});

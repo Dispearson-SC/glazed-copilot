@@ -80,7 +80,17 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
 
 export type Api = ReturnType<typeof createApi>;
 
+// A same-origin base ("") becomes the page origin. window.location.origin never carries
+// embedded credentials, so the browser accepts the request even when the page was opened
+// as https://user:pass@host (Firefox rejects relative fetches from such pages).
+export function resolveBase(configured: string, origin: string): string {
+  return configured === "" ? origin : configured;
+}
+
 // Dev: relative URLs go through the Vite proxy. Prod: VITE_API_URL or http://localhost:8080.
 export const api: Api = createApi(
-  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "" : "http://localhost:8080"),
+  resolveBase(
+    import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "" : "http://localhost:8080"),
+    typeof window === "undefined" ? "" : window.location.origin,
+  ),
 );
