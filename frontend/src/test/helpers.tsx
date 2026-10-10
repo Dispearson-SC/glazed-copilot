@@ -4,7 +4,7 @@ import { vi } from "vitest";
 import { ApiProvider } from "../ApiContext";
 import type { Api } from "../api";
 import { SessionProvider } from "../SessionContext";
-import { issueA, kpisA, planA } from "./fixtures";
+import { briefingA, daySummaryA, issueA, kpisA, planA } from "./fixtures";
 import type { Alert, Case, Proposal, Store, TraceEvent } from "../types";
 
 export const store: Store = { store_id: "S030", name: "Glazed Centro", format: "mall", site_id: "X", region: "N",
@@ -50,6 +50,8 @@ export function fakeApi(over: Partial<Record<keyof Api, unknown>> = {}): Api {
     getCase: vi.fn(async () => caseA),
     advance: vi.fn(async () => ({ sim_today: "2026-03-02", new_alerts: [] })),
     getOrderPlan: vi.fn(async () => planA),
+    getDaySummary: vi.fn(async (_id: string, date?: string) => ({ ...daySummaryA, date: date ?? daySummaryA.date })),
+    getBriefing: vi.fn(async () => briefingA),
     getKpis: vi.fn(async () => kpisA),
     getCompliance: vi.fn(async () => []),
     inject: vi.fn(async () => ({})),

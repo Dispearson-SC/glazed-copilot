@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -48,5 +48,23 @@ describe("App", () => {
     await screen.findByText(/2026-03-02/);
     await new Promise((r) => setTimeout(r, 50));
     expect((api.listAlerts as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBeGreaterThan(before);
+  });
+});
+
+describe("App shell", () => {
+  it("shows the store display name in the top bar and links to the picker", async () => {
+    open();
+    expect(await within(screen.getByRole("banner")).findByText("Aeropuerto Norte · Glazed Centro")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Cambiar sucursal" })).toHaveAttribute("href", "/login");
+  });
+
+  it("serves the picker at /login", async () => {
+    open("/login");
+    expect(await screen.findByRole("button", { name: "Entrar" })).toBeInTheDocument();
+  });
+
+  it("marks the current page in the bottom navigation", async () => {
+    open("/alerts");
+    expect(await screen.findByRole("link", { name: "Alertas" })).toHaveAttribute("aria-current", "page");
   });
 });

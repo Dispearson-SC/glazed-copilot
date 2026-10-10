@@ -1,6 +1,13 @@
 import { Link } from "react-router-dom";
 import { useApi } from "../ApiContext";
 import { ErrorBox, StoreSelect, useStores } from "../components";
+import BriefingCard from "../dashboard/BriefingCard";
+import ContextChips from "../dashboard/ContextChips";
+import Hero from "../dashboard/Hero";
+import MetricCards from "../dashboard/MetricCards";
+import TopProducts from "../dashboard/TopProducts";
+import TrendChart from "../dashboard/TrendChart";
+import { lastSevenDays } from "../dashboard/format";
 import { rangeText, usd, wasteMid } from "../issues";
 import { useSession } from "../SessionContext";
 import { useCurrentCase } from "../useCurrentCase";
@@ -21,7 +28,22 @@ export default function HomePage() {
     storeId,
     session.refreshKey,
   ]);
+  const summary = usePolling(() => (caseId ? api.getDaySummary(caseId) : Promise.resolve(null)), 60_000, true, [caseId, session.refreshKey]);
+  const day = summary.data?.date;
+  const trend = usePolling(
+    async () => {
+      if (!caseId || !day) return null;
+      // The summary date is already loaded; only the six previous days are fetched.
+      const prev = lastSevenDays(day).slice(0, 6);
+      return [...(await Promise.all(prev.map((d) => api.getDaySummary(caseId, d)))), summary.data!];
+    },
+    60_000,
+    false,
+    [caseId, day, session.refreshKey],
+  );
+  const briefing = usePolling(() => (caseId ? api.getBriefing(caseId) : Promise.resolve(null)), 60_000, true, [caseId, session.refreshKey]);
   const error = storesError ?? caseError ?? kpis.error ?? alerts.error;
+  const summaryError = summary.error;
   const open = (alerts.data ?? []).filter((a) => !CLOSED.includes(a.state));
   const count = (c: string) => open.filter((a) => semaphore(a.severity_usd) === c).length;
 
@@ -30,6 +52,17 @@ export default function HomePage() {
       <h2>Inicio</h2>
       <StoreSelect stores={stores} value={storeId} onChange={session.setStoreId} />
       <ErrorBox error={error} />
+      <ErrorBox error={summaryError} />
+      {summary.data && !summaryError && (
+        <div className="flex flex-col gap-space-md">
+          <Hero summary={summary.data} />
+          <ContextChips context={summary.data.context} />
+          <MetricCards summary={summary.data} />
+          <TrendChart days={trend.data} selected={summary.data.date} error={trend.error} />
+          <TopProducts summary={summary.data} />
+        </div>
+      )}
+      {currentCase && <BriefingCard briefing={briefing.data} error={briefing.error} />}
       {!error && !loading && !currentCase && <p className="muted">Sin caso activo para esta sucursal</p>}
       {kpis.data && (
         <>

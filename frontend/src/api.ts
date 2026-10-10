@@ -1,4 +1,4 @@
-import type { AdvanceResult, Alert, Case, CaseMode, ComplianceRecord, Execution, InjectBody, Kpis, OrderPlan, Proposal, Store, TraceEvent, Turn } from "./types";
+import type { AdvanceResult, Alert, Briefing, Case, CaseMode, ComplianceRecord, DaySummary, Execution, InjectBody, Kpis, OrderPlan, Proposal, Store, TraceEvent, Turn } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -65,6 +65,9 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
     decide: (proposalId: string, b: { approved: boolean; reason?: string }) =>
       request<Execution>(`/proposals/${proposalId}/decision`, send("POST", b)),
     getCase: (caseId: string) => request<Case>(`/cases/${caseId}`),
+    getDaySummary: (caseId: string, date?: string) =>
+      request<DaySummary>(`/cases/${caseId}/day-summary`, {}, { date }),
+    getBriefing: (caseId: string) => request<Briefing>(`/cases/${caseId}/briefing`),
     advance: (caseId: string, days = 1) => request<AdvanceResult>(`/cases/${caseId}/advance`, send("POST", { days })),
     // REQUIRED backend routes (not in the public API yet).
     getOrderPlan: (caseId: string) => request<OrderPlan>(`/cases/${caseId}/order-plan`),

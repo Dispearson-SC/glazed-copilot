@@ -4,7 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { registerSW } from "virtual:pwa-register";
 import { SessionProvider } from "./SessionContext";
 import App from "./App";
-import "./styles.css";
+import "./index.css";
 
 registerSW({ immediate: true });
 
