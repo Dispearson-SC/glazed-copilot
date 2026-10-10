@@ -338,3 +338,10 @@ def test_projection_and_next_delivery_dates_after_as_of_are_flagged_as_projectio
     assert proj["daily"] and all(d["projected"] is True for d in proj["daily"])
     assert all(p["projected"] is True for p in proj["in_transit"])
     assert all(s["next_delivery_projected"] is True for s in m.supplier_performance(S, JUL))
+
+
+def test_flow_and_staffing_history_skip_days_the_cleaning_flagged_as_invalid(m):
+    bad = date(2026, 6, 22)  # S001: transactions_gt_footfall;implausible_ticket
+    assert all(r["date"] != bad for r in m.flow_history("S001", JUL, bad - timedelta(days=3)))
+    assert not any(r["store_id"] == "S001" and r["date"] == bad for r in m.staffing_history("S001", JUL, bad - timedelta(days=3))["rows"])
+    assert all(r["transactions"] < 2000 for r in m.flow_history("S001", JUL, JUL - timedelta(days=90)))

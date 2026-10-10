@@ -526,7 +526,8 @@ class DuckDBMetrics:
     def flow_history(self, store_id: str, as_of: date, start: date) -> list[dict[str, Any]]:
         """Store daily transactions, footfall (null when the conversion data is not valid) and net sales to as_of."""
         return self._rows("SELECT date, transactions, CASE WHEN conversion_valid THEN footfall END footfall, net_sales"
-                          " FROM store_daily_kpis WHERE store_id=? AND date BETWEEN ? AND ? ORDER BY date",
+                          " FROM store_daily_kpis WHERE store_id=? AND date BETWEEN ? AND ?"
+                          " AND coalesce(dq_flags,'') NOT LIKE '%implausible_ticket%' ORDER BY date",
                           [store_id, start, as_of])
 
     # -- Manager metrics inputs (Wave 12) ---------------------------------------
@@ -553,7 +554,8 @@ class DuckDBMetrics:
         fmt = self.store_profile(store_id)["format"]
         rows = self._rows("SELECT k.store_id, k.date, k.transactions, k.staff_hours FROM store_daily_kpis k"
                           " JOIN stores s USING (store_id) WHERE s.format=? AND k.date BETWEEN ? AND ?"
-                          " AND k.staff_hours>0 ORDER BY k.date, k.store_id", [fmt, start, as_of])
+                          " AND k.staff_hours>0 AND coalesce(k.dq_flags,'') NOT LIKE '%staff_hours_invalid%'"
+                          " AND coalesce(k.dq_flags,'') NOT LIKE '%implausible%' ORDER BY k.date, k.store_id", [fmt, start, as_of])
         return {"format": fmt, "rows": rows}
 
     def promotions(self, store_id: str, as_of: date) -> list[dict[str, Any]]:
