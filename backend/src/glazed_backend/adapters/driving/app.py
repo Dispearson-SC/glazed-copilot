@@ -80,7 +80,7 @@ def build_container(env: dict[str, str] | None = None) -> Container:
     core_url = env.get("GLAZED_CORE_URL")
     if core_url:
         from ..driven.agent_core_http import AgentCoreHttp
-        core: Any = AgentCoreHttp(core_url, env.get("GLAZED_CORE_PROFILE", "orchestrator"))
+        core: Any = AgentCoreHttp.from_env(core_url, env)
     else:
         core = _NoCore()
     cors = cors_origins_from_env(env)

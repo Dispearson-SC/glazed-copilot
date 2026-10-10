@@ -15,18 +15,32 @@ from ...domain.models import CoreError
 
 
 class AgentCoreHttp:
-    def __init__(self, base_url: str, profile_id: str = "orchestrator", subject_id: str = "glazed-manager",
-                 timeout: float = 30.0, client: httpx.Client | None = None) -> None:
+    """Identity per Agent-Core's Glazed vertical (VERTICAL_GLAZED.md): channel `glazed`, role `glazed-manager`
+    (`glazed-service` for scheduled turns), tenant = store, session = case, profile `glazed_orchestrator`."""
+
+    def __init__(self, base_url: str, profile_id: str = "glazed_orchestrator", subject_id: str = "manager-1",
+                 timeout: float = 30.0, client: httpx.Client | None = None, channel: str = "glazed",
+                 roles: str = "glazed-manager", service_roles: str = "glazed-service") -> None:
         self.profile_id, self.subject_id = profile_id, subject_id
+        self.channel, self.roles, self.service_roles = channel, roles, service_roles
         self._c = client or httpx.Client(base_url=base_url, timeout=timeout)
 
-    def _headers(self, store_id: str, admin: bool = False) -> dict[str, str]:
-        return {"X-Subject-Id": self.subject_id, "X-Tenant-Id": store_id, "X-Channel": "http",
-                "X-Roles": "manager,admin" if admin else "manager"}
+    @classmethod
+    def from_env(cls, base_url: str, env: dict[str, str]) -> "AgentCoreHttp":
+        return cls(base_url, env.get("GLAZED_CORE_PROFILE", "glazed_orchestrator"),
+                   env.get("GLAZED_CORE_SUBJECT", "manager-1"), channel=env.get("GLAZED_CORE_CHANNEL", "glazed"),
+                   roles=env.get("GLAZED_CORE_ROLES", "glazed-manager"),
+                   service_roles=env.get("GLAZED_CORE_SERVICE_ROLES", "glazed-service"))
 
-    def _call(self, method: str, url: str, store_id: str, admin: bool = False, **kw: Any) -> httpx.Response:
+    def _headers(self, store_id: str, admin: bool = False, service: bool = False) -> dict[str, str]:
+        roles = self.service_roles if service else self.roles
+        return {"X-Subject-Id": self.subject_id, "X-Tenant-Id": store_id, "X-Channel": self.channel,
+                "X-Roles": f"{roles},admin" if admin else roles}
+
+    def _call(self, method: str, url: str, store_id: str, admin: bool = False, service: bool = False,
+              **kw: Any) -> httpx.Response:
         try:
-            resp = self._c.request(method, url, headers=self._headers(store_id, admin), **kw)
+            resp = self._c.request(method, url, headers=self._headers(store_id, admin, service), **kw)
         except httpx.HTTPError as exc:
             raise CoreError(f"Agent-Core unreachable: {exc}") from exc
         if resp.status_code == 404:
@@ -38,9 +52,9 @@ class AgentCoreHttp:
     def create_conversation(self, case_id: str, store_id: str) -> str:
         return case_id  # the Core creates the session lazily on the first turn
 
-    def send_turn(self, conversation_id: str, store_id: str, text: str) -> str:
+    def send_turn(self, conversation_id: str, store_id: str, text: str, service: bool = False) -> str:
         body = {"session_id": conversation_id, "profile_id": self.profile_id, "text": text}
-        return self._call("POST", "/turns", store_id, json=body).json()["turn_id"]
+        return self._call("POST", "/turns", store_id, service=service, json=body).json()["turn_id"]
 
     def get_turn(self, turn_id: str, store_id: str) -> dict[str, Any]:
         return self._call("GET", f"/turns/{turn_id}", store_id).json()
