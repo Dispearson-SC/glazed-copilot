@@ -74,7 +74,7 @@ export default function MemoriesWindow({
             </div>
           </article>
         ))}
-        {shown.length === 0 && <p className="m-0 py-6 text-center text-[13px] text-on-surface-variant">{state === "loading" ? "Cargando memorias…" : state === "soon" ? SOON_TEXT : state === "error" ? "No se pudieron cargar las memorias." : "Sin memorias que coincidan"}</p>}
+        {shown.length === 0 && <p className="m-0 py-6 text-center text-[13px] text-on-surface-variant">{state === "loading" ? "Cargando memorias…" : state === "soon" ? SOON_TEXT : state === "error" ? "No se pudieron cargar las memorias." : memories.length === 0 ? "Aún no hay memorias. Se irán sumando con tus decisiones." : "Sin memorias que coincidan"}</p>}
       </div>
       <p className="m-0 text-[12px] leading-[18px] text-on-surface-variant">Las memorias se escriben solo después de una decisión o de un resultado medido. Con un solo caso, el copiloto lo dice y la confianza queda baja.</p>
     </main>
