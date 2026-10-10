@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api";
-import { analysisApproval, pendingA } from "../test/copilotFixtures";
+import { analysisApproval, analysisPromoAlt, analysisPromoRec, pendingPromo, pendingA } from "../test/copilotFixtures";
 import { fakeApi, renderPage } from "../test/helpers";
 import CopilotPage from "./CopilotPage";
 
@@ -199,5 +199,28 @@ describe("Decisiones window", () => {
     const card = (await screen.findByRole("heading", { name: /Pedir 10 unidades/ })).closest("article")!;
     expect(within(card).getByRole("button", { name: /Aceptar/ })).toBeDisabled();
     expect(within(card).getByText(/Disponible pronto/)).toBeInTheDocument();
+  });
+});
+
+describe("activate_promo option (fixture)", () => {
+  const promoApi = (analysis = analysisPromoRec) => apiWith({ getPending: async () => pendingPromo, getAnalysis: async () => analysis });
+
+  it("renders the recommended promo on the approval card with copy, numbers and caveat", async () => {
+    await openDecisiones(promoApi());
+    const card = (await screen.findByRole("heading", { name: "Activar promoción −20% en 12 Croiss-Ant Donuts" })).closest("article")!;
+    expect(within(card).getByText("Activar promoción −20% por 5 días (lun 20 jul–vie 24 jul)")).toBeInTheDocument();
+    expect(within(card).getByText("Vende ~36 de 48 unidades en riesgo")).toBeInTheDocument();
+    expect(within(card).getByText("Merma evitada +$42.50")).toBeInTheDocument();
+    expect(within(card).getByText("Aumento esperado 35% (20–50%) · confianza media")).toBeInTheDocument();
+    expect(within(card).getByText("Basado en 6 promociones similares de los últimos 90 días")).toBeInTheDocument();
+    expect(within(card).getByText("promo lift estimated from history")).toBeInTheDocument();
+    expect(within(card).getByText("N2 · Propuesta")).toBeInTheDocument();
+  });
+
+  it("approves the promo from the analysis with that option_id", async () => {
+    const api = await openDecisiones(promoApi());
+    await userEvent.click(await screen.findByRole("button", { name: "Analizar con el copiloto" }));
+    await userEvent.click(await screen.findByRole("button", { name: /Aprobar/ }));
+    await waitFor(() => expect(api.recordDecision).toHaveBeenCalledWith("c1", { issue_id: "S030|overstock_waste|SKU-100502", option_id: "pr0m0a1b2c3d", approved: true }, expect.anything()));
   });
 });

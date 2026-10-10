@@ -66,3 +66,9 @@ export const dateLabel = (iso: string): string => {
     .replace(",", "");
   return t.charAt(0).toUpperCase() + t.slice(1);
 };
+
+/** "lun 20 jul": short weekday, day and month, in Spanish. */
+export const shortDate = (iso: string): string => {
+  const month = new Intl.DateTimeFormat("es-MX", { month: "short", timeZone: "UTC" }).format(new Date(`${iso.slice(0, 10)}T00:00:00Z`));
+  return `${weekdayDay(iso)} ${month.replace(".", "")}`;
+};

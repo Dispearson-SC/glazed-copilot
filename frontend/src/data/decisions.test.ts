@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError, type Api } from "../api";
-import { analysisApproval, pendingA } from "../test/copilotFixtures";
+import { analysisApproval, analysisPromoAlt, analysisPromoRec, pendingA, pendingPromo } from "../test/copilotFixtures";
 import { analysisSections, buildPendingItems, deadlineText, fetchIssueAnalysis, tierLabel } from "./copilot";
 
 const SIM = "2026-07-19";
@@ -135,5 +135,40 @@ describe("confidence label follows calibration", () => {
   it("treats a bare number (old backend) as not calibrated", () => {
     const t = build(approval, { ...tech, confidence: 0.41 }).find((i) => i.kind === "tech")!;
     expect(t.confLabel).toBe("Confianza estimada (sin calibrar)");
+  });
+});
+
+describe("activate_promo option", () => {
+  it("builds the approval card with the promo detail when it is the recommendation", () => {
+    const [c] = buildPendingItems(pendingPromo, SIM);
+    expect(c).toMatchObject({ icon: "sell", optionId: "pr0m0a1b2c3d", level: "N2 · Propuesta" });
+    expect(c.promo).toEqual({
+      label: "Activar promoción",
+      primary: "Activar promoción −20% por 5 días (lun 20 jul–vie 24 jul)",
+      details: ["Vende ~36 de 48 unidades en riesgo", "Merma evitada +$42.50", "Aumento esperado 35% (20–50%) · confianza media"],
+      basis: "Basado en 6 promociones similares de los últimos 90 días",
+      caveat: "promo lift estimated from history",
+    });
+  });
+
+  it("maps the Spanish confidence labels and leaves non-promo cards without promo", () => {
+    const withConf = (c: "low" | "medium" | "high") => buildPendingItems({ ...pendingPromo, approvals: [{ ...pendingPromo.approvals[0], recommendation: { ...pendingPromo.approvals[0].recommendation, params: { ...pendingPromo.approvals[0].recommendation.params, lift_confidence: c } } }] }, SIM)[0].promo!.details[2];
+    expect([withConf("low"), withConf("high")]).toEqual(["Aumento esperado 35% (20–50%) · confianza baja", "Aumento esperado 35% (20–50%) · confianza alta"]);
+    expect(buildPendingItems(pendingA, SIM)[1].promo).toBeUndefined();
+  });
+
+  it("shows the promo detail in the analysis when recommended", () => {
+    const items = analysisSections("analizar", analysisPromoRec).find((x) => x.label === "Recomendación")!.items;
+    expect(items).toEqual([
+      "Activar promoción −20% en 12 Croiss-Ant Donuts", "Activar promoción −20% por 5 días (lun 20 jul–vie 24 jul)", "Vende ~36 de 48 unidades en riesgo", "Merma evitada +$42.50",
+      "Aumento esperado 35% (20–50%) · confianza media", "Basado en 6 promociones similares de los últimos 90 días", "promo lift estimated from history",
+    ]);
+  });
+
+  it("lists 'Activar promoción' among the alternatives", () => {
+    const alts = analysisSections("dialogo", analysisPromoAlt).find((x) => x.label === "Alternativas")!.items;
+    expect(alts[0]).toBe("Activar promoción −20% por 5 días (lun 20 jul–vie 24 jul) (efecto neto $31.20)");
+    expect(alts).toContain("Aumento esperado 35% (20–50%) · confianza media");
+    expect(alts).toContain("No hacer nada (efecto neto $0.00)");
   });
 });

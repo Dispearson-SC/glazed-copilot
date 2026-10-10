@@ -427,7 +427,7 @@ export interface PendingApproval {
   impact_usd: Range3;
   confidence: { score: number | null; calibrated: boolean };
   problem: string;
-  recommendation: { option_id: string; label: string; action_type: string; params: Record<string, unknown> };
+  recommendation: Recommendation;
   requires_approval: boolean;
   kind?: string;
   kinds?: string[];
@@ -458,6 +458,39 @@ export interface PendingTechnical {
   warning_codes?: string[];
 }
 
+/** Params of an `activate_promo` option (N2): promotion on expiring/overstock stock. */
+export interface PromoParams {
+  sku: string;
+  discount_pct: number;
+  days: number;
+  start_date: string;
+  end_date: string;
+  expected_lift_pct: number;
+  lift_range_pct: [number, number];
+  units_at_risk: number;
+  expected_units_cleared: number;
+  waste_avoided_usd: number;
+  lift_confidence: "low" | "medium" | "high";
+  promo_ids: string[];
+  lift_basis: string;
+}
+
+/** Standard option fields shared by the recommendation and the alternatives. */
+export interface OptionExtras {
+  benefit_usd?: Range3 | null;
+  cost_usd?: Range3 | null;
+  net_usd?: Range3 | null;
+  risks?: string[];
+  data_caveat?: string | null;
+}
+
+export interface Recommendation extends OptionExtras {
+  option_id: string;
+  label: string;
+  action_type: string;
+  params: Record<string, unknown>;
+}
+
 /** GET /cases/{id}/decisions/pending */
 export interface PendingResponse {
   as_of: string;
@@ -475,11 +508,11 @@ export interface IssueAnalysis {
   impact_usd: Range3;
   confidence: { score: number | null; calibrated: boolean };
   problem: string;
-  recommendation: { option_id: string; label: string; action_type: string; params: Record<string, unknown> };
+  recommendation: Recommendation;
   pros: string[];
   cons: string[];
   requires_approval: boolean;
-  dialog: { why: string; if_accept: string; if_not_act: string; alternatives: { option_id: string; label: string; net_usd_mid: number | null }[] };
+  dialog: { why: string; if_accept: string; if_not_act: string; alternatives: ({ option_id: string; label: string; net_usd_mid: number | null; action_type?: string; params?: Record<string, unknown> } & OptionExtras)[] };
 }
 
 /** POST /cases/{id}/decisions */
