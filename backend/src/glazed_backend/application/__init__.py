@@ -533,7 +533,22 @@ def _message_text(payload: dict[str, Any]) -> str:
     content = payload.get("content", payload.get("text", payload.get("summary", "")))
     if isinstance(content, list):
         content = " ".join(str(p.get("text", "")) if isinstance(p, dict) else str(p) for p in content).strip()
+    if isinstance(content, str) and content.startswith('{"kind"'):
+        content = _envelope_text(content)
     return content if isinstance(content, str) else _clip(content)
+
+
+def _envelope_text(raw: str) -> str:
+    """Older transcript rows store the serialized model envelope {"kind", "parts": [{"content"}]}: keep its text."""
+    try:
+        env = json.loads(raw)
+    except ValueError:
+        return raw
+    parts = env.get("parts") if isinstance(env, dict) else None
+    if not isinstance(parts, list):
+        return raw
+    texts = [str(p.get("content")) for p in parts if isinstance(p, dict) and isinstance(p.get("content"), str)]
+    return "\n".join(texts) if texts else raw
 
 
 def _events_from_entry(case: Case, entry: dict[str, Any]) -> list[TraceEvent]:
