@@ -65,7 +65,8 @@ def label(o: dict[str, Any], issue: dict[str, Any]) -> str:
     if at == "markdown_end_of_day":
         return f"Rebajar {name} {p.get('discount_pct', '')}% al cierre ({p.get('units', '?')} unidades)".replace("  ", " ")
     if at == "activate_promo":
-        return f"Activar promoción de {p.get('discount_pct', '')}% en {name} por {p.get('days', '?')} días".replace("  ", " ")
+        days = p.get('days', '?')
+        return f"Activar promoción de {p.get('discount_pct', '')}% en {name} por {days} {'día' if days == 1 else 'días'}".replace("  ", " ")
     if at == "do_nothing":
         return "No hacer nada"
     return {"run_promo": f"Lanzar promoción en {name}", "transfer_stock": (f"Trasladar {int(qty)} unidades de {name} a {p.get('to_store_name') or p['to_store']}" if qty is not None and p.get("to_store")
