@@ -152,7 +152,18 @@ def _action_signature(issue: dict) -> tuple | None:
     if rec is None or rec.get("action_type") == "do_nothing" or not issue.get("sku"):
         return None
     p = rec.get("params") or {}
+    if _reduces_order(rec["action_type"], p):  # "omit" and "cut to ~0" this cycle read the same to the manager
+        return (issue.get("store_id"), issue["sku"], "reduce_order", p.get("supplier_id"))
     return (issue.get("store_id"), issue["sku"], rec["action_type"], p.get("supplier_id"), p.get("plan_qty", p.get("qty")))
+
+
+def _reduces_order(action_type: str, p: dict) -> bool:
+    if action_type == "skip_order":
+        return True
+    if action_type != "adjust_order_qty":
+        return False
+    qty, typical = p.get("qty"), p.get("typical_qty", p.get("plan_qty"))
+    return qty is not None and typical is not None and float(qty) < float(typical)
 
 
 def _rank(issue: dict) -> tuple:

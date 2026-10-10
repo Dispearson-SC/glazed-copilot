@@ -32,3 +32,17 @@ def test_approval_duplicate_of_technical_is_linked():
     appr = [{"issue_id": "i2", "sku": "SKU-1", "recommendation": {"action_type": "skip_order"}}]
     a, t = _dedupe_by_sku_action(appr, tech)
     assert a == [] and t[0]["linked_issue_ids"] == ["i2"]
+
+
+def test_skip_order_and_a_downward_adjust_of_the_same_sku_merge():
+    from glazed_backend.metrics.issues import merge_same_action
+
+    def issue(kind, action, params, score, n):
+        return {"issue_id": f"S004|{kind}|SKU-1", "kind": kind, "store_id": "S004", "sku": "SKU-1", "evidence": [],
+                "data_caveats": [], "severity_usd": 10.0, "recommended_option_id": "o",
+                "options": [{"option_id": "o", "action_type": action, "params": params,
+                             "confidence": {"score": score, "n_backtest": n}}]}
+    a = issue("inflated_order", "adjust_order_qty", {"supplier_id": "SUP03", "qty": 1, "typical_qty": 10.0}, 0.3, 0)
+    b = issue("overstock_waste", "skip_order", {"supplier_id": "SUP03", "typical_qty": 10.0}, 0.84, 120)
+    (only,) = merge_same_action([a, b])
+    assert only["issue_id"] == "S004|overstock_waste|SKU-1" and only["merged_issue_ids"] == ["S004|inflated_order|SKU-1"]
