@@ -42,22 +42,24 @@ describe("Decisiones window", () => {
     expect(screen.getByText("Todas las decisiones técnicas de hoy están resueltas.")).toBeInTheDocument();
   });
 
-  it("accepts a technical decision: propose, then decide, with idempotency keys; removes the card and toasts", async () => {
+  it("accepts a technical decision with ONE atomic POST /decisions and an idempotency key; removes the card and toasts", async () => {
     const api = await openDecisiones();
     await userEvent.click(await screen.findByRole("button", { name: /Aceptar/ }));
-    await waitFor(() => expect(api.decide).toHaveBeenCalled());
-    expect(api.propose).toHaveBeenCalledWith(
-      { case_id: "c1", issue_id: "S030|stockout_risk|SKU-100263", option_id: "8f63a675ef2b", rationale: expect.any(String) },
+    await waitFor(() => expect(api.recordDecision).toHaveBeenCalled());
+    expect(api.recordDecision).toHaveBeenCalledWith(
+      "c1",
+      { issue_id: "S030|stockout_risk|SKU-100263", option_id: "8f63a675ef2b", approved: true },
       { idempotencyKey: expect.any(String) },
     );
-    expect(api.decide).toHaveBeenCalledWith("pp-new", { approved: true }, { idempotencyKey: expect.any(String) });
+    expect(api.propose).not.toHaveBeenCalled();
+    expect(api.decide).not.toHaveBeenCalled();
     expect(await screen.findByRole("status")).toHaveTextContent("Aceptada: Pedir 10 unidades de Md Choc Stout C.B. Wsweet Cold Foam");
     expect(screen.queryByRole("heading", { name: /Pedir 10 unidades/ })).toBeNull();
     expect(screen.getByText(/1 aceptada por ti/)).toBeInTheDocument();
   });
 
   it("keeps the card and shows the error when the backend refuses", async () => {
-    await openDecisiones(apiWith({ propose: async () => { throw new ApiError(400, "unknown option"); } }));
+    await openDecisiones(apiWith({ recordDecision: async () => { throw new ApiError(400, "unknown option"); } }));
     await userEvent.click(await screen.findByRole("button", { name: /Aceptar/ }));
     expect(await screen.findByRole("status")).toHaveTextContent("No se pudo registrar: unknown option");
     expect(screen.getByRole("heading", { name: /Pedir 10 unidades/ })).toBeInTheDocument();
@@ -74,7 +76,7 @@ describe("Decisiones window", () => {
     expect(submit).toBeEnabled();
     await userEvent.type(within(sheet).getByLabelText("Cuéntale más (opcional)"), "muy caro");
     await userEvent.click(submit);
-    await waitFor(() => expect(api.decide).toHaveBeenCalledWith("pp-new", { approved: false, reason: "Precio o costo: muy caro" }, expect.anything()));
+    await waitFor(() => expect(api.recordDecision).toHaveBeenCalledWith("c1", { issue_id: "S030|stockout_risk|SKU-100263", option_id: "8f63a675ef2b", approved: false, reason: "Precio o costo: muy caro" }, expect.anything()));
     expect(await screen.findByRole("status")).toHaveTextContent("Motivo registrado como «Precio o costo»");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.queryByRole("heading", { name: /Pedir 10 unidades/ })).toBeNull();
@@ -86,7 +88,7 @@ describe("Decisiones window", () => {
     await userEvent.click(within(card).getByRole("button", { name: /Rechazar/ }));
     await userEvent.click(screen.getByRole("button", { name: "Cerrar" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(api.decide).not.toHaveBeenCalled();
+    expect(api.recordDecision).not.toHaveBeenCalled();
   });
 
   it("Analizar switches to Agente with the context pinned, the user message and the analysis card", async () => {
@@ -111,7 +113,7 @@ describe("Decisiones window", () => {
     const api = await openDecisiones();
     await userEvent.click(await screen.findByRole("button", { name: "Analizar con el copiloto" }));
     await userEvent.click(await screen.findByRole("button", { name: /Aprobar/ }));
-    await waitFor(() => expect(api.decide).toHaveBeenCalledWith("pp-new", { approved: true }, expect.anything()));
+    await waitFor(() => expect(api.recordDecision).toHaveBeenCalledWith("c1", { issue_id: "S030|overstock_waste|SKU-100502", option_id: "65ead6dcd46e", approved: true }, expect.anything()));
     expect(await screen.findByText("Decisión registrada")).toBeInTheDocument();
   });
 

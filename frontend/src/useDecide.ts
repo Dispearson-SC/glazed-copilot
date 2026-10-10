@@ -11,7 +11,7 @@ export interface Rejection {
 }
 
 /**
- * Two-step decision on the real backend: POST /proposals (reused when one is pending), then POST /proposals/{id}/decision.
+ * Atomic decision on the real backend: POST /cases/{id}/decisions (proposal and decision in one call).
  * Local state (card removed, toast, learned memory) changes only after the backend accepted the decision.
  */
 export function useDecide(caseId: string, refresh: () => Promise<void> | void) {
@@ -26,9 +26,12 @@ export function useDecide(caseId: string, refresh: () => Promise<void> | void) {
       const reason = approved ? undefined : [rejection?.label, rejection?.text].filter(Boolean).join(": ");
       setBusy(item.id);
       try {
-        const proposalId = (await api.propose({ case_id: caseId, issue_id: item.issueId, option_id: item.optionId, rationale: item.title }, { idempotencyKey: crypto.randomUUID() })).proposal_id;
         try {
-          await api.decide(proposalId, approved ? { approved: true } : { approved: false, reason }, { idempotencyKey: crypto.randomUUID() });
+          await api.recordDecision(
+            caseId,
+            { issue_id: item.issueId, option_id: item.optionId, approved, ...(approved ? {} : { reason }) },
+            { idempotencyKey: crypto.randomUUID() },
+          );
         } catch (e) {
           if (!(e instanceof ApiError && e.status === 409)) throw e; // already decided elsewhere: reconcile below
         }
