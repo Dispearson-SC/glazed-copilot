@@ -25,6 +25,8 @@ class Product:
     unit_cost: float
     case_size: int = 1
     shelf_life_days: int | None = None
+    department: str | None = None
+    category: str | None = None
 
 
 @dataclass(frozen=True)
@@ -73,7 +75,35 @@ class Config:
     backtest_days: int = 28
     markdown_discount: float = 0.30
     markdown_recovery: tuple[float, float, float] = (0.25, 0.50, 0.75)  # assumed elasticity (low, mid, high)
+    # Order policy. "margin" is the newsvendor critical ratio on price - cost vs cost (the default, unchanged).
+    # "waste_aware" adds `waste_penalty` x unit cost to the overage cost of perishables, optionally caps their
+    # service level, and prices markdowns / promotions with the lift estimated from the promotion history.
+    order_policy: str = "margin"
+    waste_penalty: float = 0.0  # extra cost per wasted perishable unit, as a multiple of unit cost (waste_aware only)
+    perishable_service_cap: float | None = None  # upper bound on the service level of perishables (waste_aware only)
+    promo_lift: object | None = None  # PromoLiftTable (metrics.promo_lift) or None: no estimate, assumptions stay
     extra: dict = field(default_factory=dict)
+
+    @property
+    def waste_aware(self) -> bool:
+        return self.order_policy == "waste_aware"
+
+
+def config_from_env(env: dict[str, str]) -> "Config":
+    """GLAZED_ORDER_POLICY=margin|waste_aware (default margin), GLAZED_WASTE_PENALTY=<float>, GLAZED_SERVICE_CAP=<0..1>.
+    Anything unset or unparsable leaves the default, so the deployed behaviour only changes on an explicit opt-in."""
+    policy = (env.get("GLAZED_ORDER_POLICY") or "margin").strip().lower()
+    if policy not in ("margin", "waste_aware"):
+        policy = "margin"
+
+    def num(key: str) -> float | None:
+        try:
+            return float(env[key]) if env.get(key) not in (None, "") else None
+        except ValueError:
+            return None
+    pen, cap = num("GLAZED_WASTE_PENALTY"), num("GLAZED_SERVICE_CAP")
+    return Config(order_policy=policy, waste_penalty=max(0.0, pen) if pen is not None else 0.0,
+                  perishable_service_cap=cap if cap is not None and 0.0 < cap < 1.0 else None)
 
 
 @dataclass(frozen=True)

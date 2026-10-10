@@ -4,7 +4,7 @@ from __future__ import annotations
 from ..domain.models import ACTION_TYPES, MEMORY_CATEGORIES
 
 ACTION_ES = {"place_order": "un pedido", "adjust_order_qty": "un ajuste de pedido", "skip_order": "omitir el pedido",
-             "markdown_end_of_day": "una rebaja al cierre", "run_promo": "una promoción", "transfer_stock": "una transferencia de inventario",
+             "markdown_end_of_day": "una rebaja al cierre", "run_promo": "una promoción", "activate_promo": "una promoción por unos días", "transfer_stock": "una transferencia de inventario",
              "shift_staff_hours": "un cambio de horas de personal", "data_fix_task": "una corrección de datos", "do_nothing": "no hacer nada"}
 # supplier-facing orders teach about suppliers; everything else shapes demand
 _ACTION_CATEGORY = {"place_order": "proveedores", "adjust_order_qty": "proveedores", "skip_order": "proveedores"}
