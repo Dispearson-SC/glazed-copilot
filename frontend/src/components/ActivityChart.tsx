@@ -10,6 +10,7 @@ export interface ActivityPoint {
 }
 
 const MAX_PX = 112;
+const CAP_RATIO = 1.5;
 
 const barClass: Record<BarKind, string> = {
   actual: "bg-surface-container group-hover:bg-outline-variant",
@@ -31,7 +32,14 @@ export default function ActivityChart({ points, model }: { points: ActivityPoint
   const today = points.find((p) => p.kind === "today")?.date ?? points[0]?.date;
   const [hover, setHover] = useState<string | null>(null);
   const active = points.find((p) => p.date === hover) ?? points.find((p) => p.date === today);
-  const max = Math.max(1, ...points.map((p) => p.value ?? 0));
+  const maxOf = (kinds: (p: ActivityPoint) => boolean) => Math.max(0, ...points.filter(kinds).map((p) => p.value ?? 0));
+  const maxActual = maxOf((p) => p.kind !== "forecast");
+  const maxProjected = maxOf((p) => p.kind === "forecast");
+  // Projected bars share the actuals' axis. When they tower over it (> 1.5x) they are capped at the top, not rescaled.
+  const capped = maxActual > 0 && maxProjected > maxActual * CAP_RATIO;
+  const max = Math.max(1, capped ? maxActual : Math.max(maxActual, maxProjected));
+  const heightOf = (p: ActivityPoint) => (p.value == null ? 24 : Math.min(MAX_PX, Math.max(4, Math.round((p.value / max) * MAX_PX))));
+  const isCapped = (p: ActivityPoint) => capped && p.kind === "forecast" && (p.value ?? 0) > max;
   return (
     <section data-testid="activity-chart" className="bg-surface-container-lowest rounded-[18px] p-space-lg shadow-sm shadow-primary/5 flex flex-col gap-space-md">
       <div className="flex items-start justify-between">
@@ -71,12 +79,17 @@ export default function ActivityChart({ points, model }: { points: ActivityPoint
               onClick={() => setHover(p.date)}
               className={`flex-1 flex flex-col items-center gap-2 group cursor-pointer ${p.kind === "forecast" ? "opacity-60" : ""} ${p.kind === "today" ? "relative" : ""}`}
             >
+              {isCapped(p) && (
+                <span data-testid={`activity-cap-${p.date}`} aria-label="Valor por encima de la escala" className="font-label-sm text-label-sm text-on-tertiary-container leading-none -mb-1">
+                  ↑
+                </span>
+              )}
               <div
                 data-testid={`activity-bar-${p.date}`}
                 data-kind={p.kind}
                 title={`${p.date}: ${p.value == null ? "sin datos" : money(p.value)}${p.kind === "forecast" ? " (proyección)" : ""}`}
                 className={`w-full max-w-[28px] rounded-t-lg transition-all ${barClass[styleOf(p)]}`}
-                style={{ height: `${p.value == null ? 24 : Math.max(4, Math.round((p.value / max) * MAX_PX))}px` }}
+                style={{ height: `${heightOf(p)}px` }}
               ></div>
               <span className={`font-label-sm text-label-sm capitalize ${labelClass[p.kind === "today" ? "today" : styleOf(p)]}`}>
                 {p.kind === "today" ? "hoy" : weekdayShort(p.date)}

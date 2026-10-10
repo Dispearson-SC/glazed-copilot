@@ -40,7 +40,13 @@ export default function DashboardPage() {
   const { currentCase, loading, error: caseError } = useCurrentCase(storeId, session.refreshKey);
   const caseId = currentCase?.case_id;
   const simToday = currentCase?.sim_today;
-  const summary = usePolling(() => (caseId ? api.getDaySummary(caseId) : Promise.resolve(null)), 60_000, true, [caseId, session.refreshKey]);
+  // "Today" is the case's simulated day (as_of): complete, never the day before.
+  const summary = usePolling(
+    () => (caseId && simToday ? api.getDaySummary(caseId, simToday) : Promise.resolve(null)),
+    60_000,
+    true,
+    [caseId, simToday, session.refreshKey],
+  );
   const day = summary.data?.date;
   const forecast = useOptionalPolling(
     () => (caseId && simToday ? api.getForecast(caseId, { from: shiftDate(simToday, -7), to: shiftDate(simToday, 7), level: "store" }) : Promise.resolve(null)),

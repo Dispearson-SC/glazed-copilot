@@ -9,12 +9,12 @@ import DashboardPage from "./DashboardPage";
 const open = (api = fakeApi()) => renderPage(api, "/", "/", <DashboardPage />);
 
 const forecastFor = (over: Partial<ForecastResponse> = {}): ForecastResponse => {
-  const days = Array.from({ length: 10 }, (_, i) => `2026-03-${String(4 + i).padStart(2, "0")}`);
+  const days = Array.from({ length: 10 }, (_, i) => `2026-03-${String(2 + i).padStart(2, "0")}`);
   return {
-    store_id: "S030", sku: null, level: "store", as_of: "2026-03-11", forecast_origin: "2026-03-11",
+    store_id: "S030", sku: null, level: "store", as_of: "2026-03-01", forecast_origin: "2026-03-01",
     model: "glm_poisson", model_version: "1", unit: "USD", horizon_days: 7,
     points: days.map((date, i) => ({
-      date, forecast: 100 + i, p10: 80, p90: 120, baseline: 90, actual: date <= "2026-03-10" ? 200 + i : 999, censored: false,
+      date, forecast: 100 + i, p10: 80, p90: 120, baseline: 90, actual: null, censored: false,
     })),
     metrics_to_date: { wape: 0.298, bias: 0, coverage_p10_p90: 0.88, wape_baseline: 0.357, n_days: 28 },
     ...over,
@@ -22,10 +22,10 @@ const forecastFor = (over: Partial<ForecastResponse> = {}): ForecastResponse => 
 };
 
 describe("DashboardPage header", () => {
-  it("shows the title, the long Spanish date of the summary and the simulated clock", async () => {
+  it("shows the title, the long date of the simulated today and the simulated clock", async () => {
     open();
     expect(await screen.findByRole("heading", { name: "Resumen de hoy" })).toBeInTheDocument();
-    expect(screen.getByText("martes, 10 de marzo de 2026")).toBeInTheDocument();
+    expect(screen.getByText("domingo, 1 de marzo de 2026")).toBeInTheDocument();
     expect(screen.getByText("Fecha simulada")).toBeInTheDocument();
     expect(screen.getByTestId("sim-today")).toHaveTextContent("2026-03-01");
   });
@@ -47,6 +47,7 @@ describe("DashboardPage hero and metrics", () => {
     open();
     const hero = await screen.findByTestId("hero");
     expect(await within(hero).findByText("$733.91")).toBeInTheDocument();
+    expect(within(hero).getByText("Ventas de hoy")).toBeInTheDocument();
     expect(screen.getByTestId("hero-delta")).toHaveTextContent("+18.8% vs promedio mismo día");
     expect(hero).toHaveTextContent("Promedio mismo día (8 sem): $617.92");
     expect(screen.getByTestId("hero-progress")).toHaveTextContent("119% del promedio");
@@ -89,34 +90,62 @@ describe("DashboardPage hero and metrics", () => {
 });
 
 describe("DashboardPage activity chart", () => {
-  it("draws the 7 days ending at the summary date plus 3 projected days, highlighting the day shown", async () => {
-    const api = fakeApi({ getForecast: async () => forecastFor() });
+  const ids = (days: string[]) => days.map((d) => `activity-bar-${d}`);
+  const actualDays = ["2026-02-23", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-02-28"];
+
+  it("uses the simulated today as the day shown and asks for exactly that date", async () => {
+    const api = fakeApi();
     open(api);
-    await screen.findByTestId("activity-bar-2026-03-10");
-    for (const d of ["04", "05", "06", "07", "08", "09", "10"]) expect(screen.getByTestId(`activity-bar-2026-03-${d}`)).toHaveAttribute("data-kind", d === "10" ? "today" : "actual");
-    for (const d of ["11", "12", "13"]) expect(screen.getByTestId(`activity-bar-2026-03-${d}`)).toHaveAttribute("data-kind", "forecast");
-    expect(screen.queryByTestId("activity-bar-2026-03-14")).toBeNull();
-    expect(within(screen.getByTestId("activity-col-2026-03-10")).getByText("hoy")).toBeInTheDocument();
+    await screen.findByTestId("hero");
+    const calls = (api.getDaySummary as unknown as { mock: { calls: [string, string | undefined][] } }).mock.calls;
+    expect(calls.some((c) => c[1] === "2026-03-01")).toBe(true);
+    expect(calls.every((c) => c[1] !== undefined)).toBe(true);
+  });
+
+  it("draws 7 actual days ending at the simulated today, then the 3 days after it, highlighting today", async () => {
+    open(fakeApi({ getForecast: async () => forecastFor() }));
+    await screen.findByTestId("activity-bar-2026-03-01");
+    for (const id of ids(actualDays)) expect(screen.getByTestId(id)).toHaveAttribute("data-kind", "actual");
+    expect(screen.getByTestId("activity-bar-2026-03-01")).toHaveAttribute("data-kind", "today");
+    for (const d of ["02", "03", "04"]) expect(screen.getByTestId(`activity-bar-2026-03-${d}`)).toHaveAttribute("data-kind", "forecast");
+    expect(screen.queryByTestId("activity-bar-2026-03-05")).toBeNull();
+    expect(within(screen.getByTestId("activity-col-2026-03-01")).getByText("hoy")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Ventas por día" })).toBeInTheDocument();
     expect(screen.queryByText(/Actividad de hoy|por hora/)).toBeNull();
   });
 
-  it("never draws an actual dated after the summary day, even if the payload carries one", async () => {
+  it("projects from the day after today with no gap", async () => {
     open(fakeApi({ getForecast: async () => forecastFor() }));
-    await screen.findByTestId("activity-bar-2026-03-11");
-    expect(screen.getByTestId("activity-bar-2026-03-11")).toHaveAttribute("title", expect.stringContaining("$107.00"));
-    expect(screen.queryByText(/999/)).toBeNull();
+    const first = await screen.findByTestId("activity-bar-2026-03-02");
+    const today = screen.getByTestId("activity-bar-2026-03-01");
+    expect(today.closest("[data-testid^=activity-col]")!.nextElementSibling).toBe(first.closest("[data-testid^=activity-col]"));
+  });
+
+  it("never draws an actual in a projected bar, even if the payload carries one", async () => {
+    const f = forecastFor();
+    open(fakeApi({ getForecast: async () => ({ ...f, points: f.points.map((p) => ({ ...p, actual: 999 })) }) }));
+    await screen.findByTestId("activity-bar-2026-03-02");
+    expect(screen.getByTestId("activity-bar-2026-03-02")).toHaveAttribute("title", expect.stringContaining("$100.00"));
     expect(document.body.innerHTML).not.toContain("999");
   });
 
-  it("shows the real value of the active bar in the tooltip, defaulting to the day shown", async () => {
+  it("shows the real value of the active bar in the tooltip, defaulting to today", async () => {
     open(fakeApi({ getForecast: async () => forecastFor() }));
     const tip = await screen.findByTestId("activity-tooltip");
     expect(tip).toHaveTextContent("$733.91");
     const { default: userEvent } = await import("@testing-library/user-event");
-    await userEvent.hover(screen.getByTestId("activity-col-2026-03-12"));
-    expect(tip).toHaveTextContent("$108.00");
+    await userEvent.hover(screen.getByTestId("activity-col-2026-03-03"));
+    expect(tip).toHaveTextContent("$101.00");
     expect(tip).toHaveTextContent("proyección");
+  });
+
+  it("draws the tooltip pill dark, as in the design", async () => {
+    open(fakeApi({ getForecast: async () => forecastFor() }));
+    const tip = await screen.findByTestId("activity-tooltip");
+    expect(tip.className).toContain("bg-primary");
+    expect(tip.className).toContain("text-surface-bright");
+    expect(tip.className).toContain("rounded-full");
+    expect(tip.className).not.toMatch(/bg-surface|bg-outline/);
   });
 
   it("captions the forecast model as given by the backend", async () => {
@@ -124,44 +153,55 @@ describe("DashboardPage activity chart", () => {
     expect(await screen.findByTestId("activity-model")).toHaveTextContent("glm_poisson");
   });
 
+  it("keeps projected bars on the actuals' axis when they are within 1.5x", async () => {
+    const f = forecastFor();
+    open(fakeApi({ getForecast: async () => ({ ...f, points: f.points.map((p) => ({ ...p, forecast: 1000 })) }) }));
+    await screen.findByTestId("activity-bar-2026-03-02");
+    expect(screen.getByTestId("activity-bar-2026-03-02")).toHaveStyle({ height: "112px" });
+    expect(screen.getByTestId("activity-bar-2026-03-01")).toHaveStyle({ height: "82px" });
+    expect(screen.queryByTestId("activity-cap-2026-03-02")).toBeNull();
+  });
+
+  it("caps projected bars at the chart top with an arrow when they exceed 1.5x the actuals, without rescaling", async () => {
+    const f = forecastFor();
+    open(fakeApi({ getForecast: async () => ({ ...f, points: f.points.map((p, i) => ({ ...p, forecast: 2000 + i })) }) }));
+    await screen.findByTestId("activity-bar-2026-03-02");
+    expect(screen.getByTestId("activity-bar-2026-03-02")).toHaveStyle({ height: "112px" });
+    expect(screen.getByTestId("activity-cap-2026-03-02")).toHaveTextContent("↑");
+    expect(screen.getByTestId("activity-cap-2026-03-04")).toBeInTheDocument();
+    expect(screen.getByTestId("activity-bar-2026-03-01")).toHaveStyle({ height: "112px" });
+    expect(screen.getByTestId("activity-bar-2026-02-28")).toHaveStyle({ height: "112px" });
+    expect(screen.getByTestId("activity-bar-2026-03-02")).toHaveAttribute("title", expect.stringContaining("$2,000.00".replace(",", "")));
+  });
+
   it("draws 7 actual days quietly, without a model caption, when the forecast route is missing", async () => {
     const api = fakeApi();
     open(api);
-    await screen.findByTestId("activity-bar-2026-03-10");
+    await screen.findByTestId("activity-bar-2026-03-01");
     expect(screen.queryByTestId("activity-model")).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
-    const dates = (api.getDaySummary as unknown as { mock: { calls: [string, string | undefined][] } }).mock.calls.map((c) => c[1]).filter(Boolean);
-    expect(new Set(dates)).toEqual(new Set(["2026-03-04", "2026-03-05", "2026-03-06", "2026-03-07", "2026-03-08", "2026-03-09"]));
+    const dates = (api.getDaySummary as unknown as { mock: { calls: [string, string | undefined][] } }).mock.calls.map((c) => c[1]);
+    expect(new Set(dates)).toEqual(new Set([...actualDays, "2026-03-01"]));
   });
 
   it("also stays quiet when the forecast route fails with a server error", async () => {
     open(fakeApi({ getForecast: vi.fn(async () => { throw new ApiError(500, "boom"); }) }));
-    await screen.findByTestId("activity-bar-2026-03-10");
+    await screen.findByTestId("activity-bar-2026-03-01");
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("takes actuals from day summaries even when the forecast carries none for the past", async () => {
-    const f = forecastFor();
-    open(fakeApi({ getForecast: async () => ({ ...f, points: f.points.map((p) => ({ ...p, actual: null })) }) }));
-    await screen.findByTestId("activity-bar-2026-03-09");
-    expect(screen.getByTestId("activity-bar-2026-03-09")).toHaveAttribute("data-kind", "actual");
-    expect(screen.getByTestId("activity-bar-2026-03-09")).toHaveAttribute("title", expect.stringContaining("$733.91"));
-  });
-
-  it("keeps the day-shown marker even when that day has no sales", async () => {
+  it("keeps the today marker even when today has no sales", async () => {
     open(fakeApi({
-      getDaySummary: vi.fn(async (_id: string, date?: string) => ({ ...daySummaryA, date: date ?? "2026-03-10", totals: date === undefined ? null : daySummaryA.totals })),
+      getDaySummary: vi.fn(async (_id: string, date?: string) => ({ ...daySummaryA, date: date ?? "", totals: date === "2026-03-01" ? null : daySummaryA.totals })),
     }));
-    expect(await screen.findByTestId("activity-bar-2026-03-10")).toHaveAttribute("data-kind", "today");
+    expect(await screen.findByTestId("activity-bar-2026-03-01")).toHaveAttribute("data-kind", "today");
   });
 
   it("marks a day without data", async () => {
     open(fakeApi({
-      getDaySummary: vi.fn(async (_id: string, date?: string) => ({
-        ...daySummaryA, date: date ?? "2026-03-10", totals: date === "2026-03-08" ? null : daySummaryA.totals,
-      })),
+      getDaySummary: vi.fn(async (_id: string, date?: string) => ({ ...daySummaryA, date: date ?? "", totals: date === "2026-02-27" ? null : daySummaryA.totals })),
     }));
-    expect(await screen.findByTestId("activity-bar-2026-03-08")).toHaveAttribute("data-kind", "nodata");
+    expect(await screen.findByTestId("activity-bar-2026-02-27")).toHaveAttribute("data-kind", "nodata");
   });
 
   it("asks for the 7 days before and after the simulated today", async () => {

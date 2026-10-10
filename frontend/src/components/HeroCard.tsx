@@ -16,7 +16,7 @@ export default function HeroCard({ summary }: { summary: DaySummary }) {
       <div className="relative z-10 flex flex-col gap-space-md">
         <div className="flex items-center justify-between">
           <span className="font-label-md text-label-md text-surface-container tracking-wider uppercase">
-            Ventas del día
+            Ventas de hoy
           </span>
           <div className="w-9 h-9 rounded-full bg-surface-container-lowest/10 flex items-center justify-center text-tertiary-fixed-dim">
             <span aria-hidden="true" className="material-symbols-outlined text-[20px]">coffee_maker</span>
