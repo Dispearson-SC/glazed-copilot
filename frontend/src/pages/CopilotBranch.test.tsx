@@ -111,6 +111,14 @@ describe("Sucursal window", () => {
     expect(document.querySelectorAll("div[data-row]")).toHaveLength(10);
   });
 
+  it("requests the whole inventory list, not just the first rows", async () => {
+    const getInventory = vi.fn(async () => inventoryMany);
+    await openSucursal(api({ getInventory }));
+    await screen.findByText("Producto 1");
+    expect(getInventory).toHaveBeenCalled();
+    for (const [, q] of getInventory.mock.calls as unknown as [string, { limit?: string }][]) expect(Number(q?.limit ?? "50")).toBeGreaterThanOrEqual(50);
+  });
+
   it("lists inventory with stock, daily outflow and the order-plan purchase", async () => {
     await openSucursal();
     const row = (await screen.findByText("Md Choc Stout C.B. Wsweet Cold Foam")).closest("div[data-row]") as HTMLElement;
