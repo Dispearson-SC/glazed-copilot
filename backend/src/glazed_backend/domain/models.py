@@ -19,6 +19,12 @@ TRACE_KINDS = ("message", "tool_call", "tool_result", "escalation")
 AGENT_IDS = ("orchestrator", "present", "past", "supply", "strategist", "sentinel", "auditor", "liaison")
 
 
+def case_id_from_session(session_id: str) -> str:
+    """Peer sessions are named `peer~<asker session id>~<uuid>` by the Core worker; the asker is the case."""
+    parts = session_id.split("~")
+    return parts[1] if len(parts) == 3 and parts[0] == "peer" and parts[1] else session_id
+
+
 def canonical_agent_id(agent_id: str) -> str:
     """Agent-Core profile ids are `glazed_<role>`; the product (trace, frontend lanes, CLI) uses `<role>`.
     Anything else (the manager, `backend`, unknown ids) keeps its id."""

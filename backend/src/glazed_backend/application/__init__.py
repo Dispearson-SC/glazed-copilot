@@ -6,12 +6,13 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from ..domain import (Alert, AlertState, BacktestRun, Case, DomainError, Execution, Experience, FutureDate, NotFound,
-                      Proposal, TraceEvent, alert_type_for_kind, canonical_agent_id, new_id)
+                      Proposal, TraceEvent, alert_type_for_kind, canonical_agent_id, case_id_from_session, new_id)
 from ..ports import (AlertRepository, BacktestRepository, CaseRepository, Clock, CorePort,
                      ExecutionRepository, ExperienceMemoryPort, MetricsPort, ProposalRepository, TracePort)
 
 
 def _case(cases: CaseRepository, case_id: str) -> Case:
+    case_id = case_id_from_session(case_id)
     case = cases.get(case_id) or cases.get_by_conversation(case_id)
     if case is None:
         raise NotFound(f"case {case_id!r} not found")

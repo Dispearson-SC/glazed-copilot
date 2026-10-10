@@ -11,22 +11,29 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
-from ...domain import Case, DomainError
+from ...domain import Case, DomainError, canonical_agent_id, case_id_from_session
 
 
 class ProposalBody(BaseModel):
     issue_id: str
+    option_id: str | None = None
     action_type: str
     params: dict[str, Any] = {}
-    tier: str
+    tier: str = "N2"  # agents do not pick the approval tier; the manager always decides
     rationale: str = ""
 
 
 class EventBody(BaseModel):
-    from_agent: str
-    to_agent: str
+    """Either a trace event (from/to/kind/payload) or the Core `record_event` tool shape
+    (type/date_from/date_to/note), attributed to the calling agent."""
+    from_agent: str | None = None
+    to_agent: str | None = None
     kind: str = "message"
     payload: dict[str, Any] = {}
+    type: str | None = None
+    date_from: str | None = None
+    date_to: str | None = None
+    note: str = ""
 
 
 def build_internal_router(c: Any) -> APIRouter:
@@ -35,7 +42,8 @@ def build_internal_router(c: Any) -> APIRouter:
     def case_ctx(x_glazed_case: Annotated[str | None, Header()] = None) -> Case:
         if not x_glazed_case:
             raise DomainError("X-Glazed-Case header is required")
-        case = c.cases.get(x_glazed_case) or c.cases.get_by_conversation(x_glazed_case)
+        key = case_id_from_session(x_glazed_case)  # peer~<case>~<uuid> -> <case>
+        case = c.cases.get(key) or c.cases.get_by_conversation(key)
         if case is None:
             raise DomainError(f"X-Glazed-Case {x_glazed_case!r} does not match any case")
         return case
@@ -87,11 +95,16 @@ def build_internal_router(c: Any) -> APIRouter:
     @r.post("/proposals", status_code=201)
     def post_proposal(case: Ctx, b: ProposalBody, x_glazed_agent: Annotated[str | None, Header()] = None):
         return jsonable_encoder(uc.SubmitProposal(c.cases, c.proposals).execute(
-            case.case_id, b.issue_id, b.action_type, b.params, b.tier, b.rationale, x_glazed_agent or ""))
+            case.case_id, b.issue_id, b.action_type, {**b.params, **({"option_id": b.option_id} if b.option_id else {})},
+            b.tier, b.rationale, canonical_agent_id(x_glazed_agent or "")))
 
     @r.post("/events", status_code=201)
-    def post_event(case: Ctx, b: EventBody):
-        return jsonable_encoder(uc.RecordEvent(c.cases, c.trace, c.clock)
-                                .execute(case.case_id, b.from_agent, b.to_agent, b.kind, b.payload))
+    def post_event(case: Ctx, b: EventBody, x_glazed_agent: Annotated[str | None, Header()] = None):
+        payload = dict(b.payload)
+        if b.type:  # Core record_event tool shape
+            payload = {"text": f"{b.type} {b.date_from}..{b.date_to}: {b.note}".strip(": "), "type": b.type,
+                       "date_from": b.date_from, "date_to": b.date_to, "note": b.note, **payload}
+        return jsonable_encoder(uc.RecordEvent(c.cases, c.trace, c.clock).execute(
+            case.case_id, b.from_agent or x_glazed_agent or "agent", b.to_agent or "orchestrator", b.kind, payload))
 
     return r

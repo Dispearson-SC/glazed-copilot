@@ -190,3 +190,47 @@ def test_cors_origins_are_configurable_via_env():
     assert cors_origins_from_env({}) == ["http://localhost:5173", "http://127.0.0.1:5173"]
     assert cors_origins_from_env({"GLAZED_CORS_ORIGINS": "https://a.test, https://b.test"}) == [
         "https://a.test", "https://b.test"]
+
+
+def test_internal_api_resolves_peer_session_ids_to_the_parent_case(env):
+    client, _ = env
+    c = mkcase(client)
+    peer = f"peer~{c['case_id']}~0b1c2d3e-aaaa-bbbb-cccc-1234567890ab"
+    h = {"X-Glazed-Case": peer, "X-Glazed-Agent": "glazed_supply"}
+    assert client.get("/internal/v1/history", headers=h).status_code == 200
+    ev = client.post("/internal/v1/events", headers=h, json={"from_agent": "glazed_supply", "to_agent": "orchestrator"})
+    assert ev.status_code == 201 and ev.json()["case_id"] == c["case_id"]
+    trace = client.get("/api/v1/trace", params={"case_id": c["case_id"]}).json()
+    assert [(e["from_agent"], e["case_id"]) for e in trace] == [("supply", c["case_id"])]
+    bad = client.get("/internal/v1/history", headers={"X-Glazed-Case": "peer~nope~u"})
+    assert bad.status_code == 400
+
+
+def test_proposal_agent_is_stored_as_canonical_id(env):
+    client, _ = env
+    c = mkcase(client)
+    r = client.post("/internal/v1/proposals", headers={"X-Glazed-Case": c["case_id"], "X-Glazed-Agent": "glazed_supply"},
+                    json={"issue_id": "S030|stockout_risk|SKU-1", "action_type": "place_order", "tier": "N1"})
+    assert r.status_code == 201, r.text
+    assert "glazed_supply" not in r.text
+
+
+def test_proposal_from_core_tool_shape_without_tier(env):
+    client, _ = env
+    c = mkcase(client)
+    r = client.post("/internal/v1/proposals", headers={"X-Glazed-Case": c["case_id"], "X-Glazed-Agent": "glazed_orchestrator"},
+                    json={"issue_id": "S030|stockout_risk|SKU-1", "option_id": "A", "action_type": "place_order",
+                          "params": {"sku": "SKU-1"}, "rationale": "r"})
+    assert r.status_code == 201, r.text
+    assert r.json()["tier"] == "N2" and r.json()["agent_id"] == "orchestrator"
+
+
+def test_record_event_from_core_tool_shape(env):
+    client, _ = env
+    c = mkcase(client)
+    r = client.post("/internal/v1/events", headers={"X-Glazed-Case": c["case_id"], "X-Glazed-Agent": "glazed_sentinel"},
+                    json={"type": "holiday", "date_from": "2026-03-08", "date_to": "2026-03-09", "note": "closed"})
+    assert r.status_code == 201, r.text
+    ev = r.json()
+    assert (ev["from_agent"], ev["kind"]) == ("sentinel", "message")
+    assert "holiday" in ev["payload"]["text"] and ev["payload"]["note"] == "closed"
