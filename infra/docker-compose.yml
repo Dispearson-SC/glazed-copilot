@@ -1,0 +1,54 @@
+name: glazed-copilot
+services:
+  db:
+    image: postgres:16
+    container_name: glazed-db          # own container; never reuse the unrelated postgres:16-alpine one
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    ports:
+      - "55432:5432"
+    volumes:
+      - glazed_pgdata:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-glazed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: ../backend
+    container_name: glazed-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GLAZED_STORAGE: postgres
+      GLAZED_DATABASE_URL: postgresql://glazed_app:glazed_dev@db:5432/glazed_app
+      GLAZED_DUCKDB_PATH: /data/glazed.duckdb
+      GLAZED_CORE_URL: http://core:8000
+    volumes:
+      - ../../Dataset/clean:/data:ro
+    ports:
+      - "8100:8100"
+
+  # Built by the Agent-Core writer (branch vertical/glazed); may not build yet.
+  core:
+    build:
+      context: ../../Agent-Core/Core
+    container_name: glazed-core
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GLAZED_BACKEND_URL: http://backend:8100
+    ports:
+      - "8000:8000"
+
+  # frontend:   # placeholder, built by the frontend task
+  #   build: ../frontend
+  #   ports: ["5173:80"]
+
+volumes:
+  glazed_pgdata:

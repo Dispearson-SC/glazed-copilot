@@ -1,0 +1,23 @@
+[project]
+name = "glazed-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["fastapi", "uvicorn", "httpx", "duckdb", "psycopg[binary]>=3.1", "pydantic>=2"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+glazed_backend = ["migrations/*.sql"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+markers = ["integration: needs Postgres or the Dataset (skipped when unreachable)"]
