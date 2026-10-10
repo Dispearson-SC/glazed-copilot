@@ -307,7 +307,9 @@ def test_turn_404_right_after_the_202_is_pending_then_an_error(w):
     del w.core.turns[tid]  # fake core raises KeyError today; make it a 404 like the real one
     w.core.get_turn = lambda turn_id, store_id: (_ for _ in ()).throw(NotFound("no turn"))
     assert get.execute(c.case_id, tid) == {"turn_id": tid, "status": "pending"}
-    w.clock._now += timedelta(seconds=30)
+    w.clock._now += timedelta(seconds=90)  # a turn queued behind another one in the conversation stays 404 for ~90s
+    assert get.execute(c.case_id, tid) == {"turn_id": tid, "status": "pending"}
+    w.clock._now += timedelta(seconds=60)
     with pytest.raises(NotFound):
         get.execute(c.case_id, tid)
 

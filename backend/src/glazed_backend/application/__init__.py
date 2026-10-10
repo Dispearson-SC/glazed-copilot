@@ -110,7 +110,7 @@ class GetTurn:
     - A turn stuck in `running` (tool exception, model 400) never ends in Core -> failed after `timeout_s`."""
 
     def __init__(self, cases: CaseRepository, core: CorePort, tracker: TurnTracker | None = None,
-                 clock: Clock | None = None, timeout_s: float = 120.0, grace_s: float = 10.0) -> None:
+                 clock: Clock | None = None, timeout_s: float = 120.0, grace_s: float = 120.0) -> None:
         self.cases, self.core, self.tracker, self.clock = cases, core, tracker, clock
         self.timeout_s, self.grace_s = timeout_s, grace_s
 
