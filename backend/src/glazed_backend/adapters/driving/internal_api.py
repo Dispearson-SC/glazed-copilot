@@ -11,7 +11,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
-from ...application import sentinel
+from ...application import forecast as uc_forecast, sentinel
 from .store_names import StoreNames
 from ...domain import Case, DomainError, canonical_agent_id, case_id_from_session
 
@@ -120,6 +120,25 @@ def build_internal_router(c: Any) -> APIRouter:
         for issue in found:
             c.served[(case.case_id, issue["issue_id"])] = issue
         return found
+
+    def own_case(case: Case, store_id: str | None, as_of: date | None) -> None:
+        """store_id and as_of are accepted only as assertions: they may never move the read away from the case."""
+        if store_id is not None and store_id != case.store_id:
+            raise DomainError("store_id does not match the case's store; it comes from X-Glazed-Case")
+        if as_of is not None and as_of != case.sim_today:
+            raise DomainError("as_of does not match the case date; it comes from X-Glazed-Case")
+
+    @r.get("/forecast/demand")
+    def forecast_demand(case: Ctx, sku: str, target_date: date, store_id: str | None = None, as_of: date | None = None):
+        """p50 and quantiles of one SKU's units on a future day (> the case date), from the forecast model."""
+        own_case(case, store_id, as_of)
+        return uc_forecast.DemandForecast(c.metrics, c.forecasters).execute(case, sku, target_date)
+
+    @r.get("/forecast/flow")
+    def forecast_flow(case: Ctx, target_date: date, store_id: str | None = None, as_of: date | None = None):
+        """Store transactions, footfall and average ticket on a future day (> the case date)."""
+        own_case(case, store_id, as_of)
+        return uc_forecast.FlowForecast(c.metrics, c.flow_forecaster).execute(case, target_date)
 
     @r.get("/inventory/projection")
     def projection(case: Ctx, sku: str, horizon: int = 7):

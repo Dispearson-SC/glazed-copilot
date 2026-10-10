@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from ...application import TurnTracker
 from ..driven.forecast import BaselineForecast, WeekdayFlow
 from ..driven.memory import InMemoryTurns
-from ...domain import DomainError, FutureDate, InvalidTransition, NotFound
+from ...domain import DomainError, FutureDate, InvalidTransition, NotFound, Unprocessable
 from ...domain.models import CoreError
 from .internal_api import build_internal_router
 from .public_api import build_public_router
@@ -79,6 +79,7 @@ def create_app(c: Container) -> FastAPI:
     app.add_exception_handler(InvalidTransition, err(409))
     app.add_exception_handler(FutureDate, err(400))
     app.add_exception_handler(CoreError, err(502))
+    app.add_exception_handler(Unprocessable, err(422))
     app.add_exception_handler(DomainError, err(400))
     app.include_router(build_public_router(c))
     app.include_router(build_internal_router(c))

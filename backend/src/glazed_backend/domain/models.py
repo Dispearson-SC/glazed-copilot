@@ -48,6 +48,10 @@ class InvalidTransition(DomainError):
     pass
 
 
+class Unprocessable(DomainError):
+    """Well-formed request that cannot be served as asked (HTTP 422)."""
+
+
 class NotFound(DomainError):
     pass
 

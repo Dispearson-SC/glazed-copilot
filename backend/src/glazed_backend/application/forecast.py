@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
-from ..domain import DomainError, NotFound
+from ..domain import DomainError, NotFound, Unprocessable
 from ..metrics.accuracy import ScoredPoint, summarize
 from ..metrics.forecast import weekday_samples
 from ..metrics.types import SkuSeries
@@ -16,7 +16,7 @@ from ..ports.forecast import ForecastResult, ForecastRow
 STORE_CENSOR_SHARE = 0.25  # a store day is censored when stockout SKUs account for this share of its USD sales
 DEFAULT_PAST_DAYS, DEFAULT_AHEAD_DAYS = 27, 13
 LOOKBACK_DAYS = 63  # history read before the first requested day: 8 same-weekday samples need 56
-MODEL_VERSION_FALLBACK = "1"
+FLOW_LOOKBACK_DAYS = 70
 
 
 def _r(x: float | None, nd: int = 4) -> float | None:
@@ -174,3 +174,57 @@ class ForecastAccuracy:
                                             actual_row.stockout_hours > 0, sum(s) / len(s) if s else None,
                                             tuple((q, lv[q]) for q in (0.2, 0.8) if q in lv))))
         return out
+
+
+class DemandForecast:
+    """One SKU, one future day, for the agents: p50 plus the quantile ladder. Levels the model does not provide are
+    interpolated and named in `interpolated_quantiles`."""
+
+    LADDER = ("p10", "p20", "p50", "p80", "p90")
+    TRAINING_DAYS = 56
+
+    def __init__(self, metrics, forecasters: list[Any]) -> None:
+        self.loader = ForecastLoader(metrics, forecasters)
+
+    def execute(self, case, sku: str, target_date: date) -> dict[str, Any]:
+        from ..metrics.forecast import LEVELS
+        as_of = case.sim_today
+        if target_date <= as_of:
+            raise Unprocessable(f"target_date {target_date} must be after the case date {as_of}")
+        loaded = self.loader.load(case.store_id, as_of, sku, target_date, target_date)
+        row = next((r for r in loaded.result.rows if r.sku == sku and r.date == target_date), None)
+        if row is None:
+            raise NotFound(f"no forecast for {sku} on {target_date}")
+        have = {k for k in row.quantiles} | {"p50"}
+        q = {k: round(row.quantile(LEVELS[k]), 4) for k in self.LADDER}
+        series = next(s for s in loaded.history if s.sku == sku)
+        window = [r for r in series.rows if loaded.result.origin - timedelta(days=self.TRAINING_DAYS) < r.date <= loaded.result.origin]
+        share = sum(1 for r in window if r.stockout_hours > 0) / len(window) if window else 0.0
+        out = {"sku": sku, "target_date": target_date.isoformat(), "qty": q["p50"],
+               "qty_range": {k: q[k] for k in ("p10", "p50", "p90")}, "quantiles": q, "censored_share": round(share, 4),
+               "weather_kind": "observed", "model": loaded.result.model, "model_version": loaded.result.model_version,
+               "forecast_origin": loaded.result.origin.isoformat()}
+        missing = [k for k in self.LADDER if k not in have]
+        if missing:
+            out["interpolated_quantiles"] = missing
+        return out
+
+
+class FlowForecast:
+    """Store transactions, footfall and average ticket for a future day, from store daily data up to as_of."""
+
+    def __init__(self, metrics, flow_forecaster) -> None:
+        self.metrics, self.flow = metrics, flow_forecaster
+
+    def execute(self, case, target_date: date) -> dict[str, Any]:
+        as_of = case.sim_today
+        if target_date <= as_of:
+            raise Unprocessable(f"target_date {target_date} must be after the case date {as_of}")
+        history = [r for r in self.metrics.flow_history(case.store_id, as_of, as_of - timedelta(days=FLOW_LOOKBACK_DAYS))
+                   if r["date"] <= as_of]  # clipped again: NO LOOK-AHEAD whatever the adapter returned
+        res = self.flow.flow(case.store_id, as_of, target_date, history)
+        if res is None:
+            raise NotFound(f"no flow data to forecast {target_date} for store {case.store_id}")
+        return {"target_date": target_date.isoformat(), "granularity": res.granularity, "transactions": res.transactions,
+                "footfall": res.footfall, "avg_ticket": res.avg_ticket, "model": res.model,
+                "forecast_origin": res.origin.isoformat()}
