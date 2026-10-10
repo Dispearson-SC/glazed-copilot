@@ -29,7 +29,9 @@ class CheckCompliance:
             p = e.payload or {}
             if p.get("type") in EVENT_TYPES and p.get("date_from"):
                 out.append({"type": p["type"], "date_from": p.get("date_from"), "date_to": p.get("date_to") or p.get("date_from"),
-                            "note": p.get("note", ""), "source": p.get("source", "agent"), "case_id": e.case_id})
+                            "note": p.get("note", ""), "source": p.get("source", "agent"), "case_id": e.case_id,
+                            "event_id": e.event_id, "proposal_id": p.get("proposal_id"), "execution_id": p.get("execution_id"),
+                            "sku": p.get("sku")})
         return out
 
     def check(self, proposal: Any, sim_today: date, events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
@@ -38,6 +40,7 @@ class CheckCompliance:
                   "execution_id": x.execution_id} for x in self.executions.list(proposal.case_id)
                  if x.proposal_id == proposal.proposal_id]
         events = self.events(proposal.store_id) if events is None else events
+        events = [e for e in events if not e.get("proposal_id") or e["proposal_id"] == proposal.proposal_id]
         res = evaluate_decision(d, execs, sim_today, None, events)
         res.update(case_id=proposal.case_id, store_id=proposal.store_id, tier=proposal.tier, reason=proposal.reason,
                    sim_today=sim_today.isoformat())
@@ -46,7 +49,18 @@ class CheckCompliance:
             res = {**evaluate_decision(d, execs, sim_today, observed, events), "case_id": proposal.case_id,
                    "store_id": proposal.store_id, "tier": proposal.tier, "reason": proposal.reason,
                    "sim_today": sim_today.isoformat()}
+        res["cause"] = self._cause(proposal, res, events)
         return res
+
+    @staticmethod
+    def _cause(proposal: Any, res: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, Any] | None:
+        """The registered event that explains this decision's deviation: one linked to it, else the overlapping one."""
+        linked = [e for e in events if e.get("proposal_id") == proposal.proposal_id]
+        hit = linked[-1] if linked else (res.get("events") or [None])[0]
+        if hit is None:
+            return None
+        keys = ("type", "note", "date_from", "date_to", "source", "event_id", "proposal_id", "execution_id", "sku")
+        return {k: hit.get(k) for k in keys}
 
     def for_case(self, case_id: str) -> list[dict[str, Any]]:
         from . import _case
@@ -63,25 +77,26 @@ class CheckCompliance:
         return self.check(p, case.sim_today)
 
     def decision_log(self, case_id: str) -> list[dict[str, Any]]:
-        """Decisions of this case plus, for a live case, earlier live decisions of the same store (scope "store").
+        """Decisions of this case plus, for a live case, earlier live decisions of the same store (scope "other_case").
         Sandbox and backtest cases never leak, and decisions dated after this case's clock are not shown."""
         from . import _case
         case = _case(self.cases, case_id)
         events = self.events(case.store_id)
-        own = {p.proposal_id: "case" for p in self.proposals.list(case_id=case.case_id)}
+        own = {p.proposal_id: "this_case" for p in self.proposals.list(case_id=case.case_id)}
         scoped = dict(own)
         if case.mode == "live":
             live = {c.case_id for c in self.cases.list(case.store_id) if c.mode == "live" and c.sim_today <= case.sim_today}
             for p in self.proposals.list(store_id=case.store_id):
                 if p.case_id in live and p.proposal_id not in scoped:
-                    scoped[p.proposal_id] = "store"
+                    scoped[p.proposal_id] = "other_case"
         out = []
         for p in sorted(self.proposals.list(store_id=case.store_id), key=lambda x: x.created_at):
             if p.proposal_id not in scoped:
                 continue
             res = self.check(p, case.sim_today, events)
             parts = p.issue_id.split("|")
-            out.append({"decision_id": p.proposal_id, "scope": scoped[p.proposal_id], "case_id": p.case_id,
+            out.append({"decision_id": p.proposal_id, "scope": scoped[p.proposal_id], "same_case": p.case_id == case.case_id,
+                        "case_id": p.case_id,
                         "issue_id": p.issue_id, "kind": parts[1] if len(parts) > 2 else None,
                         "sku": p.params.get("sku"), "action_type": p.action_type, "tier": p.tier, "status": p.status,
                         "rationale": p.rationale, "reason": p.reason, "agent_id": p.agent_id,
@@ -171,7 +186,35 @@ class InjectEvent:
     def __init__(self, record_event) -> None:
         self.record_event = record_event
 
-    def execute(self, case_id: str, type_: str, date_from: date | None, date_to: date | None, note: str = ""):
+    def __init__(self, record_event, cases=None, proposals=None, executions=None) -> None:
+        self.record_event, self.cases, self.proposals, self.executions = record_event, cases, proposals, executions
+
+    def _link(self, case_id: str, proposal_id: str | None, sku: str | None) -> dict[str, Any]:
+        """The decision/execution the event refers to: the given proposal, else the latest execution matching the sku,
+        else the latest execution of the case. Unknown ids stay unlinked (nothing is invented)."""
+        if self.cases is None or self.proposals is None or self.executions is None:
+            return {}
+        from . import _case
+        case = _case(self.cases, case_id)
+        chosen = None
+        if proposal_id:
+            p = self.proposals.get(proposal_id)
+            chosen = p if p is not None and p.store_id == case.store_id else None
+        else:
+            props = {p.proposal_id: p for p in self.proposals.list(case_id=case.case_id)}
+            rows = [x for x in self.executions.list(case.case_id) if x.proposal_id in props
+                    and (not sku or props[x.proposal_id].params.get("sku") == sku)]
+            if rows:
+                chosen = props[max(rows, key=lambda x: x.executed_at).proposal_id]
+        if chosen is None:
+            return {}
+        ex = [x for x in self.executions.list(chosen.case_id) if x.proposal_id == chosen.proposal_id]
+        last = max(ex, key=lambda x: x.executed_at) if ex else None
+        return {"proposal_id": chosen.proposal_id, "execution_id": last.execution_id if last else None,
+                "sku": sku or chosen.params.get("sku")}
+
+    def execute(self, case_id: str, type_: str, date_from: date | None, date_to: date | None, note: str = "",
+                proposal_id: str | None = None, sku: str | None = None):
         if type_ not in EVENT_TYPES:
             raise DomainError(f"event type must be one of {EVENT_TYPES}")
         if date_from is None:
@@ -180,5 +223,6 @@ class InjectEvent:
         if to < date_from:
             raise DomainError("date_to must not precede date_from")
         payload = {"text": f"{type_} {date_from}..{to}: {note}".strip(": "), "type": type_, "date_from": date_from.isoformat(),
-                   "date_to": to.isoformat(), "note": note, "source": "demo_injected"}
+                   "date_to": to.isoformat(), "note": note, "source": "demo_injected",
+                   **self._link(case_id, proposal_id, sku)}
         return self.record_event.execute(case_id, "manager", "sentinel", "message", payload)

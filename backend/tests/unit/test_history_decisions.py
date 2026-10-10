@@ -34,7 +34,7 @@ def test_history_adds_the_decision_log_to_the_weekly_series(env):
     h = client.get("/internal/v1/history", headers={"X-Glazed-Case": case_id}).json()
     assert h["as_of"] and "decision_log" in h
     (d,) = h["decision_log"]
-    assert d["decision_id"] == pid and d["status"] == "approved" and d["action_type"] == "place_order" and d["scope"] == "case"
+    assert d["decision_id"] == pid and d["status"] == "approved" and d["action_type"] == "place_order" and d["scope"] == "this_case" and d["same_case"] is True
     assert d["kind"] == "stockout_risk" and d["sku"] == "SKU-1" and d["rationale"] == "cover the gap"
     assert d["executions"][0]["status"] == "executed" and d["executions"][0]["source"] == "simulated"
     assert d["outcome"] is None  # the horizon has not passed at sim_today
@@ -62,8 +62,8 @@ def test_store_history_includes_other_live_cases_but_never_sandbox_ones(env):
     other, other_pid = decided(client, sim="2026-03-12")  # decided later than this case's date
     log = client.get("/internal/v1/history", headers={"X-Glazed-Case": live_case}).json()["decision_log"]
     ids = {d["decision_id"]: d["scope"] for d in log}
-    assert ids == {live_pid: "case"}
+    assert ids == {live_pid: "this_case"}
     log2 = client.get("/internal/v1/history", headers={"X-Glazed-Case": other}).json()["decision_log"]
-    assert {d["decision_id"]: d["scope"] for d in log2} == {other_pid: "case", live_pid: "store"}
+    assert {d["decision_id"]: d["scope"] for d in log2} == {other_pid: "this_case", live_pid: "other_case"}
     log3 = client.get("/internal/v1/history", headers={"X-Glazed-Case": sandbox_case}).json()["decision_log"]
     assert {d["decision_id"] for d in log3} == {sandbox_pid}

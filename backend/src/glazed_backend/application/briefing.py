@@ -54,7 +54,9 @@ def trim_line(line: dict[str, Any]) -> dict[str, Any]:
 
 
 def _trim_proposal(p: Any, scope: str) -> dict[str, Any]:
-    return {**{k: getattr(p, k) for k in _PROPOSAL_KEEP}, "created_at": p.created_at.isoformat(), "scope": scope}
+    """`scope` is this_case | other_case; `same_case` repeats it as a boolean so a model cannot misread the label."""
+    return {**{k: getattr(p, k) for k in _PROPOSAL_KEEP}, "created_at": p.created_at.isoformat(), "scope": scope,
+            "same_case": scope == "this_case"}
 
 
 class SnapshotBuilder:
@@ -102,14 +104,16 @@ class SnapshotBuilder:
         }
 
     def live(self, case: Case) -> dict[str, Any]:
-        """Case-scoped records first, then the rest of the store's, each tagged with its scope."""
+        """Pending proposals of THIS case only (the other cases of the store are just counted); recent decisions list
+        this case first and then the store's, each labelled with its scope."""
         mine = self.proposals.list(case_id=case.case_id)
         rest = [p for p in self.proposals.list(store_id=case.store_id) if p.case_id != case.case_id]
-        tagged = [(p, "case") for p in mine] + [(p, "store") for p in rest]
-        pending = [_trim_proposal(p, s) for p, s in tagged if p.status == "pending"][:MAX_PENDING]
+        tagged = [(p, "this_case") for p in mine] + [(p, "other_case") for p in rest]
+        pending = [_trim_proposal(p, s) for p, s in tagged if p.status == "pending" and s == "this_case"][:MAX_PENDING]
         decided = sorted(((p, s) for p, s in tagged if p.status in ("approved", "rejected")),
-                         key=lambda t: (t[1] != "case", -t[0].created_at.timestamp()))
+                         key=lambda t: (t[1] != "this_case", -t[0].created_at.timestamp()))
         return {"pending_proposals": pending,
+                "other_cases_pending_count": sum(1 for p, s in tagged if p.status == "pending" and s == "other_case"),
                 "recent_decisions": [_trim_proposal(p, s) for p, s in decided[:MAX_DECISIONS]]}
 
 

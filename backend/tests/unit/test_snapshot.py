@@ -7,7 +7,7 @@ def test_snapshot_has_the_contract_shape_and_a_seven_day_window(env):
     client, _, _ = env
     s = snap(client, mkcase(client))
     assert set(s) == {"store_id", "store_display_name", "as_of", "window", "kpis", "top_issues", "integrity",
-                      "order_plan", "suppliers", "pending_proposals", "recent_decisions", "generated_at", "cache_age_s"}
+                      "order_plan", "suppliers", "pending_proposals", "other_cases_pending_count", "recent_decisions", "generated_at", "cache_age_s"}
     assert s["as_of"] == "2026-03-10" and s["window"] == {"from": "2026-03-04", "to": "2026-03-10"}
     assert set(s["kpis"]) == {"net_sales", "transactions", "waste_usd", "lost_sales_usd", "tx_per_staff_hour"}
     assert set(s["order_plan"]) >= {"due_today", "due_tomorrow", "top_lines"}
@@ -58,7 +58,7 @@ def test_suppliers_carry_next_delivery(env):
                     "next_delivery": "2026-03-11"}
 
 
-def test_pending_and_decisions_are_case_first_then_store(env):
+def test_pending_is_this_case_and_decisions_are_case_first_then_store(env):
     client, _, _ = env
     a, b = mkcase(client), mkcase(client)
     ia = snap(client, a)["top_issues"][0]
@@ -68,10 +68,11 @@ def test_pending_and_decisions_are_case_first_then_store(env):
     pb = client.post("/internal/v1/proposals", headers={"X-Glazed-Case": b},
                      json={"issue_id": ib["issue_id"], "option_id": ib["options"][0]["option_id"]}).json()
     s = snap(client, a)
-    assert [(p["proposal_id"], p["scope"]) for p in s["pending_proposals"]] == [(pa["proposal_id"], "case"), (pb["proposal_id"], "store")]
+    assert [(p["proposal_id"], p["scope"]) for p in s["pending_proposals"]] == [(pa["proposal_id"], "this_case")]
+    assert s["other_cases_pending_count"] == 1
     client.post(f"/api/v1/proposals/{pa['proposal_id']}/decision", json={"approved": True, "reason": "ok"})
     s = snap(client, a)
-    assert [p["proposal_id"] for p in s["pending_proposals"]] == [pb["proposal_id"]]
+    assert s["pending_proposals"] == [] and s["other_cases_pending_count"] == 1
     assert [(d["proposal_id"], d["status"]) for d in s["recent_decisions"]] == [(pa["proposal_id"], "approved")]
 
 

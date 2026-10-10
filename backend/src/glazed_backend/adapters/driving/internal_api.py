@@ -214,8 +214,14 @@ def build_internal_router(c: Any) -> APIRouter:
             if e.ref and e.ref.startswith("PR"):
                 return {"tool": "evaluate_promo", "promo_id": e.ref}
             return {"tool": "history", "decision_id": e.decision_id} if e.decision_id else None
+        def origin(e: Any) -> str | None:
+            p = c.proposals.get(e.decision_id) if e.decision_id else None
+            return p.case_id if p is not None and p.store_id == case.store_id else None
+        # store memory spans every case of the store: say which case a memory came from (when known)
         return [{"text": e.text, "decision_id": e.decision_id, "ref": e.ref, "kind": e.kind,
-                 "created_at": e.created_at.isoformat(), "score": e.score, "verify": verify(e)} for e in found]
+                 "created_at": e.created_at.isoformat(), "score": e.score, "verify": verify(e),
+                 "scope": "store_memory", "case_id": origin(e), "same_case": origin(e) == case.case_id}
+                for e in found]
 
     @r.post("/proposals", status_code=201)
     def post_proposal(case: Ctx, b: ProposalBody, response: Response,

@@ -66,6 +66,8 @@ class InjectEventBody(BaseModel):
     date_from: date | None = None
     date_to: date | None = None
     note: str = ""
+    proposal_id: str | None = None  # the decision the event refers to; else the latest matching execution
+    sku: str | None = None
 
 
 class InjectBody(BaseModel):
@@ -167,8 +169,8 @@ def build_public_router(c: Any) -> APIRouter:
             out["execution"] = jsonable_encoder(sentinel.InjectExecution(c.cases, c.proposals, c.executions).execute(
                 case_id, b.execution.proposal_id, b.execution.status, b.execution.detail))
         if b.event is not None:
-            ev = sentinel.InjectEvent(uc.RecordEvent(c.cases, c.trace, c.clock)).execute(
-                case_id, b.event.type, b.event.date_from, b.event.date_to, b.event.note)
+            ev = sentinel.InjectEvent(uc.RecordEvent(c.cases, c.trace, c.clock), c.cases, c.proposals, c.executions).execute(
+                case_id, b.event.type, b.event.date_from, b.event.date_to, b.event.note, b.event.proposal_id, b.event.sku)
             out["event"] = {**ev.payload, "event_id": ev.event_id}
         return out
 
