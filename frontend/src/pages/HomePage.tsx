@@ -7,6 +7,7 @@ import ContextChips from "../dashboard/ContextChips";
 import Hero from "../dashboard/Hero";
 import MetricCards from "../dashboard/MetricCards";
 import TopProducts from "../dashboard/TopProducts";
+import ForecastAccuracy from "../dashboard/ForecastAccuracy";
 import ForecastChart from "../dashboard/ForecastChart";
 import UpcomingCard from "../dashboard/UpcomingCard";
 import TrendChart from "../dashboard/TrendChart";
@@ -54,6 +55,12 @@ export default function HomePage() {
     false,
     [caseId, simToday, session.refreshKey],
   );
+  const accuracy = useOptionalPolling(
+    () => (caseId && forecast.data ? api.getForecastAccuracy(caseId, "shelf_life") : Promise.resolve(null)),
+    300_000,
+    false,
+    [caseId, simToday, session.refreshKey, Boolean(forecast.data)],
+  );
   const error = storesError ?? caseError ?? kpis.error ?? alerts.error;
   const summaryError = summary.error;
   const open = (alerts.data ?? []).filter((a) => !CLOSED.includes(a.state));
@@ -71,7 +78,10 @@ export default function HomePage() {
           <ContextChips context={summary.data.context} />
           <MetricCards summary={summary.data} />
           {forecast.data ? (
-            <ForecastChart forecast={forecast.data} />
+            <>
+              <ForecastChart forecast={forecast.data} />
+              {accuracy.data && <ForecastAccuracy accuracy={accuracy.data} />}
+            </>
           ) : (
             <TrendChart days={trend.data} selected={summary.data.date} error={trend.error} />
           )}

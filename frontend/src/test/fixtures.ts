@@ -169,7 +169,7 @@ export const forecastA: ForecastResponse = {
     { date: "2026-03-02", forecast: 120, p10: 95, p90: 150, baseline: 115, actual: null, censored: false },
     { date: "2026-03-03", forecast: 80, p10: 60, p90: 100, baseline: 82, actual: 999, censored: false },
   ],
-  metrics_to_date: { wape: 0.123, bias: -0.021, coverage_p10_p90: 0.8, wape_baseline: 0.2, n_days: 28 },
+  metrics_to_date: { wape: 0.123, bias: -0.021, coverage_p10_p90: 0.8, wape_baseline: 0.2, n_days: 28, n_censored: 3 },
 };
 
 import type { DecisionRow } from "../types";
@@ -187,3 +187,11 @@ export const decisionsA: DecisionRow[] = [
   { decision_id: "p4", ts: "2026-03-05T08:00:00Z", kind: "outcome", status: "measured", as_of: "2026-03-04", issue_id: "i4", action_type: "place_order",
     outcome: { observed: { net_usd: 999 }, simulated: { net_usd_mid: 10 }, label: "backtest" } },
 ];
+
+import type { ForecastAccuracy } from "../types";
+const m = (wape: number, n_days: number, n_censored: number) => ({ wape, bias: -0.1, coverage_p10_p90: 0.78, wape_baseline: wape, n_days, n_censored });
+export const accuracyA: ForecastAccuracy = {
+  store_id: "S030", by: "shelf_life", as_of: "2026-03-01", window: { from: "2026-02-01", to: "2026-03-01" }, unit: "units", model: "baseline-weekday-8w",
+  groups: { "1": m(0.4243, 176, 18), "2-3": m(0.4889, 571, 121), "4-14": m(1.1736, 27, 1), non_perishable: m(0.6855, 179, 14) },
+  overall: m(0.4959, 953, 154),
+};

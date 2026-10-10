@@ -15,7 +15,7 @@ export default function ForecastChart({ forecast }: { forecast: ForecastResponse
       <div>
         <h2 className="font-headline-sm text-headline-sm text-primary">Ventas: real y proyección</h2>
         <p className="font-label-sm text-label-sm text-on-surface-variant">
-          Proyección ({forecast.unit}) con rango p10–p90 · <span data-testid="forecast-model">{forecast.model}</span>
+          Proyección ({forecast.unit}) con rango · <span data-testid="forecast-model">{forecast.model}</span>
         </p>
       </div>
       <div className="w-full flex items-end justify-between px-1 pt-4 gap-1">
@@ -37,7 +37,8 @@ export default function ForecastChart({ forecast }: { forecast: ForecastResponse
                   <div
                     data-testid={`fc-actual-${p.date}`}
                     title={`${p.date} real: ${money(actual)}`}
-                    className="absolute bottom-0 left-1 right-1 bg-on-tertiary-container rounded-t"
+                    data-censored={p.censored ? "true" : "false"}
+                    className={`absolute bottom-0 left-1 right-1 rounded-t ${p.censored ? "bg-on-tertiary-container/40 border border-dashed border-error" : "bg-on-tertiary-container"}`}
                     style={{ height: `${Math.max(2, px(actual))}px` }}
                   />
                 )}
@@ -65,10 +66,13 @@ export default function ForecastChart({ forecast }: { forecast: ForecastResponse
       <p className="font-label-sm text-label-sm text-on-surface-variant flex gap-3">
         <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-on-tertiary-container" />Real</span>
         <span className="inline-flex items-center gap-1"><span className="w-3 h-0.5 bg-secondary" />Proyección</span>
-        <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-secondary/20" />p10–p90</span>
+        <span data-testid="forecast-band-note" className="inline-flex items-center gap-1">
+          <span className="w-2 h-2 rounded-sm bg-secondary/20" />
+          {forecast.level === "store" ? "rango (suma por producto)" : "p10–p90"}
+        </span>
       </p>
       <p data-testid="forecast-metrics" className="text-body-md text-on-surface">
-        Error (WAPE) {pct(m.wape)} vs línea base {pct(m.wape_baseline)} · sesgo {pct(m.bias)} · el rango cubre {Math.round(m.coverage_p10_p90 * 100)}% de los días · {m.n_days} días evaluados
+        Error (WAPE) {pct(m.wape)} vs línea base {pct(m.wape_baseline)} · sesgo {pct(m.bias)} · el rango cubre {Math.round(m.coverage_p10_p90 * 100)}% de los días · {m.n_days} días evaluados{m.n_censored ? ` · ${m.n_censored} días con quiebre no cuentan como error` : ""}
       </p>
     </section>
   );

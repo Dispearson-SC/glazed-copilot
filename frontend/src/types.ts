@@ -323,6 +323,7 @@ export interface ForecastPoint {
   actual: number | null;
   censored: boolean;
   stockout_hours?: number;
+  quantiles?: Record<string, number>;
 }
 
 export interface ForecastMetrics {
@@ -331,6 +332,24 @@ export interface ForecastMetrics {
   coverage_p10_p90: number;
   wape_baseline: number;
   n_days: number;
+  pinball_074?: number | null;
+  censored_coverage?: number | null;
+  censored_pinball_074?: number | null;
+  /** Stockout-censored days: shown apart and not counted as misses. */
+  n_censored?: number;
+}
+
+export type AccuracyBy = "shelf_life" | "format" | "sku";
+
+export interface ForecastAccuracy {
+  store_id: string;
+  by: AccuracyBy;
+  as_of: string;
+  window: { from: string; to: string };
+  unit: string;
+  model: string;
+  groups: Record<string, ForecastMetrics>;
+  overall: ForecastMetrics;
 }
 
 export interface ForecastResponse {

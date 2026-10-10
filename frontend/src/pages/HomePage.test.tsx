@@ -189,4 +189,15 @@ describe("HomePage forecast overlay", () => {
     const call = (api.getForecast as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
     expect(call).toEqual(["c1", { from: "2026-02-22", to: "2026-03-08", level: "store" }]);
   });
+
+  it("shows the accuracy table under the chart when the route answers, and stays quiet otherwise", async () => {
+    const { forecastA, accuracyA } = await import("../test/fixtures");
+    const { unmount } = open(fakeApi({ getForecast: async () => forecastA, getForecastAccuracy: async () => accuracyA }));
+    expect(await screen.findByTestId("accuracy")).toBeInTheDocument();
+    unmount();
+    open(fakeApi({ getForecast: async () => forecastA }));
+    await screen.findByTestId("forecast-chart");
+    expect(screen.queryByTestId("accuracy")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });

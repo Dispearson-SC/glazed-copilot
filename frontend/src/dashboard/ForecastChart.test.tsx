@@ -42,4 +42,16 @@ describe("ForecastChart", () => {
     show();
     expect(screen.getByTestId("fc-censored-2026-02-28")).toHaveAttribute("title", expect.stringContaining("5"));
   });
+
+  it("labels the band as a sum over products at store level", () => {
+    show();
+    expect(screen.getByTestId("forecast-band-note")).toHaveTextContent("rango (suma por producto)");
+  });
+
+  it("does not count censored days as misses and says how many there are", () => {
+    show();
+    expect(screen.getByTestId("forecast-metrics")).toHaveTextContent("3 días con quiebre no cuentan como error");
+    expect(screen.getByTestId("fc-actual-2026-02-28")).toHaveAttribute("data-censored", "true");
+    expect(screen.getByTestId("fc-actual-2026-02-27")).toHaveAttribute("data-censored", "false");
+  });
 });
