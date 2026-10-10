@@ -8,6 +8,7 @@ from typing import Any
 
 from ..domain import (Alert, AlertState, BacktestRun, Case, DomainError, Execution, Experience, FutureDate, InvalidTransition, NotFound,
                       Proposal, TraceEvent, TurnRecord, alert_type_for_kind, canonical_agent_id, case_id_from_session, new_id)
+from .reply_sanitizer import clean_reply, sanitize_reply  # noqa: F401 - sanitize_reply stays importable from here
 from ..ports import (AlertRepository, BacktestRepository, CaseRepository, Clock, CorePort,
                      ExecutionRepository, ExperienceMemoryPort, MetricsPort, ProposalRepository, TracePort,
                      TurnRepository)
@@ -105,21 +106,6 @@ class AskAgent:
         if self.turns is not None and self.clock:
             self.turns.add(TurnRecord(turn_id, case.case_id, case.store_id, self.clock.now(), text))
         return turn_id
-
-
-_FOREIGN = ("\u0400-\u052f\u0530-\u058f\u0590-\u05ff\u0600-\u06ff\u0750-\u077f\u0900-\u097f\u0e00-\u0e7f"
-            "\u1100-\u11ff\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af")
-_FOREIGN_RUN = re.compile(f"[{_FOREIGN}]+(?:[ ]+[{_FOREIGN}]+)*")
-
-
-def sanitize_reply(text: str) -> tuple[str, list[str]]:
-    """Conservative clean-up of stray non-Latin tokens the model sometimes emits (CJK, Cyrillic, Arabic, ...).
-    Only whole runs of those scripts are removed; Latin, accents, digits, punctuation, symbols, markdown stay."""
-    removed = _FOREIGN_RUN.findall(text)
-    if not removed:
-        return text, []
-    clean = re.sub(r"[ ]{2,}", " ", _FOREIGN_RUN.sub("", text)).strip()
-    return clean, removed
 
 
 _LIVE_STATUSES = ("running", "waiting", "started", "pending", "queued")
