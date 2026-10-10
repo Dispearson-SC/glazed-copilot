@@ -59,7 +59,9 @@ def test_decide_reject_with_reason(api, run):
            {"execution_id": "e1", "proposal_id": "p1", "case_id": "c1", "source": "simulated",
             "status": "not_executed", "detail": ""})
     run("decide", "p1", "--reject", "--reason", "too much stock")
-    assert api.last_json() == {"approved": False, "reason": "too much stock"}
+    import json
+    post = [c for c in api.calls if c.method == "POST"][-1]
+    assert json.loads(post.content) == {"approved": False, "reason": "too much stock"}
 
 
 def test_decide_reject_requires_reason_locally(api, run):

@@ -60,10 +60,41 @@ def case_table(cases: list[dict], current: str | None) -> Table:
          c["mode"], c.get("parent_case_id"), c.get("title")] for c in cases))
 
 
+def _alert_cells(a: dict) -> tuple[Any, Any]:
+    issue = a.get("issue") or {}
+    kind = issue.get("kind")
+    kind_cell = f"{a.get('alert_type')} {kind}" if kind else a.get("alert_type")
+    integrity = issue.get("category") == "integrity" or kind in ("sku_key_mismatch", "orphan_sku")
+    if integrity and issue.get("exposure_usd") is not None:
+        return kind_cell, f"exposure {issue['exposure_usd']:.2f}"
+    return kind_cell, a.get("severity_usd")
+
+
 def alerts_table(alerts: list[dict], title: str = "Alerts") -> Table:
     return table(title, ["alert_id", "type", "store", "severity_usd", "state", "as_of", "issue_key"], (
-        [a["alert_id"], a.get("alert_type"), a.get("store_display_name") or a.get("store_id"), a.get("severity_usd"), a.get("state"),
-         a.get("as_of"), a.get("issue_key")] for a in alerts))
+        [a["alert_id"], _alert_cells(a)[0], a.get("store_display_name") or a.get("store_id"), _alert_cells(a)[1],
+         a.get("state"), a.get("as_of"), a.get("issue_key")] for a in alerts))
+
+
+def compliance_table(records: list[dict]) -> Table:
+    def money(v: Any) -> str:
+        return "-" if v is None else f"{v:.2f}"
+
+    return table("Centinela: compliance", ["decision", "action", "execution", "diagnosis", "simulated", "observed", "explanation"], (
+        [r["decision_id"], r.get("action_type"), r.get("execution_status") or r.get("status"), r.get("diagnosis") or "-",
+         money((r.get("simulated") or {}).get("net_usd_mid")),
+         "-" if not r.get("observed") else f"{r['observed']['net_usd']:.2f} ({r['observed'].get('label', 'backtest')})",
+         r.get("explanation")] for r in records))
+
+
+def promo_audit_report(a: dict, out: Console) -> None:
+    out.print(f"Verdict: [bold]{a.get('verdict')}[/bold]  recommendation: {a.get('recommendation')}")
+    for reason in a.get("reasons") or []:
+        out.print(f"  - {reason}")
+    if a.get("similar"):
+        out.print("Similar promos: " + ", ".join(str(p.get("promo_id")) for p in a["similar"]))
+    if a.get("alternative"):
+        out.print(f"Alternative: {a['alternative'].get('promo_id')}")
 
 
 def proposals_table(items: list[dict], title: str = "Proposals") -> Table:

@@ -293,9 +293,85 @@ def decide(ctx: typer.Context, proposal_id: str,
     if reason:
         body["reason"] = reason
     ex = c.api.post(f"/api/v1/proposals/{proposal_id}/decision", body)
-    c.out(ex, lambda d: render.console().print(
-        f"Proposal {proposal_id} {'approved' if approve else 'rejected'}: execution "
-        f"[bold]{d['status']}[/bold] (source: {d['source']}). {d.get('detail') or ''}"))
+    stored: dict = {}
+    if reject:  # Jev's label lives on the stored proposal, not in the execution the decision returns
+        try:
+            stored = next((p for p in c.api.get("/api/v1/proposals", case_id=ex.get("case_id"), status="rejected")
+                           if p.get("proposal_id") == proposal_id), {})
+        except CliError:
+            stored = {}
+
+    def human(d: dict) -> None:
+        out = render.console()
+        out.print(f"Proposal {proposal_id} {'approved' if approve else 'rejected'}: execution "
+                  f"[bold]{d['status']}[/bold] (source: {d['source']}). {d.get('detail') or ''}")
+        if stored.get("reason_category"):
+            conf = stored.get("reason_confidence")
+            out.print(f"Reason category: [bold]{stored['reason_category']}[/bold]"
+                      + (f" (confidence {conf:.2f})" if conf is not None else ""))
+
+    c.out({**ex, **{k: stored[k] for k in ("reason_category", "reason_confidence") if k in stored}}, human)
+
+
+# ---- Sentinel, demo injection, promo audit ----
+
+@app.command()
+@_guard
+def compliance(ctx: typer.Context, decision: Optional[str] = typer.Option(None, "--decision", help="Only this decision id."),
+               case: Optional[str] = typer.Option(None, "--case")) -> None:
+    """Centinela: execution status, diagnosis and simulated vs observed (backtest) of each decision."""
+    c: Ctx = ctx.obj
+    rows = c.api.get(f"/api/v1/cases/{current_case_id(case)}/compliance")
+    if decision:
+        rows = [r for r in rows if r["decision_id"] == decision]
+        if not rows:
+            raise CliError(f"No decision {decision!r} in this case.")
+    c.out(rows, lambda d: render.console().print(render.compliance_table(d) if d else "No decisions to check."))
+
+
+inject_app = typer.Typer(help="Demo only: inject a not-executed decision or an external event.", no_args_is_help=True)
+app.add_typer(inject_app, name="inject")
+
+
+@inject_app.command("not-executed")
+@_guard
+def inject_not_executed(ctx: typer.Context, proposal_id: str, detail: Optional[str] = typer.Option(None, "--detail"),
+                        case: Optional[str] = typer.Option(None, "--case")) -> None:
+    """Record that an approved proposal was NOT carried out (source demo_injected)."""
+    c: Ctx = ctx.obj
+    body: dict[str, Any] = {"proposal_id": proposal_id, "status": "not_executed"}
+    if detail:
+        body["detail"] = detail
+    out = c.api.post(f"/api/v1/cases/{current_case_id(case)}/inject", {"execution": body})
+    c.out(out, lambda _: render.console().print(f"Injected: proposal {proposal_id} was not executed."))
+
+
+@inject_app.command("event")
+@_guard
+def inject_event(ctx: typer.Context, type_: str = typer.Option(..., "--type", help="bloqueo, clima_extremo, evento_local..."),
+                 date_from: str = typer.Option(..., "--from"), date_to: Optional[str] = typer.Option(None, "--to"),
+                 note: Optional[str] = typer.Option(None, "--note"), case: Optional[str] = typer.Option(None, "--case")) -> None:
+    """Register an external event over a date range (source demo_injected)."""
+    c: Ctx = ctx.obj
+    body: dict[str, Any] = {"type": type_, "date_from": date_from}
+    if date_to:
+        body["date_to"] = date_to
+    if note:
+        body["note"] = note
+    out = c.api.post(f"/api/v1/cases/{current_case_id(case)}/inject", {"event": body})
+    c.out(out, lambda _: render.console().print(f"Injected event {type_} from {date_from}" + (f" to {date_to}." if date_to else ".")))
+
+
+@app.command("promo-audit")
+@_guard
+def promo_audit(ctx: typer.Context, department: str = typer.Option(..., "--department"),
+                discount: float = typer.Option(..., "--discount", help="Discount percentage, e.g. 15."),
+                case: Optional[str] = typer.Option(None, "--case")) -> None:
+    """Audit a proposed promotion against similar finished promos (verdict block/allow)."""
+    c: Ctx = ctx.obj
+    out = c.api.post("/api/v1/promos/audit",
+                     {"case_id": current_case_id(case), "department": department, "discount_pct": discount})
+    c.out(out, lambda d: render.promo_audit_report(d, render.console()))
 
 
 # ---- backtest, trace ----
