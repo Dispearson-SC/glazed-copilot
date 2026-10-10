@@ -8,6 +8,9 @@ export interface Store {
   site_name?: string;
   site_type?: string;
   display_name?: string;
+  /** Optional ISO dates; absent in the current payload. */
+  closed_on?: string | null;
+  opened_on?: string | null;
 }
 
 /** What users see: site and store, never the code. */
