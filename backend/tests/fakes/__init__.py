@@ -113,12 +113,17 @@ class FakeMetrics:
         self.calls.append(("supplier_performance", store_id, as_of))
         return [{"supplier_id": "SUP01", "on_time_pct": 90.0}]
 
+    evals: dict = {}  # promo_id -> promo_evaluation payload
+    audit_verdicts: dict = {}  # department -> verdict (default "block")
+
     def promo_evaluation(self, store_id, as_of, promo_id):
-        return {"promo_id": promo_id, "confidence": "low"}
+        self.calls.append(("promo_evaluation", store_id, as_of, promo_id))
+        return self.evals.get(promo_id, {"promo_id": promo_id, "confidence": "low"})
 
     def promo_audit(self, store_id, as_of, department, discount_pct):
         self.calls.append(("promo_audit", store_id, as_of, department, discount_pct))
-        return {"department": department, "discount_pct": discount_pct, "verdict": "block", "recommendation": "do_nothing",
+        return {"department": department, "discount_pct": discount_pct, "verdict": self.audit_verdicts.get(department, "block"),
+                "recommendation": "do_nothing",
                 "similar": [{"promo_id": "PR002"}, {"promo_id": "PR005"}], "alternative": {"promo_id": "PR009"}}
 
     def observed_outcome(self, store_id, as_of, action_type, params):

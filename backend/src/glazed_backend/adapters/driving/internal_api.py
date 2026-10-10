@@ -158,6 +158,13 @@ def build_internal_router(c: Any) -> APIRouter:
     def suppliers(case: Ctx):
         return c.metrics.supplier_performance(case.store_id, case.sim_today)
 
+    @r.get("/promos")
+    def promos(case: Ctx, status: str | None = None, days: int | None = None, limit: int | None = None,
+               store_id: str | None = None, as_of: date | None = None):
+        """Promotions (active, upcoming, past) with audit verdict and evaluation; the same use case as the public route."""
+        own_case(case, store_id, as_of)
+        return uc_manager.PromosView(c.metrics, names).execute(case, status, days, limit)
+
     @r.get("/promos/{promo_id}/evaluation")
     def promo(case: Ctx, promo_id: str):
         return c.metrics.promo_evaluation(case.store_id, case.sim_today, promo_id)

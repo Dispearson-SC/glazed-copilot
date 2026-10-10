@@ -546,6 +546,13 @@ class DuckDBMetrics:
         return {r[0] for r in self._q("SELECT DISTINCT sku FROM sales_daily WHERE store_id=? AND date BETWEEN ? AND ?"
                                       " AND units_sold>0", [store_id, start, as_of])}
 
+    def promotions(self, store_id: str, as_of: date) -> list[dict[str, Any]]:
+        """Promotions whose scope covers the store's region (ALL or the region); planned dates only, no result data."""
+        region = self.store_profile(store_id)["region"]
+        return self._rows("SELECT promo_id, promo_name, department, category, discount_pct, start_date, end_date, region_scope"
+                          " FROM promotions WHERE upper(coalesce(region_scope,'ALL'))='ALL' OR region_scope=?"
+                          " ORDER BY start_date, promo_id", [region])
+
     def delivery_inputs(self, store_id: str, as_of: date, until: date) -> dict[str, Any]:
         """Orders placed by as_of that are open, overdue (within the lookback) or received on as_of, expected by `until`;
         a receipt after as_of is reported as not received. Plus the delivery weekdays of the store's suppliers."""

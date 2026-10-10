@@ -9,6 +9,7 @@ from typing import Any
 from ..domain import Case, DomainError
 from ..metrics.deliveries import LATE_LOOKBACK_DAYS, build_delivery_days
 from ..metrics.expiry import MAX_SHELF_LIFE_DAYS, expiring_items, summarize_expiry
+from ..metrics.promos_view import STATUSES, in_window, promo_status, sort_promos
 from ..metrics.inventory_view import SORTS, inventory_item, sort_items
 
 DEFAULT_LIMIT, MAX_LIMIT = 50, 500
@@ -129,3 +130,35 @@ class DeliveriesView(_View):
         pos = [p for p in got["pos"] if p["order_date"] <= as_of]  # a PO placed after the case date is not known yet
         return self.envelope(case, window_days=days, late_lookback_days=LATE_LOOKBACK_DAYS,
                              days=build_delivery_days(pos, got["suppliers"], as_of, days))
+
+
+class PromosView(_View):
+    """Promotions with the audit verdict the rule would give (known when the promo started, or today for a promo that has
+    not) and, only for promos that ended on or before the case date, the store's naive pre/post uplift."""
+    SOURCE = "promotions+promo_audit+promo_evaluation"
+    MAX_DAYS = 365
+
+    def execute(self, case: Case, status: str | None = None, days: int | None = None, limit: int | None = None) -> dict[str, Any]:
+        if status is not None and status not in STATUSES:
+            raise DomainError(f"status must be one of {', '.join(STATUSES)}")
+        days = 14 if days is None else days
+        if not 1 <= days <= self.MAX_DAYS:
+            raise DomainError(f"days must be between 1 and {self.MAX_DAYS}")
+        as_of, store = case.sim_today, case.store_id
+        items = []
+        for p in self.metrics.promotions(store, as_of):
+            st = promo_status(p["start_date"], p["end_date"], as_of)
+            if (status and st != status) or not in_window(st, p["start_date"], p["end_date"], as_of, days):
+                continue
+            audit = self.metrics.promo_audit(store, min(p["start_date"], as_of), p["department"], float(p["discount_pct"] or 0))
+            ev = None
+            if p["end_date"] <= as_of:  # NO LOOK-AHEAD: a promo that has not finished has no result yet
+                got = self.metrics.promo_evaluation(store, as_of, p["promo_id"])
+                ev = {"uplift_pct": got.get("uplift_pct"), "expected_uplift_pct": got.get("expected_uplift_pct"),
+                      "confidence": got.get("confidence"), "caveat": got.get("caveat")}
+            items.append({"promo_id": p["promo_id"], "name": p["promo_name"], "department": p["department"],
+                          "category": p.get("category"), "discount_pct": p["discount_pct"],
+                          "start_date": p["start_date"].isoformat(), "end_date": p["end_date"].isoformat(), "status": st,
+                          "audit_verdict": audit.get("verdict"), "evaluation": ev,
+                          "projected": p["end_date"] > as_of})
+        return self.envelope(case, window_days=days, items=sort_promos(items)[:clamp_limit(limit)])

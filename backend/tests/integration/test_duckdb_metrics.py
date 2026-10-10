@@ -317,3 +317,9 @@ def test_delivery_inputs_are_known_at_as_of_and_hide_later_receipts(m):
     assert all(p["received_date"] is None or p["received_date"] <= JUL for p in got["pos"])
     assert all(p["expected_date"] <= JUL + timedelta(days=7) for p in got["pos"])
     assert all(isinstance(s["delivery_days"], list) and s["delivery_days"] for s in got["suppliers"])
+
+
+def test_promotions_in_scope_carry_plan_dates_only(m):
+    ps = m.promotions(S, JUL)
+    assert len(ps) >= 5 and {"promo_id", "promo_name", "department", "discount_pct", "start_date", "end_date"} <= set(ps[0])
+    assert not any(k in ps[0] for k in ("applied_rows", "first_applied", "last_applied"))
