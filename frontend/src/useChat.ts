@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApi } from "./ApiContext";
 import { ApiError } from "./api";
 import { buildHistory, buildTurnHistory, type ChatMessage } from "./chatHistory";
+import { parseTraceMessage } from "./parseTraceMessage";
 import { sanitizeReply } from "./sanitize";
-import type { Proposal } from "./types";
+import type { Proposal, TurnRecord } from "./types";
 
 export type ChatStatus = "idle" | "working" | "waiting_approval";
 
@@ -15,6 +16,8 @@ export interface UseChatOptions {
   /** How long a 404 on a fresh turn is treated as "still queued". */
   notFoundGraceMs?: number;
 }
+
+const isPendingTurn = (t: TurnRecord) => t.status === "pending" || (t.status !== "failed" && !t.reply);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -50,12 +53,48 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
     setProposals([]);
     if (!enabled || !caseId) return;
     let alive = true;
+    const patch = (id: string, next: ChatMessage) => setHistory((h) => h.map((m) => (m.id === id ? next : m)));
+    // A pending stored turn has no live poller after a reload: resume it like a fresh one.
+    const resumeTurn = async (turn: TurnRecord) => {
+      const startedAt = Date.now();
+      const id = `s-${turn.turn_id}-a`;
+      const userText = parseTraceMessage(turn.user_text ?? "").text;
+      const fail = (msg: string) => {
+        setStillRunning(false);
+        patch(id, { id: `s-${turn.turn_id}-e`, role: "error", text: msg, retryText: userText });
+      };
+      while (alive) {
+        try {
+          const t = await api.getTurn(caseId, turn.turn_id);
+          if (!alive) return;
+          if (t.status === "pending") {
+            setStillRunning(Boolean(t.still_running));
+          } else {
+            setStillRunning(false);
+            if (t.status === "failed") return fail(t.error || "El copiloto no pudo responder.");
+            const raw = t.reply?.trim();
+            if (raw && raw !== "None") {
+              const reply = parseTraceMessage(raw);
+              patch(id, { id, role: "assistant", text: reply.text, turnId: turn.turn_id, meta: t.reply_meta, ...(reply.truncated ? { truncated: true } : {}) });
+            }
+            await refreshProposals();
+            return;
+          }
+        } catch (e) {
+          const queued = e instanceof ApiError && e.status === 404 && Date.now() - startedAt < notFoundGraceMs;
+          if (!queued) return alive ? fail((e as Error).message) : undefined;
+        }
+        await sleep(pollMs);
+      }
+    };
     // Stored turns carry the full replies; the trace parser is the fallback while the route is missing or empty.
     api
       .listTurns(caseId)
       .then((turns) => {
         if (turns.length === 0) throw new Error("no stored turns");
-        if (alive) setHistory(buildTurnHistory(turns));
+        if (!alive) return;
+        setHistory(buildTurnHistory(turns));
+        turns.filter(isPendingTurn).forEach((t) => void resumeTurn(t));
       })
       .catch(() =>
         api.getTrace(storeId, caseId).then((ev) => alive && setHistory(buildHistory(ev))).catch(() => {}),
@@ -65,7 +104,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
       alive = false;
       run.current++;
     };
-  }, [api, caseId, storeId, enabled, refreshProposals]);
+  }, [api, caseId, storeId, enabled, refreshProposals, pollMs, notFoundGraceMs]);
 
   const addLocal = (m: Omit<ChatMessage, "id">) => setLocal((l) => [...l, { ...m, id: `l-${++seq.current}` }]);
 

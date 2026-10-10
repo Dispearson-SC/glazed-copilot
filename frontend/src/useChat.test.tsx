@@ -56,6 +56,53 @@ describe("useChat", () => {
     expect(api.getTrace).toHaveBeenCalledWith("S030", "c1");
   });
 
+  describe("pending turns loaded from history", () => {
+    const pendingTurn = { turn_id: "t7", ts: "2026-03-01T10:00:00Z", user_text: "hola", reply: null, status: "pending" as const };
+
+    it("resumes polling and replaces the working bubble with the parsed reply, then loads proposals", async () => {
+      const getTurn = vi
+        .fn()
+        .mockResolvedValueOnce({ turn_id: "t7", status: "pending", still_running: true })
+        .mockResolvedValue({ turn_id: "t7", status: "done", reply: "Listo, ya quedó" });
+      const listProposals = vi.fn(async () => [proposalA]);
+      const api = fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn, listProposals });
+      const { result } = setup(api);
+      await waitFor(() => expect(result.current.messages[1]?.text).toBe("Listo, ya quedó"));
+      expect(getTurn).toHaveBeenCalledWith("c1", "t7");
+      expect(getTurn.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(result.current.messages).toHaveLength(2);
+      await waitFor(() => expect(listProposals.mock.calls.length).toBeGreaterThanOrEqual(2));
+      await waitFor(() => expect(result.current.proposals).toHaveLength(1));
+    });
+
+    it("turns the bubble into a retryable error when the turn fails", async () => {
+      const getTurn = vi.fn(async () => ({ turn_id: "t7", status: "failed" as const, error: "se cayó" }));
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(result.current.messages.map((m) => m.role)).toEqual(["user", "error"]));
+      expect(result.current.messages[1]).toMatchObject({ text: "se cayó", retryText: "hola" });
+    });
+
+    it("stops polling after unmount", async () => {
+      const getTurn = vi.fn(async () => ({ turn_id: "t7", status: "pending" as const }));
+      const { unmount, result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(getTurn).toHaveBeenCalled());
+      unmount();
+      const n = getTurn.mock.calls.length;
+      await new Promise((r) => setTimeout(r, 60));
+      expect(getTurn.mock.calls.length).toBeLessThanOrEqual(n + 1);
+      expect(result.current.messages[1]?.text).toBe("El copiloto sigue trabajando…");
+    });
+
+    it("does not poll turns that are already done", async () => {
+      const getTurn = vi.fn();
+      const done = { turn_id: "t9", ts: "2026-03-01T10:00:00Z", user_text: "hola", reply: "buenas", status: "done" as const };
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [done]), getTurn }));
+      await waitFor(() => expect(result.current.messages).toHaveLength(2));
+      await new Promise((r) => setTimeout(r, 30));
+      expect(getTurn).not.toHaveBeenCalled();
+    });
+  });
+
   it("tolerates a 404 right after the POST, then shows the reply", async () => {
     const getTurn = vi
       .fn()
