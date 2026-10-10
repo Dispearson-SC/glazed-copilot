@@ -332,6 +332,8 @@ export interface DayView {
   date: string;
   expected: string;
   range: string | null;
+  /** Same-weekday average, shown when the forecast has no point for the day. */
+  baseline: string | null;
   /** "Pronóstico", "Pronóstico cerrado". */
   conf: string;
   real: string;
@@ -370,6 +372,9 @@ function contextText(date: string, s: DaySummary | null): string {
   return [weekdayLong(date), c?.is_holiday ? c.holiday_name || "Feriado" : "", c?.is_school_break ? "vacaciones escolares" : ""].filter(Boolean).join(" · ");
 }
 
+/** True for the honest empty values, which the UI draws small and muted. */
+export const isPlaceholder = (v: string): boolean => ["Sin datos", SOON_TEXT, NO_FORECAST, "Pendiente"].includes(v);
+
 export function buildDayView(day: DayKey, input: DayViewInput): DayView {
   const { asOf, forecast, ayer, hoy, kpis, expiring, outlook } = input;
   const date = day === "ayer" ? shiftDate(asOf, -1) : day === "hoy" ? asOf : shiftDate(asOf, 1);
@@ -387,6 +392,7 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
     date: cap(longDate(date)),
     expected: expectedValue == null ? "Sin datos" : usd(expectedValue),
     range,
+    baseline: null,
     conf: day === "ayer" ? "Pronóstico cerrado" : "Pronóstico",
     real: "Pendiente",
     realNote: day === "hoy" ? "Se registra al cierre" : "Día futuro",
@@ -404,6 +410,9 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
       sub: `${rangeText(lostKpi?.low, lostKpi?.high) ?? "Sin datos"} · por falta de producto`,
     },
   };
+
+  const weekdayAvg = (day === "ayer" ? ayer : day === "hoy" ? hoy : null)?.vs_same_weekday_avg;
+  if (expectedValue == null && weekdayAvg) view.baseline = `Promedio mismo día (${weekdayAvg.weeks_used} sem): ${usd(weekdayAvg.baseline_net_sales)}`;
 
   if (!future) {
     const t = ayer?.totals;

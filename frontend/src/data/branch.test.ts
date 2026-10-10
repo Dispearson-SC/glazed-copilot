@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, branchKpis, hoySummary, orderPlanA } from "../test/copilotFixtures";
-import { buildDayView, buildInventoryRows, buildScheduled } from "./copilot";
+import { buildDayView, isPlaceholder, buildInventoryRows, buildScheduled } from "./copilot";
 
 const input = { asOf: "2026-07-19", forecast: branchForecast, ayer: ayerSummary, hoy: hoySummary, kpis: branchKpis, expiring: branchExpiring };
 
@@ -69,6 +69,21 @@ describe("buildDayView with /outlook", () => {
   });
   it("keeps 'Disponible pronto' for a day the outlook does not cover", () => {
     expect(buildDayView("manana", { ...input, outlook }).orders.value).toBe("Disponible pronto");
+  });
+});
+
+describe("same-weekday baseline when the forecast has no point for the day", () => {
+  it("shows the backend's same-weekday average for Ayer and Hoy instead of an empty range", () => {
+    expect(buildDayView("ayer", { ...input, forecast: null }).baseline).toBe("Promedio mismo día (7 sem): $677.87");
+    expect(buildDayView("hoy", { ...input, forecast: null }).baseline).toBe("Promedio mismo día (7 sem): $700.00");
+    expect(buildDayView("manana", { ...input, forecast: null }).baseline).toBeNull();
+  });
+});
+
+describe("isPlaceholder", () => {
+  it("recognises the honest empty values", () => {
+    for (const v of ["Sin datos", "Disponible pronto", "Sin pronóstico", "Pendiente"]) expect(isPlaceholder(v)).toBe(true);
+    expect(isPlaceholder("$12.00")).toBe(false);
   });
 });
 

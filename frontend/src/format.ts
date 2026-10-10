@@ -58,3 +58,11 @@ export const clockTime = (ts: string | undefined): string => {
 const usdWholeFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 /** "$4,320" (no cents), for ranges. */
 export const usdWhole = (n: number): string => `${n < 0 ? "-" : ""}$${usdWholeFmt.format(Math.abs(n))}`;
+
+/** "Sábado 10 de octubre": weekday, day and month (no year), capitalised. */
+export const dateLabel = (iso: string): string => {
+  const t = new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" })
+    .format(new Date(`${iso.slice(0, 10)}T00:00:00Z`))
+    .replace(",", "");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};

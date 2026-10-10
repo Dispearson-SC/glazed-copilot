@@ -71,6 +71,12 @@ describe("Sucursal window", () => {
     expect(screen.getAllByText("Disponible pronto").length).toBeGreaterThanOrEqual(3);
   });
 
+  it("renders empty values small and muted, never as a headline figure", async () => {
+    await openSucursal();
+    await screen.findByText("$868.54");
+    for (const el of screen.getAllByText("Disponible pronto")) expect(el.className).toMatch(/text-\[13px\]/);
+  });
+
   it("lists inventory with stock, daily outflow and the order-plan purchase", async () => {
     await openSucursal();
     const row = (await screen.findByText("Md Choc Stout C.B. Wsweet Cold Foam")).closest("div[data-row]") as HTMLElement;

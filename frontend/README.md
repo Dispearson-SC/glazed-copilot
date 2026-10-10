@@ -21,11 +21,18 @@ npm run preview
 
 ## Pages
 
-The app is exactly three screens, copied from the Glazed-Co design (github.com/CesarOliva/Glazed-Co @ b9d4132: markup, Tailwind classes, spacing, Material Symbols icons). Any other path redirects to `/`.
+The app has four screens: the three below plus `/copiloto`. The three were copied from the Glazed-Co design (github.com/CesarOliva/Glazed-Co @ b9d4132: markup, Tailwind classes, spacing, Material Symbols icons). Any other path redirects to `/`.
 
 - `/` (Resumen): dashboard of the current case's store, from the simulation clock (never the wall clock). Header with "Fecha simulada" and the sim date, hero with the day's net sales, delta and progress against the same-weekday average, metric cards (transactions, average ticket, units), "Ventas por día" chart (7 actual days plus up to 3 projected days, model name captioned), top 3 products, link to the chat and "Datos al <as_of>". A floating chat bubble opens a compact chat.
 - `/login`: store and case picker (no credentials; access control is the reverse proxy's basic auth). The choice lives in `SessionContext` (`storeId`, `caseId`).
 - `/chat`: full chat with the copilot over the same logic as the floating panel (turn history, polling, inline pending proposals with Aprobar/Rechazar, reply chip).
+
+- `/copiloto`: the decision copilot (handoff `Copiloto.dc.html`), five windows behind a capsule navigation. It wires real data only; whatever the backend does not serve yet shows "Sin datos" / "Disponible pronto" (see the GAP LIST in `odd/tasks/copiloto.md`).
+  - Agente: the chat over `useChat` (polling, history, inline proposals, markdown), pinned context ("Hablando de: ..."), suggestions and analysis/dialogue cards. The context is prefixed into the message text (`chatContextText`) until `POST /messages` accepts a `context` field.
+  - Decisiones: approvals = `/issues` whose recommended option is N2/N3; technical = `/order-plan` lines (plus N1 issue options). Aceptar/Aprobar/Rechazar run `POST /proposals` then `POST /proposals/{id}/decision` with Idempotency-Key; the card, toast and learned memory change only after the backend accepted. An order-plan line without issue is read-only.
+  - Sucursal: Ayer (day-summary + vs same-weekday average), Hoy and Mañana (forecast / `/outlook` when deployed). Today's real sales are never shown ("Pendiente · Se registra al cierre"). Mañana weather is permanently "Sin pronóstico".
+  - Memorias: `/history` decision log, `/suppliers/performance`, plus rejections taught in this session. Advertencias: open `/alerts` and integrity issues; no "Revertir" (N1 auto-execution does not exist).
+  - Each source not served yet is one function in `src/data/copilot.ts` returning `{status: "soon"}`; swapping it is a one-line change. `src/data/copilot.ts` holds view-model types and pure adapters only, no sample data.
 
 All pages show error and empty states when the backend is unreachable.
 
@@ -43,7 +50,7 @@ Rules: a day with `totals: null` (HTTP 200) shows "Sin datos", never 0, and a ch
 
 ## Visual check
 
-Build or run the dev server and compare at 422 px width with the design's `screen.png`. Note: the backend sends no CORS headers, so use `npm run dev` (Vite proxy), not `vite preview`, against a live backend.
+Build or run the dev server and compare at 390 px width with the design (`screen.png`, and the handoff's `*.dc.html`, which only render inside the design canvas: expand their `{{ }}`/`sc-if`/`sc-for` with the values of `renderVals()` to get a static page). Note: the backend sends no CORS headers, so use `npm run dev` (Vite proxy), not `vite preview`, against a live backend.
 
 ## Layout
 

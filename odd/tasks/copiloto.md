@@ -42,8 +42,8 @@ Strict. Runner: `cd frontend && npm test -- --run`; plus `npm run build` and `np
 - [x] T3 (ca8bf87) Decisiones window (ApprovalCard, TechDecisionCard, ⋯ menu, RejectSheet) wired to proposals/decision. Route: delegated writer.
 - [x] T4 (d803d40) Sucursal window (Ayer/Hoy/Mañana, sales card, weather, KPIs, inventory, scheduled purchases). Route: delegated writer.
 - [x] T5 (317f15e) Memorias and Advertencias windows. Route: delegated writer.
-- [x] T6 Realign Main, Login and Chat to their `.dc.html`; BottomNav "Chat" → "Copiloto". Route: delegated writer.
-- [ ] T7 390px screenshots vs the designs, README, and the GAP LIST (design field → backend status). Route: delegated writer.
+- [x] T6 (81e7ea8) Realign Main, Login and Chat to their `.dc.html`; BottomNav "Chat" → "Copiloto". Route: delegated writer.
+- [x] T7 390px screenshots vs the designs, README, and the GAP LIST (design field → backend status). Route: delegated writer.
 
 ## Progress
 - 2026-10-10: worktree created; all mapped routes answer 200 on :8100.
@@ -78,7 +78,8 @@ Format: design element | needed field/endpoint | current backend status | sugges
 | Expected visits, weather forecast (Hoy/Mañana) | `/forecast?metric=traffic|weather` | missing (Mañana: "Sin pronóstico", permanent) | `/forecast?metric=traffic -> points[{date,value,p10,p90}]` |
 | Expected orders, ticket, conversion (Hoy/Mañana) | forecast of transactions/ticket/conversion | missing | `/forecast?metric=transactions|ticket|conversion` |
 | Forecast confidence "Pronóstico 80%" | forecast confidence | partial (`calibration`, `band_method`, `metrics_to_date` null) | `calibration.coverage` as a number |
-| Expected sales Ayer / Hoy / Mañana | `/forecast?level=store&from=as_of-1&to=as_of+1` | exists (now returns past and as_of points with `actual`; Hoy's actual is never rendered) | none |
+| Expected sales Ayer / Hoy | forecast point for `as_of-1` and `as_of` | missing in the live backend at the time of the check (`/forecast` returns only `as_of+1..`; an earlier run did return past points with `actual`); UI shows "Sin datos" plus the same-weekday average from day-summary | include `as_of-1` and `as_of` points (Hoy's `actual` is never rendered) |
+| Expected sales Mañana | `/forecast?level=store` point for `as_of+1` | exists | none |
 | Hoy/Mañana orders, ticket, waste, lost sales ranges | `GET /cases/{id}/outlook?days=2` | approved, answers 404 today -> "Disponible pronto" (adapter `fetchOutlook`; shape as proposed, unverified) | `{days:[{date, net_sales{low,mid,high}, transactions, ticket, expected_waste_usd, expected_lost_sales_usd, weather:null}]}` |
 | Conversion (Hoy/Mañana) | expected conversion | missing | add `conversion{low,mid,high}` to outlook days |
 | Ayer waste (per day) | real waste of a given day | missing (only 7-day `kpis.waste_usd`) | `/kpis?date_from=&date_to=` already supports a window: expose per-day |
@@ -93,3 +94,8 @@ Format: design element | needed field/endpoint | current backend status | sugges
 | Capsule badges | `GET /cases/{id}/inbox-counts` | missing (counted from loaded lists) | `{decisiones, memorias, alertas}` |
 | Product photos | image URL per SKU | missing (initials thumbnail) | `products[].image_url` |
 | Spanish narrative | backend text fields (`urgency.reason`, `risk[]`, `tier_reasons[]`) are English | partial (shown as received) | return Spanish or codes |
+- T7 done: 390px screenshots (device scale 2) of /login, /, /copiloto (5 windows, Sucursal Ayer/Hoy/Mañana, ⋯ menu, reject sheet) and /chat against the live backend (case fce42dd29fba, S030, 2026-07-19), plus the designs rendered statically for side-by-side comparison. Fixes from the comparison (commit below): empty values drawn small and muted, same-weekday average when the forecast has no point, Decisiones date as "Domingo 19 de julio". GREEN 288/288, build ok, tsc ok. frontend/README documents /copiloto.
+  - Screenshots (scratchpad ): app-login, app-main(-full), app-copiloto-{agente,decisiones,sucursal,memorias,alertas}(-full), app-copiloto-sucursal-{ayer,manana}-full, app-copiloto-decisiones-menu, app-copiloto-rejectsheet, app-chat. Design renders: ; side-by-sides: .
+  - Vite was started WITHOUT `VITE_API_URL` (default proxy to :8100): with `VITE_API_URL=http://localhost:8100` the browser calls the backend cross-origin and the backend sends no CORS headers (README), so every request failed.
+  - Remaining visual differences (not data errors): Main still follows the earlier port (title shows store name instead of "Café Central", no bell icon, "Ventas por día" instead of the hourly "Actividad de hoy", initials instead of product photos, floating chat button overlaps the chart); Copiloto top bar shows the branch name instead of the code S030; Decisiones lists every issue the backend returns (17 approvals, 7 technical in the check), so counts differ from the mock's 3/4; inventory pills show days of cover (no status field yet); Sucursal Hoy/Ayer hero shows "Sin datos" because the live forecast carries no point for those days; the first six inventory rows are zero-stock items because the backend sorts by days of cover.
+  - Not verified: pixel measurements by overlay (comparison was visual); Accept/Reject/Analizar against the live backend (not clicked to avoid mutating real data; covered by tests with a fake API); `/outlook` shape (route answers 404); real (non-mocked) rendering of an approval card with N3 data; desktop widths.

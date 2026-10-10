@@ -1,4 +1,6 @@
-import type { DayKey, DayView, InventoryRow, ScheduledRow } from "../../data/copilot";
+import { isPlaceholder, type DayKey, type DayView, type InventoryRow, type ScheduledRow } from "../../data/copilot";
+
+const EMPTY = "text-[13px] font-medium leading-[18px] text-on-surface-variant";
 
 const DAYS: { key: DayKey; label: string }[] = [
   { key: "ayer", label: "Ayer" },
@@ -12,7 +14,7 @@ const tile = "rounded-2xl bg-white p-3 shadow-[0_1px_2px_rgba(51,27,17,.05)]";
 function Tile({ value, label }: { value: string; label: string }) {
   return (
     <div className={tile}>
-      <span className="block text-[18px] font-bold leading-6 text-primary">{value}</span>
+      <span className={isPlaceholder(value) ? `block ${EMPTY}` : "block text-[18px] font-bold leading-6 text-primary"}>{value}</span>
       <span className="font-label-sm text-label-sm font-normal text-on-surface-variant">{label}</span>
     </div>
   );
@@ -80,14 +82,14 @@ export default function BranchWindow({
             <span className="rounded-full bg-white/10 px-2 py-0.5 font-label-sm text-label-sm font-semibold text-tertiary-fixed-dim">{view.conf}</span>
           </div>
           <div>
-            <span className="block font-headline-lg text-[30px] font-bold leading-9 tracking-tight text-surface">{view.expected}</span>
-            <span className="font-label-sm text-label-sm font-normal text-surface-variant">{view.range ? `Rango probable ${view.range}` : "Rango probable: Sin datos"}</span>
+            <span className={isPlaceholder(view.expected) ? "block text-[16px] font-medium leading-9 text-surface-variant" : "block font-headline-lg text-[30px] font-bold leading-9 tracking-tight text-surface"}>{view.expected}</span>
+            <span className="font-label-sm text-label-sm font-normal text-surface-variant">{view.range ? `Rango probable ${view.range}` : (view.baseline ?? "Rango probable: Sin datos")}</span>
           </div>
           <div className="h-px bg-white/[.12]" />
           <div className="flex items-center justify-between gap-2">
             <div className="flex flex-col">
               <span className="font-label-sm text-label-sm font-normal text-surface-variant">Ventas reales</span>
-              <span className="text-[18px] font-bold leading-6 text-surface">{view.real}</span>
+              <span className={isPlaceholder(view.real) ? "text-[14px] font-medium leading-6 text-surface-variant" : "text-[18px] font-bold leading-6 text-surface"}>{view.real}</span>
             </div>
             <span className={`rounded-full px-2.5 py-1 font-label-md text-label-md normal-case tracking-normal text-white ${view.realKnown ? "bg-on-tertiary-container" : "bg-white/[.14]"}`}>{view.realNote}</span>
           </div>
@@ -100,8 +102,8 @@ export default function BranchWindow({
             <span aria-hidden="true" className="material-symbols-outlined text-[22px] text-on-tertiary-container">{view.weather.icon}</span>
             <span className="font-label-sm text-label-sm font-semibold text-on-surface-variant">Clima · {view.weather.tag}</span>
           </div>
-          <span className="text-[22px] font-bold leading-7 text-primary">{view.weather.temp}</span>
-          <span className="text-[12px] leading-4 text-on-surface-variant">{view.weather.text}</span>
+          <span className={isPlaceholder(view.weather.temp) ? EMPTY : "text-[22px] font-bold leading-7 text-primary"}>{view.weather.temp}</span>
+          {!isPlaceholder(view.weather.text) && <span className="text-[12px] leading-4 text-on-surface-variant">{view.weather.text}</span>}
           {view.weather.effect && <span className="self-start rounded-full bg-[rgba(185,133,86,.15)] px-2 py-0.5 font-label-sm text-label-sm font-semibold text-on-tertiary-fixed-variant">{view.weather.effect}</span>}
         </div>
         <div className={card}>
@@ -109,7 +111,7 @@ export default function BranchWindow({
             <span aria-hidden="true" className="material-symbols-outlined text-[22px] text-on-tertiary-container">calendar_month</span>
             <span className="font-label-sm text-label-sm font-semibold text-on-surface-variant">Contexto del día</span>
           </div>
-          <span className="text-[22px] font-bold leading-7 text-primary">{view.traffic.value}</span>
+          <span className={isPlaceholder(view.traffic.value) ? EMPTY : "text-[22px] font-bold leading-7 text-primary"}>{view.traffic.value}</span>
           <span className="text-[12px] leading-4 text-on-surface-variant">{view.traffic.caption}</span>
           <span className="text-[12px] leading-4 text-on-surface-variant">{view.context}</span>
         </div>
@@ -125,7 +127,7 @@ export default function BranchWindow({
         {[view.waste, view.lost].map((s) => (
           <div key={s.label} className="rounded-2xl bg-surface-container-high p-3.5">
             <span className="font-label-sm text-label-sm font-semibold text-on-surface-variant">{s.label}</span>
-            <span className="block text-[18px] font-bold leading-6 text-primary">{s.value}</span>
+            <span className={isPlaceholder(s.value) ? `block ${EMPTY}` : "block text-[18px] font-bold leading-6 text-primary"}>{s.value}</span>
             <span className="font-label-sm text-label-sm font-normal text-on-surface-variant">{s.sub}</span>
           </div>
         ))}

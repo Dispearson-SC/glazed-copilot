@@ -1,5 +1,5 @@
 import type { DecisionItem } from "../../data/copilot";
-import { longDate } from "../../format";
+import { dateLabel } from "../../format";
 import ApprovalCard from "./ApprovalCard";
 import TechDecisionCard from "./TechDecisionCard";
 
@@ -44,7 +44,7 @@ export default function DecisionsWindow({
   return (
     <main className="mx-auto flex w-full max-w-[640px] flex-col gap-6 px-4 pb-28 pt-[68px]">
       <header className="flex flex-col gap-1 pt-3">
-        <span className="font-label-md text-label-md uppercase tracking-[0.05em] text-on-tertiary-container first-letter:uppercase">{simToday ? longDate(simToday) : "Sin datos"}</span>
+        <span className="font-label-md text-label-md uppercase tracking-[0.05em] text-on-tertiary-container first-letter:uppercase">{simToday ? dateLabel(simToday) : "Sin datos"}</span>
         <h1 className="m-0 font-headline-lg text-headline-lg tracking-tight text-primary">Decisiones de hoy</h1>
         <p className="m-0 font-body-md text-body-md text-on-surface-variant">El código calcula; el copiloto explica. Tú decides.</p>
       </header>

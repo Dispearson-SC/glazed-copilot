@@ -16,3 +16,11 @@ describe("usd", () => {
     expect(money(null)).not.toMatch(/\$/);
   });
 });
+
+import { dateLabel } from "./format";
+describe("dateLabel", () => {
+  it("is 'Sábado 10 de octubre' like the copilot design: weekday, day and month, no comma or year", () => {
+    expect(dateLabel("2026-10-10")).toBe("Sábado 10 de octubre");
+    expect(dateLabel("2026-07-19")).toBe("Domingo 19 de julio");
+  });
+});
