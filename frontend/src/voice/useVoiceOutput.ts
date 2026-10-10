@@ -3,8 +3,34 @@ import { useApi } from "../ApiContext";
 import type { VoiceConfig } from "../types";
 import { stripMarkdown } from "./markdown";
 
-/** 44-byte WAV with no samples: playing it inside a gesture unlocks later programmatic play() on iOS. */
-const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+/** About 0.1 s of silent 8-bit mono WAV: playing it inside a gesture unlocks later programmatic play() on iOS. */
+const SILENT_WAV = (() => {
+  const n = 800;
+  const b = new Uint8Array(44 + n);
+  const dv = new DataView(b.buffer);
+  const tag = (o: number, t: string) => [...t].forEach((c, i) => b.set([c.charCodeAt(0)], o + i));
+  tag(0, "RIFF");
+  dv.setUint32(4, 36 + n, true);
+  tag(8, "WAVEfmt ");
+  dv.setUint32(16, 16, true);
+  dv.setUint16(20, 1, true);
+  dv.setUint16(22, 1, true);
+  dv.setUint32(24, 8000, true);
+  dv.setUint32(28, 8000, true);
+  dv.setUint16(32, 1, true);
+  dv.setUint16(34, 8, true);
+  tag(36, "data");
+  dv.setUint32(40, n, true);
+  b.fill(0x80, 44);
+  return `data:audio/wav;base64,${btoa(String.fromCharCode(...b))}`;
+})();
+
+const VOICES_WAIT_MS = 1500;
+const normLang = (l: string) => l.toLowerCase().replace("_", "-");
+/** es-MX first, then es-US, then any es-*; undefined when the device has no Spanish voice. */
+export function pickSpanishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+  return voices.find((v) => normLang(v.lang) === "es-mx") ?? voices.find((v) => normLang(v.lang) === "es-us") ?? voices.find((v) => normLang(v.lang).startsWith("es"));
+}
 
 export const RATES = [0.75, 1, 1.25, 1.5, 2] as const;
 const RATE_KEY = "glazed.voice.rate";
@@ -37,6 +63,7 @@ export function useVoiceOutput(config: VoiceConfig | null) {
   const [time, setTime] = useState({ current: 0, duration: 0 });
   const [rate, setRate] = useState(loadRate);
   const rateRef = useRef(rate);
+  const voicesWaited = useRef(false);
   const synth = useRef<{ text: string; u: SpeechSynthesisUtterance | null; done: () => void } | null>(null);
   const ttsRef = useRef(Boolean(config?.tts));
   ttsRef.current = Boolean(config?.tts);
@@ -88,17 +115,27 @@ export function useVoiceOutput(config: VoiceConfig | null) {
     setTime({ current: 0, duration: 0 });
   }, [clear]);
 
-  /** Call inside a user gesture (pointerdown): makes later play() calls on the shared element allowed. */
-  const unlock = useCallback(() => {
-    stop();
+  /**
+   * Call synchronously inside a user gesture: plays a silent clip on the shared element so later
+   * programmatic play() calls are allowed (iOS). Skipped while a reply is already playing.
+   */
+  const prime = useCallback(() => {
+    if (current.current !== null) return;
     try {
       const a = getAudio();
       a.src = SILENT_WAV;
       void a.play()?.catch(() => {});
+      a.pause();
     } catch {
-      /* unlock is best effort */
+      /* priming is best effort */
     }
-  }, [stop]);
+  }, []);
+
+  /** Mic tap: stops any reading and primes the element. */
+  const unlock = useCallback(() => {
+    stop();
+    prime();
+  }, [stop, prime]);
 
   /** Speaks synth.current.text at the current rate (also used to restart after a speed change). */
   const speakSynthesis = useCallback(() => {
@@ -107,19 +144,37 @@ export function useVoiceOutput(config: VoiceConfig | null) {
     const u = new SpeechSynthesisUtterance(cur.text);
     u.lang = "es-MX";
     u.rate = rateRef.current;
-    const voices = window.speechSynthesis.getVoices?.() ?? [];
-    const v = voices.find((x) => x.lang === "es-MX") ?? voices.find((x) => x.lang.toLowerCase().startsWith("es"));
-    if (v) u.voice = v;
-    u.onend = cur.done;
-    u.onerror = cur.done;
-    cur.u = u;
-    window.speechSynthesis.speak(u);
+    const go = (voices: SpeechSynthesisVoice[]) => {
+      if (synth.current !== cur) return; // stopped while waiting for voices
+      const v = pickSpanishVoice(voices);
+      if (v) u.voice = v; // never the default voice when a Spanish one exists; lang es-MX is set either way
+      u.onend = cur.done;
+      u.onerror = cur.done;
+      cur.u = u;
+      window.speechSynthesis.speak(u);
+    };
+    const ss = window.speechSynthesis;
+    const voices = ss.getVoices?.() ?? [];
+    if (voices.length || voicesWaited.current || typeof ss.addEventListener !== "function") return go(voices);
+    // iOS/Chrome load voices lazily: wait once for voiceschanged.
+    voicesWaited.current = true;
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      ss.removeEventListener?.("voiceschanged", finish);
+      go(ss.getVoices?.() ?? []);
+    };
+    const timer = setTimeout(finish, VOICES_WAIT_MS);
+    ss.addEventListener("voiceschanged", finish);
   }, []);
 
   const speak = useCallback(
     async (text: string, id: string) => {
       if (current.current === id) return stop(); // second press stops
       stop();
+      prime(); // synchronous, inside the tap that led here (speaker button / auto-speak after a voice send)
       const clean = text.trim();
       if (!clean) return;
       const mine = token.current;
@@ -129,8 +184,10 @@ export function useVoiceOutput(config: VoiceConfig | null) {
         if (token.current !== mine) return;
         stop();
       };
+      let reason = "tts-off";
       if (ttsRef.current) {
         try {
+          reason = "speak-error";
           setPreparing(true);
           const blob = await api.speak(clean);
           if (token.current !== mine) return;
@@ -143,7 +200,9 @@ export function useVoiceOutput(config: VoiceConfig | null) {
           applyRate(a);
           setTime({ current: 0, duration: 0 });
           setEngine("audio");
+          reason = "play-rejected";
           await a.play();
+          console.info("[voice] tts path:", "minimax", "ok");
           return;
         } catch {
           if (token.current !== mine) return;
@@ -152,11 +211,12 @@ export function useVoiceOutput(config: VoiceConfig | null) {
         }
       }
       if (!hasSynthesis()) return done();
+      console.info("[voice] tts path:", "speechSynthesis", reason);
       synth.current = { text: stripMarkdown(clean), u: null, done };
       setEngine("synthesis");
       speakSynthesis();
     },
-    [api, stop, clear, speakSynthesis],
+    [api, stop, clear, prime, speakSynthesis],
   );
 
   const togglePause = useCallback(() => {
@@ -203,5 +263,5 @@ export function useVoiceOutput(config: VoiceConfig | null) {
 
   const player = !preparing && engine ? { engine, paused, rate, current: time.current, duration: time.duration } : null;
 
-  return { player, togglePause, seek, cycleRate, preparing, playingId, speaking: playingId !== null, speak, stop, unlock, available: Boolean(config?.tts) || hasSynthesis() };
+  return { player, togglePause, seek, cycleRate, preparing, playingId, speaking: playingId !== null, speak, stop, unlock, prime, available: Boolean(config?.tts) || hasSynthesis() };
 }

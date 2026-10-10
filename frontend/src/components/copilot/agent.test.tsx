@@ -159,12 +159,11 @@ describe("AgentWindow", () => {
     for (const c of ["¿Qué pido hoy?", "¿Por qué tiramos tanta dona?", "Resume las advertencias"]) expect(screen.getByRole("button", { name: c })).toBeInTheDocument();
   });
 
-  it("renders the hold-to-talk mic; a quick tap only explains how to use it", async () => {
+  it("renders the tap-to-talk mic as a toggle button", async () => {
     render(<AgentWindow chat={chatOf()} {...props} />, { wrapper: wrap });
     const mic = await screen.findByRole("button", { name: "Hablar con el copiloto" });
     expect(mic.className).toMatch(/w-11/);
-    await userEvent.click(mic); // pointerdown + pointerup within 0.5 s: cancelled, nothing is sent
-    expect(screen.queryByText(/Escuchando/)).toBeNull();
+    expect(mic).toHaveAttribute("aria-pressed", "false");
   });
 
   it("shows errors from useChat with a retry, and no inline proposals (not in the design)", () => {
