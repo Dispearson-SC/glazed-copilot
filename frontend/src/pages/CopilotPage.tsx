@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import AgentWindow from "../components/copilot/AgentWindow";
 import AlertsWindow from "../components/copilot/AlertsWindow";
 import BranchWindow from "../components/copilot/BranchWindow";
@@ -147,10 +148,16 @@ function CopilotShell() {
   );
 }
 
-/** /copiloto: the decision copilot with its five windows and the capsule navigation. */
+/** /copiloto: the decision copilot with its five windows and the capsule navigation. `?tab=` picks the opening window. */
+const TABS = ["agente", "decisiones", "sucursal", "memorias", "alertas"] as const;
+type TabParam = (typeof TABS)[number];
+const isTab = (v: string | null): v is TabParam => TABS.includes(v as TabParam);
+
 export default function CopilotPage() {
+  const [params] = useSearchParams();
+  const tab = params.get("tab");
   return (
-    <CopilotProvider>
+    <CopilotProvider initialTab={isTab(tab) ? tab : undefined}>
       <CopilotShell />
     </CopilotProvider>
   );

@@ -93,8 +93,8 @@ interface CopilotCtxValue {
 
 const Ctx = createContext<CopilotCtxValue | null>(null);
 
-export function CopilotProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(copilotReducer, initialCopilotState);
+export function CopilotProvider({ children, initialTab }: { children: ReactNode; initialTab?: Tab }) {
+  const [state, dispatch] = useReducer(copilotReducer, initialTab ? { ...initialCopilotState, tab: initialTab } : initialCopilotState);
   const showToast = useCallback((text: string) => dispatch({ type: "toast", text }), []);
 
   // Every new toast restarts the 3.2 s timer.
