@@ -1,0 +1,85 @@
+"""Composition root: wires ports to adapters by environment and builds the FastAPI app."""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from typing import Any
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from ...domain import DomainError, FutureDate, InvalidTransition, NotFound
+from ...domain.models import CoreError
+from .internal_api import build_internal_router
+from .public_api import build_public_router
+
+
+@dataclass
+class Container:
+    metrics: Any
+    core: Any
+    cases: Any
+    alerts: Any
+    proposals: Any
+    executions: Any
+    backtests: Any
+    trace: Any
+    clock: Any
+    storage: str = "memory"
+    core_status: str = "configured"
+
+
+class _NoCore:
+    def _fail(self, *a: Any, **k: Any) -> Any:
+        raise CoreError("GLAZED_CORE_URL is not configured")
+
+    create_conversation = send_turn = get_turn = list_transcript = _fail
+
+
+def create_app(c: Container) -> FastAPI:
+    app = FastAPI(title="glazed-backend")
+
+    def err(status: int):
+        async def handler(_: Request, exc: Exception) -> JSONResponse:
+            return JSONResponse(status_code=status, content={"detail": str(exc)})
+        return handler
+
+    app.add_exception_handler(NotFound, err(404))
+    app.add_exception_handler(InvalidTransition, err(409))
+    app.add_exception_handler(FutureDate, err(400))
+    app.add_exception_handler(CoreError, err(502))
+    app.add_exception_handler(DomainError, err(400))
+    app.include_router(build_public_router(c))
+    app.include_router(build_internal_router(c))
+    return app
+
+
+def build_container(env: dict[str, str] | None = None) -> Container:
+    from ..driven.duckdb_metrics import DuckDBMetrics
+    from ..driven.memory import (InMemoryAlerts, InMemoryBacktests, InMemoryCases, InMemoryExecutions,
+                                 InMemoryProposals, InMemoryTrace, SystemClock)
+    env = dict(os.environ if env is None else env)
+    path = env.get("GLAZED_DUCKDB_PATH")
+    if not path or not os.path.exists(path):
+        raise RuntimeError("GLAZED_DUCKDB_PATH must point to glazed.duckdb")
+    metrics = DuckDBMetrics(path)
+    core_url = env.get("GLAZED_CORE_URL")
+    if core_url:
+        from ..driven.agent_core_http import AgentCoreHttp
+        core: Any = AgentCoreHttp(core_url, env.get("GLAZED_CORE_PROFILE", "orchestrator"))
+    else:
+        core = _NoCore()
+    if env.get("GLAZED_STORAGE", "memory") == "postgres":
+        from ..driven.postgres import PostgresStore
+        store = PostgresStore(env["GLAZED_DATABASE_URL"])
+        store.migrate()
+        return Container(metrics, core, store.cases, store.alerts, store.proposals, store.executions,
+                         store.backtests, store.trace, SystemClock(), "postgres",
+                         "configured" if core_url else "missing")
+    return Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
+                     InMemoryBacktests(), InMemoryTrace(), SystemClock(), "memory",
+                     "configured" if core_url else "missing")
+
+
+def create_app_from_env() -> FastAPI:
+    return create_app(build_container())

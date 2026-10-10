@@ -27,4 +27,4 @@ Mapping: tenant = `store_id`; Core `session_id` = `core_conversation_id` = `case
 Headers: `X-Glazed-Case` (case id or core conversation id; unknown or missing is 400), `X-Glazed-Agent` (optional). The backend resolves `store_id` and `as_of` (= case `sim_today`) from the case. Reads: `GET /internal/v1/{kpis, day-summary, issues, inventory/projection, order-plan, suppliers/performance, promos/{id}/evaluation, history}`. Writes: `POST /internal/v1/proposals`, `POST /internal/v1/events`. All queries enforce `date <= as_of`.
 
 ## Public API
-`/api/v1/*`: health, cases, ask/turns, day summary, alerts (+advance clock), proposals (+decide), backtests, trace.
+Fixed contract (see the ODD feature document): `/api/v1/` health, stores, cases (create/list/get/fork), `cases/{id}/messages` + `cases/{id}/turns/{turn}` (status pending|done|failed|waiting_approval, reply), day-summary, advance (`{sim_today, new_alerts}`), alerts (list, PATCH state), proposals (list, `POST /decision`), backtests, trace (ordered by `ts`). Domain errors map to 400, not found 404, invalid alert transition 409, Agent-Core failure 502.

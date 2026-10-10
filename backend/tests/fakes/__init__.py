@@ -29,6 +29,10 @@ class FakeMetrics:
         if d > as_of:
             raise FutureDate(f"{d} > as_of {as_of}")
 
+    def stores(self):
+        return [{"store_id": "S030", "name": "Gate Area West", "format": "Shop-in-Shop", "site_id": "ST12",
+                 "region": "Northeast"}]
+
     def kpis(self, store_id, as_of, date_from, date_to):
         self._guard(as_of, date_to)
         self.calls.append(("kpis", store_id, as_of, date_from, date_to))

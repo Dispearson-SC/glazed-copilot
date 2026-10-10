@@ -85,3 +85,9 @@ def test_backtest_day_returns_both_arms(m):
     r = m.backtest_day(S, date(2026, 3, 2), "simple_v0")
     assert set(r) >= {"current", "policy"} and r["policy"]["waste_usd"] <= r["current"]["waste_usd"]
     assert r["policy"]["lost_sales_usd"] <= r["current"]["lost_sales_usd"]
+
+
+def test_stores_listing(m):
+    rows = m.stores()
+    s030 = next(r for r in rows if r["store_id"] == "S030")
+    assert s030.keys() >= {"store_id", "name", "format", "site_id", "region"} and s030["region"]
