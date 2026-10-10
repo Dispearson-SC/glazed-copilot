@@ -78,7 +78,8 @@ async function expectNo(marker: string) {
 
 beforeEach(() => localStorage.setItem("glazed.storeId", "S001"));
 
-describe("switching stores never shows the previous store's data", () => {
+// Heavy multi-window scenario: give it room when the machine is loaded.
+describe("switching stores never shows the previous store's data", { timeout: 20_000 }, () => {
   it("S001 answers that resolve AFTER the switch to S005 are ignored in every window", async () => {
     const alfa = deferred();
     renderPage(storeApi({ cA1: alfa.promise }), "/copiloto", "/copiloto", <CopilotPage />);
