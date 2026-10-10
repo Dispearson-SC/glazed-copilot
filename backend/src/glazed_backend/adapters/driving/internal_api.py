@@ -11,7 +11,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
-from ...application import copilot as uc_copilot, forecast as uc_forecast, manager as uc_manager, sentinel
+from ...application import copilot as uc_copilot, forecast as uc_forecast, manager as uc_manager, notes as uc_notes, sentinel
 from .store_names import StoreNames
 from ...domain import Case, DomainError, canonical_agent_id, case_id_from_session
 
@@ -48,6 +48,15 @@ class EventBody(BaseModel):
     date_from: str | None = None
     date_to: str | None = None
     note: str = ""
+
+
+class NoteBody(BaseModel):
+    """A manager note. Store and as-of come from the case; the code decides what is written where."""
+    text: str
+    category: str = "eventos"
+    date_from: date | None = None
+    date_to: date | None = None
+    impact: str | None = None
 
 
 def build_internal_router(c: Any) -> APIRouter:
@@ -242,10 +251,21 @@ def build_internal_router(c: Any) -> APIRouter:
             p = c.proposals.get(e.decision_id) if e.decision_id else None
             return p.case_id if p is not None and p.store_id == case.store_id else None
         # store memory spans every case of the store: say which case a memory came from (when known)
-        return [{"text": e.text, "decision_id": e.decision_id, "ref": e.ref, "kind": e.kind,
+        out = [{"text": e.text, "decision_id": e.decision_id, "ref": e.ref, "kind": e.kind,
                  "created_at": e.created_at.isoformat(), "score": e.score, "verify": verify(e),
                  "scope": "store_memory", "case_id": origin(e), "same_case": origin(e) == case.case_id}
-                for e in found]
+                for e in found if not (e.kind == "note" and (e.ref or "").startswith("note-"))]
+        # manager notes come from the local copy, so they are recalled even when Backboard is down
+        words = {w.lower() for w in query.split() if w}
+        seen = {x["text"] for x in out}
+        for n in uc_notes.ManagerNotes(c.cases, c.trace, c.decision_memories, c.memory, c.clock).known(case):
+            text = f"Nota del gerente ({n['date_from']} a {n['date_to']}): {n['text']}"
+            if text in seen or (words and not any(w in text.lower() for w in words)):
+                continue
+            out.append({"text": text, "decision_id": None, "ref": n["memory_id"], "kind": "note",
+                        "created_at": n["created_at"], "score": None, "verify": None, "scope": "store_memory",
+                        "case_id": n["case_id"], "same_case": n["case_id"] == case.case_id})
+        return out[:max(1, min(limit, 20))]
 
     @r.post("/proposals", status_code=201)
     def post_proposal(case: Ctx, b: ProposalBody, response: Response,
@@ -257,6 +277,12 @@ def build_internal_router(c: Any) -> APIRouter:
         if not created:
             response.status_code = 200  # replay of an earlier request: the original proposal
         return jsonable_encoder(proposal)
+
+    @r.post("/notes", status_code=201)
+    def post_note(case: Ctx, b: NoteBody):
+        """The manager's note about upcoming demand, events or suppliers: a memory, an experience and an event."""
+        return uc_notes.ManagerNotes(c.cases, c.trace, c.decision_memories, c.memory, c.clock).add(
+            case, b.text, b.category, b.date_from, b.date_to, b.impact)
 
     @r.post("/events", status_code=201)
     def post_event(case: Ctx, b: EventBody, x_glazed_agent: Annotated[str | None, Header()] = None):

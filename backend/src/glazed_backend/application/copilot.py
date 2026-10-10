@@ -243,13 +243,19 @@ class ListMemories:
                 (owners[m.case_id].sim_today if m.case_id in owners else None)
             if not seen(day):
                 continue
-            outcome = m.memory_id.startswith("out-")
+            outcome, note = m.memory_id.startswith("out-"), m.memory_id.startswith("note-")
+            if note:  # a manager note: his own words, verified by definition
+                rows.append(self._row(m.memory_id, m.category, m.text, "gerente", True, day, m.created_at,
+                                      ("nota", m.text), m.case_id))
+                continue
             rows.append(self._row(m.memory_id, m.category, m.text, "outcome" if outcome else "rejection_reason", outcome, day,
                                   m.created_at, (m.action_type, m.sku if outcome else (m.reason_category or "otro")), m.case_id))
         own_outcomes = {r["text"] for r in rows if r["source"] == "outcome"}
         for e in self._experiences(store):
             if e.kind == "outcome" and e.text in own_outcomes:
                 continue  # the same fact as the verified outcome memory
+            if e.kind == "note" and (e.ref or "").startswith("note-"):
+                continue  # the local manager-note row is the scope-aware copy of this fact
             if not experience_visible(case, e, self.proposals, owners):
                 continue
             local = props.get(e.decision_id or "")

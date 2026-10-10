@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 HORIZON_DAYS = 3
-EVENT_TYPES = ("bloqueo", "clima_extremo", "evento_local", "cierre", "falla_proveedor", "otro")
+EVENT_TYPES = ("bloqueo", "clima_extremo", "evento_local", "cierre", "falla_proveedor", "nota_gerente", "otro")
 _PRIORITY = {"operational": 2, "demo_injected": 1, "simulated": 0}
 
 

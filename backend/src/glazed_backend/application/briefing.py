@@ -67,8 +67,10 @@ class SnapshotBuilder:
     """Composes MetricsPort reads into the snapshot payload. `served` receives the full issues so that an agent can
     propose one of the snapshot's options without calling /issues first."""
 
-    def __init__(self, metrics: Any, proposals: Any, name_of: Callable[[str], str], served: dict, cases: Any = None) -> None:
+    def __init__(self, metrics: Any, proposals: Any, name_of: Callable[[str], str], served: dict, cases: Any = None,
+                 notes: Any = None) -> None:
         self.metrics, self.proposals, self.name_of, self.served, self.cases = metrics, proposals, name_of, served, cases
+        self.notes = notes  # ManagerNotes: notes active on the case's day, read live (they change within a day)
 
     def core(self, case: Case) -> dict[str, Any]:
         sid, as_of = case.store_id, case.sim_today
@@ -111,6 +113,13 @@ class SnapshotBuilder:
                           for s in self.metrics.supplier_performance(sid, as_of)],
         }
 
+    def _notes(self, case: Case) -> list[dict[str, Any]]:
+        try:
+            return self.notes.active(case) if self.notes is not None else []
+        except Exception:  # noqa: BLE001 - a notes problem never breaks the briefing
+            log.warning("manager notes unavailable for %s", case.case_id, exc_info=True)
+            return []
+
     def live(self, case: Case) -> dict[str, Any]:
         """Pending proposals of THIS case only (the other cases of the store are just counted); recent decisions list
         this case first and then the store's, each labelled with its scope."""
@@ -123,7 +132,7 @@ class SnapshotBuilder:
         pending = [_trim_proposal(p, s) for p, s in tagged if p.status == "pending" and s == "this_case"][:MAX_PENDING]
         decided = sorted(((p, s) for p, s in tagged if p.status in ("approved", "rejected")),
                          key=lambda t: (t[1] != "this_case", -t[0].created_at.timestamp()))
-        return {"pending_proposals": pending,
+        return {"manager_notes": self._notes(case), "pending_proposals": pending,
                 "other_cases_pending_count": sum(1 for p, s in tagged if p.status == "pending" and s == "other_case"),
                 "recent_decisions": [_trim_proposal(p, s) for p, s in decided[:MAX_DECISIONS]]}
 
@@ -190,7 +199,8 @@ class BriefingService:
 
     def briefing(self, case: Case) -> dict[str, Any]:
         entry = self._entry(case)
-        return {"snapshot": self.snapshot(case), "headline": entry.headline, "suggested_focus": entry.focus,
+        snap = self.snapshot(case)
+        return {"snapshot": snap, "manager_notes": snap["manager_notes"], "headline": entry.headline, "suggested_focus": entry.focus,
                 "as_of_weekday_es": entry.core["as_of_weekday_es"], "calendar": entry.core["calendar"]}
 
     def refresh(self, case: Case) -> None:

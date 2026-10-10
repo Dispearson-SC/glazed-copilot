@@ -66,7 +66,9 @@ def create_app(c: Container) -> FastAPI:
     if c.briefings is None:
         from ...application.briefing import BriefingService, SnapshotBuilder
         from .store_names import StoreNames
-        c.briefings = BriefingService(SnapshotBuilder(c.metrics, c.proposals, StoreNames(c.metrics).of, c.served, c.cases), c.clock, c.cases,
+        from ...application.notes import ManagerNotes
+        notes = ManagerNotes(c.cases, c.trace, c.decision_memories, c.memory, c.clock)
+        c.briefings = BriefingService(SnapshotBuilder(c.metrics, c.proposals, StoreNames(c.metrics).of, c.served, c.cases, notes), c.clock, c.cases,
                                    (c.memory.warm,) if hasattr(c.memory, "warm") else ())
     app = FastAPI(title="glazed-backend")
     app.add_middleware(CORSMiddleware, allow_origins=c.cors_origins or DEFAULT_CORS_ORIGINS,
