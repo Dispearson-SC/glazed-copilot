@@ -40,12 +40,16 @@ function AssistantBubble({ m }: { m: ChatMessage }) {
 export default function AgentWindow({
   chat,
   items,
+  openIds,
   pendingLine,
   onApprove,
   onReject,
 }: {
   chat: Chat;
+  /** Every decision seen this session, so a decided card still renders as 'Decisión registrada'. */
   items: DecisionItem[];
+  /** Ids still pending (default: all). */
+  openIds?: string[];
   pendingLine: string;
   onApprove: (item: DecisionItem) => void;
   onReject: (item: DecisionItem) => void;
@@ -54,7 +58,7 @@ export default function AgentWindow({
   const [draft, setDraft] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
   const busy = chat.status === "working";
-  const pendingIds = new Set(items.map((i) => i.id));
+  const pendingIds = new Set(openIds ?? items.map((i) => i.id));
 
   const count = chat.messages.length + state.analyses.length + chat.proposals.length;
   useEffect(() => {

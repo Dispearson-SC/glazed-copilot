@@ -38,8 +38,8 @@ Strict. Runner: `cd frontend && npm test -- --run`; plus `npm run build` and `np
 
 ## Tasks
 - [x] T1 (dfecad6) Tokens and fonts per the handoff (partition, elevation, card/hero/sheet shadows; Playfair/Plus Jakarta), plus the shared copilot shell: CopilotTopBar, CapsuleNav with badges, AgentOrb, Toast, `/copiloto` route and state store. Route: delegated writer.
-- [ ] T2 Agente window over useChat (orb, status, pinned context, suggestions, composer, AnalysisCard). Route: delegated writer.
-- [ ] T3 Decisiones window (ApprovalCard, TechDecisionCard, ⋯ menu, RejectSheet) wired to proposals/decision. Route: delegated writer.
+- [x] T2 (e9d9ced) Agente window over useChat (orb, status, pinned context, suggestions, composer, AnalysisCard). Route: delegated writer.
+- [x] T3 Decisiones window (ApprovalCard, TechDecisionCard, ⋯ menu, RejectSheet) wired to proposals/decision. Route: delegated writer.
 - [ ] T4 Sucursal window (Ayer/Hoy/Mañana, sales card, weather, KPIs, inventory, scheduled purchases). Route: delegated writer.
 - [ ] T5 Memorias and Advertencias windows. Route: delegated writer.
 - [ ] T6 Realign Main, Login and Chat to their `.dc.html`; BottomNav "Chat" → "Copiloto". Route: delegated writer.
@@ -49,6 +49,8 @@ Strict. Runner: `cd frontend && npm test -- --run`; plus `npm run build` and `np
 - 2026-10-10: worktree created; all mapped routes answer 200 on :8100.
 - T1 done: RED observed (4 files failing: theme, copilotStore, shell, App), GREEN 210/210 tests (187 baseline + 23), `npm run build` ok, `tsc --noEmit` ok. Route: inline single writer (no sub-agents; instruction said single writer). Deviation: top bar shows the branch name instead of the store code ("users never see the code").
 - T2 done: RED observed (agent.test, chatHistory ts, useChat display failing), GREEN 235/235 tests, build ok, tsc ok. Adds Issue/OrderPlan/Alert API types, `api.listIssues/getOrderPlan/listAlerts/propose`, decision adapters in `src/data/copilot.ts`, AgentWindow, AnalysisCard; `ChatMessage.ts` (message time); `useChat.send(text, {display})`.
+
+- T3 done: RED observed (CopilotPage.test 11 failing), GREEN 246/246, build ok, tsc ok. Decisiones window (ApprovalCard, TechDecisionCard, ⋯ menu, RejectSheet) wired to `POST /proposals` + `POST /proposals/{id}/decision` with Idempotency-Key; local state changes only after the backend accepts. `useCopilotData`, `useDecide`.
 
 ## Coordinator decisions applied (2026-10-10)
 - Approvals = `/issues` whose recommended option tier is N2/N3; technical = order-plan lines plus issue options with tier N1. Tiers are the backend's. Order-plan lines without issue/option are read-only with "Disponible pronto".
