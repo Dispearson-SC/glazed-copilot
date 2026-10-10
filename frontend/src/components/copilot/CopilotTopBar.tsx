@@ -5,7 +5,7 @@ export default function CopilotTopBar({ storeCode, onSettings }: { storeCode: st
   return (
     <header className="fixed inset-x-0 top-0 z-40 bg-surface/[.88] pt-safe backdrop-blur-xl shadow-[0_1px_8px_rgba(75,48,37,.04)]">
       <div className="mx-auto flex h-16 max-w-[640px] items-center justify-between px-4">
-        <Link to="/" aria-label="Volver al resumen" className="flex min-w-0 items-center gap-2 no-underline">
+        <Link to="/resumen" aria-label="Volver al resumen" className="flex min-w-0 items-center gap-2 no-underline">
           <img alt="Logo Glazed Co." src="/Logo.png" className="h-8 w-8 rounded-full object-contain" />
           <div className="flex min-w-0 flex-col">
             <span className="font-headline-sm text-headline-sm tracking-tight text-primary">Glazed Co.</span>

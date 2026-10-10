@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fakeApi, renderPage } from "../test/helpers";
 import DashboardPage from "./DashboardPage";
 
-const open = (api = fakeApi()) => renderPage(api, "/", "/", <DashboardPage />);
+const open = (api = fakeApi()) => renderPage(api, "/resumen", "/resumen", <DashboardPage />);
 
 /** Main.dc.html, element by element. */
 describe("Main (/) matches Main.dc.html", () => {

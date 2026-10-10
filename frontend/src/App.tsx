@@ -7,11 +7,12 @@ import LoginPage from "./pages/LoginPage";
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<DashboardPage />} />
+      <Route path="/" element={<Navigate to="/copiloto" replace />} />
+      <Route path="/resumen" element={<DashboardPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/copiloto" element={<CopilotPage />} />
       <Route path="/chat" element={<ChatPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/copiloto" replace />} />
     </Routes>
   );
 }

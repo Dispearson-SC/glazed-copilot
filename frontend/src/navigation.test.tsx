@@ -33,7 +33,7 @@ describe("navigation reaches every screen", () => {
     const nav = await screen.findByRole("navigation", { name: "Navegación principal" });
     const hrefs = Object.fromEntries(within(nav).getAllByRole("link").map((a) => [a.textContent?.replace(/^[a-z_]+/, ""), a.getAttribute("href")]));
     expect(hrefs).toEqual({
-      Resumen: "/",
+      Resumen: "/resumen",
       Pedidos: "/copiloto?tab=decisiones",
       Productos: "/copiloto?tab=sucursal",
       Chat: "/chat",
@@ -63,6 +63,6 @@ describe("navigation reaches every screen", () => {
 
   it("the copilot logo goes back to Resumen", async () => {
     renderPage(copilotApi(), "/copiloto", "/copiloto", <CopilotPage />);
-    expect(await screen.findByRole("link", { name: /Volver al resumen/ })).toHaveAttribute("href", "/");
+    expect(await screen.findByRole("link", { name: /Volver al resumen/ })).toHaveAttribute("href", "/resumen");
   });
 });
