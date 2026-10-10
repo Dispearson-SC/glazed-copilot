@@ -81,12 +81,19 @@ class Config:
     order_policy: str = "margin"
     waste_penalty: float = 0.0  # extra cost per wasted perishable unit, as a multiple of unit cost (waste_aware only)
     perishable_service_cap: float | None = None  # upper bound on the service level of perishables (waste_aware only)
+    # Promotions priced from history (activate_promo, markdown recovery from the measured lift) under ANY order
+    # policy; GLAZED_PROMO_SUGGESTIONS=false turns them off. waste_aware always has them.
+    promo_suggestions: bool = True
     promo_lift: object | None = None  # PromoLiftTable (metrics.promo_lift) or None: no estimate, assumptions stay
     extra: dict = field(default_factory=dict)
 
     @property
     def waste_aware(self) -> bool:
         return self.order_policy == "waste_aware"
+
+    @property
+    def promos_on(self) -> bool:
+        return self.waste_aware or self.promo_suggestions
 
 
 def config_from_env(env: dict[str, str]) -> "Config":
@@ -102,7 +109,8 @@ def config_from_env(env: dict[str, str]) -> "Config":
         except ValueError:
             return None
     pen, cap = num("GLAZED_WASTE_PENALTY"), num("GLAZED_SERVICE_CAP")
-    return Config(order_policy=policy, waste_penalty=max(0.0, pen) if pen is not None else 0.0,
+    promos = (env.get("GLAZED_PROMO_SUGGESTIONS") or "true").strip().lower() not in ("0", "false", "no", "off")
+    return Config(order_policy=policy, waste_penalty=max(0.0, pen) if pen is not None else 0.0, promo_suggestions=promos,
                   perishable_service_cap=cap if cap is not None and 0.0 < cap < 1.0 else None)
 
 

@@ -144,8 +144,8 @@ def _reduction_options(issue_id: str, state: SkuState, cfg: Config, typical_qty:
 
 
 def _lift_for(state: SkuState, cfg: Config, discount: float) -> LiftEstimate | None:
-    """Promo lift estimated from history for this SKU's scope; None unless the policy is waste_aware with a table."""
-    table = cfg.promo_lift if cfg.waste_aware else None
+    """Promo lift estimated from history for this SKU's scope; None when promotions are off or there is no table."""
+    table = cfg.promo_lift if cfg.promos_on else None
     p = state.product
     return table.estimate(p.department, p.category, discount * 100.0) if table is not None else None
 
@@ -196,7 +196,7 @@ def expiring_options(issue_id: str, state: SkuState, cfg: Config, typical_qty: f
     est = _lift_for(state, cfg, d)
     rec_share, extra, risk = cfg.markdown_recovery, {}, ["Sell-through at a discount is an assumption (no discount history, no hourly data)."]
     caveat = "assumed elasticity"
-    if est is not None:  # waste_aware: recovery follows the lift measured on past promotions
+    if est is not None:  # promotions on: recovery follows the lift measured on past promotions
         mu = max(state.daily_mean(state.t + timedelta(days=1)), 0.0)
         rec_share = markdown_recovery(est, mu, units)
         extra = {"recovery_pct": round(rec_share[1] * 100, 1), "recovery_source": "promo_lift"}

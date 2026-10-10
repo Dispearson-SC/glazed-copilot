@@ -192,8 +192,8 @@ class DuckDBMetrics:
 
     # -- Issues ------------------------------------------------------------------
     def _cfg(self, as_of: date) -> Config:
-        """The configured policy; waste_aware also carries the promo lift known at as_of (history only)."""
-        if not self.config.waste_aware:
+        """The configured policy plus, when promotions are on, the promo lift known at as_of (history only)."""
+        if not self.config.promos_on:
             return self.config
         return dataclasses.replace(self.config, promo_lift=self.promo_lift_table(as_of))
 

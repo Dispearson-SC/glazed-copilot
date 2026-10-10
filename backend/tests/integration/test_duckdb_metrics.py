@@ -72,7 +72,7 @@ def test_issues_follow_the_wave5_contract_with_deterministic_options(m):
         assert len({o["option_id"] for o in opts}) == len(opts)
         assert i["recommended_option_id"] in {o["option_id"] for o in opts}
         for o in opts:
-            assert o["action_type"] in {"place_order", "adjust_order_qty", "skip_order", "markdown_end_of_day",
+            assert o["action_type"] in {"place_order", "adjust_order_qty", "skip_order", "markdown_end_of_day", "activate_promo",
                                         "run_promo", "transfer_stock", "shift_staff_hours", "do_nothing"}
             assert o["tier"] in {"N0", "N1", "N2", "N3"} and o["tier_reasons"]
             assert set(o["expected_benefit_usd"]) == {"low", "mid", "high"} and o["if_act"] is None and o["if_not"] is None

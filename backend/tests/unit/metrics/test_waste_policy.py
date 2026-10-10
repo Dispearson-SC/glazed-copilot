@@ -186,3 +186,14 @@ def test_activate_promo_always_needs_approval_and_has_a_spanish_label():
     assert classify(o, None, Config())[0] == "N2"
     assert classify({**o, "net_usd_mid": -1.0}, None, Config())[0] == "N0"
     assert label(o, {"product_name": "Dona"}) == "Activar promoción de 30% en Dona por 2 días"
+
+
+def test_the_default_margin_policy_also_offers_activate_promo_and_the_flag_turns_it_off():
+    s, table = _expiring_state(), PromoLiftTable(FIX, date(2026, 6, 1))
+    margin = Config(promo_lift=table)
+    assert not margin.waste_aware and margin.promos_on
+    assert "activate_promo" in {o["action_type"] for o in expiring_options("S|expiring|SKU", s, margin, None)}
+    off = Config(promo_lift=table, promo_suggestions=False)
+    assert "activate_promo" not in {o["action_type"] for o in expiring_options("S|expiring|SKU", s, off, None)}
+    assert config_from_env({"GLAZED_PROMO_SUGGESTIONS": "false"}).promo_suggestions is False
+    assert config_from_env({}).promo_suggestions is True
