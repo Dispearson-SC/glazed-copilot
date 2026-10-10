@@ -1,6 +1,9 @@
 """Typer application: wiring only. Every command talks to the public API."""
 from __future__ import annotations
 
+import json
+import os
+import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
@@ -176,7 +179,7 @@ def ask(ctx: typer.Context, question: str,
         new: bool = typer.Option(False, "--new", help="Start an isolated case first (needs --store and --date)."),
         store: Optional[str] = typer.Option(None, "--store"),
         date: Optional[str] = typer.Option(None, "--date"),
-        timeout: float = typer.Option(300.0, "--timeout", help="Seconds to wait for the answer.")) -> None:
+        timeout: float = typer.Option(600.0, "--timeout", help="Seconds to wait for the answer.")) -> None:
     """Ask the copilot a question in the current case."""
     c: Ctx = ctx.obj
     if new:
@@ -412,14 +415,44 @@ def backtest_show(ctx: typer.Context, run_id: str) -> None:
 @app.command()
 @_guard
 def trace(ctx: typer.Context, case: Optional[str] = typer.Option(None, "--case"),
-          store: Optional[str] = typer.Option(None, "--store")) -> None:
+          store: Optional[str] = typer.Option(None, "--store"),
+          follow: bool = typer.Option(False, "--follow", "-f", help="Keep polling and print only new events (Ctrl-C to stop)."),
+          all_store: bool = typer.Option(False, "--all-store", help="With --follow: every case of the store.")) -> None:
     """Agent-communication timeline (current case, or a whole store with --store)."""
     c: Ctx = ctx.obj
     store = resolve_store(c.api, store)
+    if follow:
+        case_id = None if (all_store or store) else current_case_id(case)
+        if all_store and not store:
+            store = c.api.get(f"/api/v1/cases/{current_case_id(case)}")["store_id"]
+        try:
+            follow_trace(lambda: c.api.get("/api/v1/trace", store_id=store, case_id=case_id), render.console().print,
+                         render.trace_line)
+        except KeyboardInterrupt:
+            pass
+        return
     case_id = case if (case or store) else current_case_id(None)
     name = _trace_store_name(c.api, case_id, store)
     data = c.api.get("/api/v1/trace", store_id=store, case_id=case_id)
     c.out(data, lambda d: render.console().print(render.trace_table(d, name) if d else "No trace events."))
+
+
+def follow_trace(fetch: Callable[[], list], emit: Callable[[str], Any], fmt: Callable[[dict], str]) -> None:
+    """Poll `fetch` every 2 s and emit one line per event not seen yet (by event_id). Runs until interrupted."""
+    interval = float(os.environ.get("GLAZED_FOLLOW_INTERVAL", "2"))
+    polls = int(os.environ.get("GLAZED_FOLLOW_POLLS", "0"))  # 0 = forever (tests bound it)
+    seen: set[str] = set()
+    n = 0
+    while True:
+        for e in sorted(fetch(), key=lambda e: str(e.get("ts"))):
+            key = str(e.get("event_id") or json.dumps(e, sort_keys=True, default=str))
+            if key not in seen:
+                seen.add(key)
+                emit(fmt(e))
+        n += 1
+        if polls and n >= polls:
+            return
+        time.sleep(interval)
 
 
 def _trace_store_name(api: Api, case_id: str | None, store: str | None) -> str | None:

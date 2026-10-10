@@ -5,6 +5,7 @@ import json
 from typing import Any, Iterable
 
 from rich.console import Console
+from rich.markup import escape as rich_escape
 from rich.table import Table
 
 
@@ -136,6 +137,12 @@ def trace_table(events: list[dict], store_name: str | None = None) -> Table:
                   f"[{agent_color(a)}]{a}[/] -> [{agent_color(b)}]{b}[/]",
                   e["kind"], short_payload(e.get("payload")))
     return t
+
+
+def trace_line(e: dict) -> str:
+    a, b = e["from_agent"], e["to_agent"]
+    return (f"{str(e['ts'])[11:19]} [{agent_color(a)}]{a}[/] → [{agent_color(b)}]{b}[/] "
+            f"[dim]{e['kind']}[/dim] {rich_escape(short_payload(e.get('payload'), 140))}")
 
 
 _METRICS = [("waste_usd", "Waste ($)"), ("lost_sales_usd", "Lost sales ($)"), ("net_usd", "Net ($)")]

@@ -94,3 +94,26 @@ def test_agent_color_is_stable():
     from glazed_cli.render import agent_color
     assert agent_color("present") == agent_color("present")
     assert agent_color("present") != agent_color("supply")
+
+
+def test_trace_follow_prints_only_new_events(api, run, monkeypatch):
+    monkeypatch.setenv("GLAZED_FOLLOW_POLLS", "3")
+    monkeypatch.setenv("GLAZED_FOLLOW_INTERVAL", "0")
+    State(current_case="c1").save()
+    api.seq("GET", "/api/v1/trace", [EVENTS[:1], EVENTS, EVENTS])
+    r = run("trace", "-f")
+    assert r.exit_code == 0, r.output
+    assert r.output.count("sales?") == 1 and r.output.count("day_summary") == 1
+    assert "10:00:01" in r.output and "orchestrator" in r.output and "present" in r.output
+    assert api.last().url.params["case_id"] == "c1"
+
+
+def test_trace_follow_all_store_uses_the_store(api, run, monkeypatch):
+    monkeypatch.setenv("GLAZED_FOLLOW_POLLS", "1")
+    State(current_case="c1").save()
+    api.on("GET", "/api/v1/cases/c1", {**__import__("conftest").CASE})
+    api.on("GET", "/api/v1/trace", EVENTS)
+    r = run("trace", "--follow", "--all-store")
+    assert r.exit_code == 0, r.output
+    q = api.last().url.params
+    assert q["store_id"] == "S030" and "case_id" not in q

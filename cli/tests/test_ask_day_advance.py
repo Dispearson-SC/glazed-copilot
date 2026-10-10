@@ -182,11 +182,11 @@ def test_ask_still_aborts_on_other_errors(monkeypatch):
         turns.ask(A(), "c", "q", 300)
 
 
-def test_ask_default_timeout_is_300s():
+def test_ask_default_timeout_is_600s():
     import inspect
 
     from glazed_cli.app import ask
-    assert inspect.signature(ask).parameters["timeout"].default.default == 300.0
+    assert inspect.signature(ask).parameters["timeout"].default.default == 600.0
 
 
 def test_ask_reports_progress_while_waiting(monkeypatch):
@@ -207,3 +207,19 @@ def test_ask_reports_progress_while_waiting(monkeypatch):
     beats = []
     turns.ask(A(), "c", "q", 300, on_progress=lambda: beats.append(1), progress_every=15)
     assert len(beats) == 2
+
+
+def test_ask_keeps_polling_through_still_running(monkeypatch):
+    from glazed_cli import turns
+
+    monkeypatch.setenv("GLAZED_POLL_INTERVAL", "0")
+    seq = [{"status": "pending", "still_running": True}] * 3 + [{"status": "done", "reply": "ok"}]
+
+    class A:
+        def post(self, *a, **k):
+            return {"turn_id": "t"}
+
+        def get(self, *a, **k):
+            return seq.pop(0)
+
+    assert turns.ask(A(), "c", "q", 60)["reply"] == "ok"
