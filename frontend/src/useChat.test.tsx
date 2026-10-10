@@ -101,6 +101,30 @@ describe("useChat", () => {
       await new Promise((r) => setTimeout(r, 30));
       expect(getTurn).not.toHaveBeenCalled();
     });
+
+    it.each([["empty", ""], ["whitespace", "   "], ["literal None", "None"]])(
+      "replaces the working bubble with a neutral message when the turn finishes with %s reply",
+      async (_n, reply) => {
+        const getTurn = vi
+          .fn()
+          .mockResolvedValueOnce({ turn_id: "t7", status: "pending", still_running: true })
+          .mockResolvedValue({ turn_id: "t7", status: "done", reply });
+        const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+        await waitFor(() => expect(result.current.messages[1]?.text).toContain("terminó sin respuesta de texto"));
+        expect(result.current.messages[1]).toMatchObject({ role: "assistant", turnId: "t7" });
+        expect(result.current.messages[1]?.text).toContain("terminó sin respuesta de texto");
+        expect(result.current.messages[1]?.text).not.toContain("None");
+        expect(result.current.stillRunning).toBe(false);
+      },
+    );
+
+    it("does not poll a done turn with an empty reply from history", async () => {
+      const getTurn = vi.fn();
+      const done = { turn_id: "t9", ts: "2026-03-01T10:00:00Z", user_text: "hola", reply: "", status: "done" as const };
+      setup(fakeApi({ listTurns: vi.fn(async () => [done]), getTurn }));
+      await new Promise((r) => setTimeout(r, 40));
+      expect(getTurn).not.toHaveBeenCalled();
+    });
   });
 
   it("tolerates a 404 right after the POST, then shows the reply", async () => {

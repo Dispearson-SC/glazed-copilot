@@ -17,7 +17,10 @@ export interface UseChatOptions {
   notFoundGraceMs?: number;
 }
 
-const isPendingTurn = (t: TurnRecord) => t.status === "pending" || (t.status !== "failed" && !t.reply);
+/** A finished turn is never pending, whatever its reply: only the backend status says it is still running. */
+const isPendingTurn = (t: TurnRecord) => t.status === "pending";
+
+const NO_TEXT_REPLY = "El copiloto terminó sin respuesta de texto. Revisa el razonamiento.";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -76,6 +79,8 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
             if (raw && raw !== "None") {
               const reply = parseTraceMessage(raw);
               patch(id, { id, role: "assistant", text: reply.text, turnId: turn.turn_id, meta: t.reply_meta, ...(reply.truncated ? { truncated: true } : {}) });
+            } else {
+              patch(id, { id, role: "assistant", text: NO_TEXT_REPLY, turnId: turn.turn_id, meta: t.reply_meta });
             }
             await refreshProposals();
             return;
