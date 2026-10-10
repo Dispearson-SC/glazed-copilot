@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useApi } from "../../ApiContext";
 import Markdown from "../../chat/Markdown";
-import { ProposalCard, SUGGESTIONS } from "../../chat/ChatView";
 import { consultingText, fetchIssueAnalysis, type AnalysisRef, type AnalysisState, type DecisionItem } from "../../data/copilot";
 import { clockTime } from "../../format";
 import { useCopilot } from "../../state/copilotStore";
@@ -12,6 +11,9 @@ import AgentOrb from "./AgentOrb";
 import AnalysisCard from "./AnalysisCard";
 
 type Chat = ReturnType<typeof useChat>;
+
+/** Suggestion chips of Copiloto.dc.html. */
+export const COPILOT_SUGGESTIONS = ["¿Qué pido hoy?", "¿Por qué tiramos tanta dona?", "Resume las advertencias"];
 
 function UserBubble({ m }: { m: ChatMessage }) {
   return (
@@ -96,7 +98,7 @@ export default function AgentWindow({
   const busy = chat.status === "working";
   const pendingIds = new Set(openIds ?? items.map((i) => i.id));
 
-  const count = chat.messages.length + state.analyses.length + chat.proposals.length;
+  const count = chat.messages.length + state.analyses.length;
   useEffect(() => {
     const el = scroller.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -161,8 +163,6 @@ export default function AgentWindow({
               </div>
             ))}
             {renderCards(chat.messages.length)}
-            {chat.proposals.map((p) => <ProposalCard key={p.proposal_id} p={p} onDecide={chat.decide} />)}
-            {chat.decisionError && <div role="alert" className="rounded-[14px] bg-error-container px-4 py-2.5 font-body-md text-body-md text-on-error-container">{chat.decisionError.message}</div>}
             {busy && (
               <div className="flex items-center gap-2">
                 <AgentOrb size={28} />
@@ -177,7 +177,7 @@ export default function AgentWindow({
 
       <div className="fixed inset-x-4 bottom-[92px] z-30 mx-auto flex max-w-[608px] flex-col gap-2">
         <div className="flex gap-2 overflow-x-auto">
-          {SUGGESTIONS.slice(0, 3).map((c) => (
+          {COPILOT_SUGGESTIONS.map((c) => (
             <button key={c} type="button" onClick={() => send(c)} className="min-h-[44px] flex-shrink-0 rounded-full bg-surface-container px-3.5 py-2 text-[13px] leading-[18px] text-secondary">{c}</button>
           ))}
         </div>

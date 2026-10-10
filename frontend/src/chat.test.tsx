@@ -19,49 +19,72 @@ const open = (path: string, api = fakeApi()) =>
     </ApiProvider>,
   );
 
-describe("chat route and nav", () => {
-  it("replaces the Chat entry of the bottom nav with Copiloto (handoff), and the dashboard still opens the chat from its floating button", async () => {
-    open("/");
-    expect(await screen.findByRole("link", { name: /Copiloto/ })).toHaveAttribute("href", "/copiloto");
-    expect(screen.queryByRole("link", { name: /^chat/i })).toBeNull();
-    expect(await screen.findByRole("button", { name: "Abrir chat del turno" })).toBeInTheDocument();
-  });
-
-  it("serves the full chat at /chat with store name, sim date and suggestion chips", async () => {
+/** Chat.dc.html, element by element. */
+describe("Chat (/chat) matches Chat.dc.html", () => {
+  it("header card: smart_toy icon, 'Chat del turno', subtitle and the agent badge", async () => {
     open("/chat");
     const header = await screen.findByTestId("chat-header");
-    await within(header).findByText(/Aeropuerto Norte · Glazed Centro/);
-    await vi.waitFor(() => expect(header).toHaveTextContent("2026-03-01"));
-    expect(screen.getByRole("button", { name: "¿Qué tengo que pedir hoy?" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "¿Qué alertas son urgentes?" })).toBeInTheDocument();
+    expect(within(header).getByText("smart_toy")).toBeInTheDocument();
+    expect(within(header).getByRole("heading", { name: "Chat del turno" })).toBeInTheDocument();
+    expect(within(header).getByText("Conversa con el asistente de barra")).toBeInTheDocument();
+    expect(await within(header).findByTestId("chat-status")).toHaveTextContent("Sin agente");
   });
 
-  it("sends a chip question and shows the reply with a fast chip, without a reasoning link", async () => {
-    const api = fakeApi({
-      getTurn: vi.fn(async () => ({
-        turn_id: "t1", status: "done", reply: "Pide 40", reply_meta: { source: "fast", elapsed_ms: 1500 },
-      })),
-    });
-    open("/chat", api);
-    await userEvent.click(await screen.findByRole("button", { name: "¿Qué tengo que pedir hoy?" }));
-    await userEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
-    expect(await screen.findByText("Pide 40")).toBeInTheDocument();
-    expect(api.sendMessage).toHaveBeenCalledWith("c1", "¿Qué tengo que pedir hoy?");
-    expect(screen.getByText("Respuesta rápida")).toBeInTheDocument();
-    expect(screen.getByText(/1\.5 s/)).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /razonamiento/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "¿Qué tengo que pedir hoy?" })).not.toBeInTheDocument();
+  it("the badge counts the connected agents when /agents/status answers", async () => {
+    open("/chat", fakeApi({ getAgentsStatus: async () => ({ connected: true, agents: [{ agent_id: "a", display_name_es: "A", status: "up" }, { agent_id: "b", display_name_es: "B", status: "up" }] }) }));
+    expect(await screen.findByText("2 agentes")).toBeInTheDocument();
   });
 
-  it("renders no chip when reply_meta is absent", async () => {
+  it("top bar and bottom navigation as in the other screens", async () => {
     open("/chat");
+    const bar = await screen.findByRole("banner");
+    expect(within(bar).getByRole("button", { name: "Notificaciones" })).toBeInTheDocument();
+    expect(within(bar).getByRole("link", { name: "Iniciar sesión" })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Navegación principal" });
+    expect(within(nav).getAllByRole("link").map((a) => a.textContent)).toEqual(["dashboardResumen", "receipt_longPedidos", "local_cafeProductos", "chatChat", "tuneAjustes"]);
+    expect(within(nav).getByRole("link", { name: /Chat/ })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("conversation box, the three design chips, composer and footer note", async () => {
+    open("/chat");
+    expect(await screen.findByRole("region", { name: "Conversación" })).toBeInTheDocument();
+    for (const chip of ["¿Cómo van las ventas?", "Dame el ticket promedio", "¿Cuál es el favorito de hoy?"]) expect(screen.getByRole("button", { name: chip })).toBeInTheDocument();
+    expect(screen.getByLabelText("Escribe un mensaje")).toHaveAttribute("placeholder", "Escribe un mensaje…");
+    expect(screen.getByRole("button", { name: "Enviar mensaje" })).toBeDisabled();
+    expect(screen.getByText("Interfaz lista. Conecta un agente para recibir respuestas.")).toBeInTheDocument();
+  });
+
+  it("a chip fills the draft (it does not send) and keeps showing after the conversation starts", async () => {
+    const api = fakeApi();
+    open("/chat", api);
+    await userEvent.click(await screen.findByRole("button", { name: "Dame el ticket promedio" }));
+    expect(screen.getByLabelText("Escribe un mensaje")).toHaveValue("Dame el ticket promedio");
+    expect(api.sendMessage).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
+    expect(await screen.findByText("listo")).toBeInTheDocument();
+    expect(api.sendMessage).toHaveBeenCalledWith("c1", "Dame el ticket promedio");
+    expect(screen.getByRole("button", { name: "¿Cómo van las ventas?" })).toBeInTheDocument();
+  });
+
+  it("shows the time under user and assistant bubbles", async () => {
+    const api = fakeApi({ listTurns: async () => [{ turn_id: "t9", ts: "2026-03-01T10:00:00Z", user_text: "hola", reply: "buenas", status: "done" }] });
+    open("/chat", api);
+    expect(await screen.findByText("buenas")).toBeInTheDocument();
+    expect(screen.getAllByText(/^\d{2}:\d{2}$/)).toHaveLength(2);
+  });
+
+  it("has none of the legacy elements: proposals, status text, metadata chips, steps", async () => {
+    open("/chat", fakeApi({ getTurn: vi.fn(async () => ({ turn_id: "t1", status: "done", reply: "Pide 40", reply_meta: { source: "fast", elapsed_ms: 1500 } })) }));
     await userEvent.type(await screen.findByLabelText("Escribe un mensaje"), "hola");
     await userEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
-    await screen.findByText("listo");
-    expect(screen.queryByText("Respuesta rápida")).not.toBeInTheDocument();
+    await screen.findByText("Pide 40");
+    for (const legacy of [/Respuesta rápida/, /1\.5 s/, /Propuesta pendiente/, /Aprobar/, /Rechazar/, /En línea/, /Trabajando/, /Esperando respuesta/, /pasos intermedios/i, /Las propuestas pendientes/, /Copiloto/]) {
+      expect(screen.queryByText(legacy)).toBeNull();
+    }
+    expect(screen.queryByRole("link", { name: /razonamiento/i })).toBeNull();
   });
 
-  it("shows history from the trace", async () => {
+  it("shows history from the trace and hides the internal events", async () => {
     const api = fakeApi({
       getTrace: vi.fn(async () => [
         ev("2026-03-01T10:00:00Z", "manager", "orchestrator", "message", { text: "¿cómo vamos?" }),
@@ -72,160 +95,47 @@ describe("chat route and nav", () => {
     open("/chat", api);
     expect(await screen.findByText("¿cómo vamos?")).toBeInTheDocument();
     expect(screen.getByText("Bien")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /razonamiento/i })).not.toBeInTheDocument();
     expect(screen.queryByText("oculto")).not.toBeInTheDocument();
   });
 
-  it("shows a truncation hint and collapsed intermediate steps for envelope history", async () => {
-    const api = fakeApi({
-      getTrace: vi.fn(async () => [
-        ev("2026-03-01T10:00:00Z", "manager", "orchestrator", "message", { text: '{"kind": "request", "parts": [{"content": "¿Qué pido?"}]}' }),
-        ev("2026-03-01T10:00:01Z", "orchestrator", "manager", "message", { text: '{"kind": "response", "parts": [{"content": "Consulto a abastecimiento…"}]}' }),
-        ev("2026-03-01T10:00:02Z", "orchestrator", "manager", "message", { text: '{"kind": "response", "parts": [{"content": "Pide 40 y además' }),
-      ]),
-    });
-    open("/chat", api);
-    expect(await screen.findByText("Pide 40 y además")).toBeInTheDocument();
-    expect(screen.getByText("…(recortado)")).toBeInTheDocument();
-    expect(screen.getByText(/pasos intermedios/i)).toBeInTheDocument();
-  });
-
-  it("shows the working notice, then an error bubble with retry on failure", async () => {
-    const getTurn = vi
-      .fn()
-      .mockResolvedValueOnce({ turn_id: "t1", status: "pending", still_running: true })
-      .mockResolvedValue({ turn_id: "t1", status: "failed", error: "boom" });
+  it("shows an error bubble with retry when the turn fails", async () => {
+    const getTurn = vi.fn().mockResolvedValue({ turn_id: "t1", status: "failed", error: "boom" });
     open("/chat", fakeApi({ getTurn }));
     await userEvent.type(await screen.findByLabelText("Escribe un mensaje"), "hola");
     await userEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
-    expect(await screen.findByText(/El copiloto sigue trabajando/)).toBeInTheDocument();
     expect(await screen.findByText(/boom/, undefined, { timeout: 4000 })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
   });
 });
 
-describe("chat proposals", () => {
-  const stateful = (over = {}) => {
-    let list = [proposalA];
-    return fakeApi({
-      listProposals: vi.fn(async () => list),
-      decide: vi.fn(async (id: string) => { list = list.filter((p) => p.proposal_id !== id); return {}; }),
-      ...over,
-    });
-  };
-
-  it("renders pending proposals inline on load and approves", async () => {
-    const api = stateful();
-    open("/chat", api);
-    const card = await screen.findByTestId("proposal-p1");
-    expect(card).toHaveTextContent("Evitar quiebre");
-    await userEvent.click(within(card).getByRole("button", { name: "Aprobar" }));
-    expect(api.decide).toHaveBeenCalledWith("p1", { approved: true }, { idempotencyKey: expect.any(String) });
-    await vi.waitFor(() => expect(screen.queryByTestId("proposal-p1")).not.toBeInTheDocument());
-  });
-
-  it("shows proposals created during a turn that ends in done", async () => {
-    let list: unknown[] = [];
-    const api = fakeApi({
-      listProposals: vi.fn(async () => list),
-      getTurn: vi.fn(async () => { list = [proposalA]; return { turn_id: "t1", status: "done", reply: "Propuse un pedido" }; }),
-    });
-    open("/chat", api);
-    await userEvent.type(await screen.findByLabelText("Escribe un mensaje"), "pide");
-    await userEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
-    expect(await screen.findByText("Propuse un pedido")).toBeInTheDocument();
-    expect(await screen.findByTestId("proposal-p1")).toBeInTheDocument();
-  });
-
-  it("renders proposals on waiting_approval too", async () => {
-    const api = stateful({ getTurn: vi.fn(async () => ({ turn_id: "t1", status: "waiting_approval" })) });
-    open("/chat", api);
-    await userEvent.type(await screen.findByLabelText("Escribe un mensaje"), "pide");
-    await userEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
-    expect(await screen.findByTestId("proposal-p1")).toBeInTheDocument();
-  });
-
-  it("requires a reason to reject", async () => {
-    const api = stateful();
-    open("/chat", api);
-    const card = await screen.findByTestId("proposal-p1");
-    await userEvent.click(within(card).getByRole("button", { name: "Rechazar" }));
-    const confirm = within(card).getByRole("button", { name: "Confirmar rechazo" });
-    expect(confirm).toBeDisabled();
-    await userEvent.type(within(card).getByLabelText("Motivo del rechazo"), "muy caro");
-    await userEvent.click(confirm);
-    expect(api.decide).toHaveBeenCalledWith("p1", { approved: false, reason: "muy caro" }, { idempotencyKey: expect.any(String) });
-  });
-
-  it("does not show an error on 409", async () => {
-    const api = fakeApi({
-      listProposals: vi.fn().mockResolvedValueOnce([proposalA]).mockResolvedValue([]),
-      decide: vi.fn().mockRejectedValue(new ApiError(409, "ya decidida")),
-    });
-    open("/chat", api);
-    const card = await screen.findByTestId("proposal-p1");
-    await userEvent.click(within(card).getByRole("button", { name: "Aprobar" }));
-    await vi.waitFor(() => expect(screen.queryByTestId("proposal-p1")).not.toBeInTheDocument());
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-});
-
-describe("floating chat on the dashboard", () => {
-  it("opens a compact panel from a bubble and links to the full chat", async () => {
+describe("floating chat on Main (Main.dc.html)", () => {
+  it("opens a compact panel with two chips and the footer link, and sends a message", async () => {
     const api = fakeApi();
     open("/", api);
     await userEvent.click(await screen.findByRole("button", { name: "Abrir chat del turno" }));
     const panel = screen.getByRole("region", { name: "Chat flotante del turno" });
     expect(within(panel).getByRole("link", { name: "Abrir chat completo" })).toHaveAttribute("href", "/chat");
+    expect(within(panel).queryByRole("button", { name: "¿Cuál es el favorito de hoy?" })).toBeNull();
     await userEvent.type(within(panel).getByLabelText("Escribe un mensaje"), "hola");
     await userEvent.click(within(panel).getByRole("button", { name: "Enviar mensaje" }));
     expect(await within(panel).findByText("listo")).toBeInTheDocument();
     expect(api.sendMessage).toHaveBeenCalledWith("c1", "hola");
   });
-});
 
-describe("chat design parity", () => {
-  it("full page: icon header card with a status badge and the design's conversation card", async () => {
-    open("/chat");
-    const header = await screen.findByTestId("chat-header");
-    expect(within(header).getByText("smart_toy")).toBeInTheDocument();
-    expect(within(header).getByRole("heading", { name: "Chat del turno" })).toBeInTheDocument();
-    expect(within(header).getByTestId("chat-status")).toHaveTextContent("En línea");
-    const conv = await screen.findByRole("region", { name: "Conversación" });
-    expect(conv.className).toContain("rounded-[18px]");
-    expect(conv.className).toContain("min-h-[320px]");
-  });
-
-  it("full page: status badge shows the copilot working while a turn runs", async () => {
-    const getTurn = vi.fn(async () => ({ turn_id: "t1", status: "pending" as const }));
-    open("/chat", fakeApi({ getTurn }));
-    await userEvent.type(await screen.findByLabelText("Escribe un mensaje"), "hola");
-    await userEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
-    expect(await screen.findByTestId("chat-status")).toHaveTextContent("Trabajando");
-  });
-
-  it("floating panel uses the compact design: two chips, small send button, link in the footer block", async () => {
+  it("uses the compact design: small send button and the link inside the footer block", async () => {
     open("/");
     await userEvent.click(await screen.findByRole("button", { name: "Abrir chat del turno" }));
     const panel = screen.getByRole("region", { name: "Chat flotante del turno" });
-    const chips = within(panel).getAllByRole("button").filter((b) => b.className.includes("font-label-md"));
-    expect(chips).toHaveLength(2);
     const send = within(panel).getByRole("button", { name: "Enviar mensaje" });
     expect(send.className).toContain("w-10 h-10");
-    const form = send.closest("form")!;
-    expect(form.className).toContain("p-1.5 pl-4");
-    expect(form.parentElement!.contains(within(panel).getByRole("link", { name: "Abrir chat completo" }))).toBe(true);
-    expect(within(panel).getByText("smart_toy", { selector: "span.text-\\[18px\\]" })).toBeInTheDocument();
+    expect(send.closest("form")!.parentElement!.contains(within(panel).getByRole("link", { name: "Abrir chat completo" }))).toBe(true);
   });
 
-  it("floating bubbles use the compact radius", async () => {
+  it("the FAB toggles to a close icon and back", async () => {
     open("/");
-    await userEvent.click(await screen.findByRole("button", { name: "Abrir chat del turno" }));
-    const panel = screen.getByRole("region", { name: "Chat flotante del turno" });
-    await userEvent.type(within(panel).getByLabelText("Escribe un mensaje"), "hola");
-    await userEvent.click(within(panel).getByRole("button", { name: "Enviar mensaje" }));
-    const reply = await within(panel).findByText("listo");
-    expect(reply.closest("[class*='rounded-[14px]']")).not.toBeNull();
+    const fab = await screen.findByRole("button", { name: "Abrir chat del turno" });
+    await userEvent.click(fab);
+    expect(screen.getByRole("button", { name: "Cerrar chat del turno" })).toHaveAttribute("aria-expanded", "true");
   });
 });
 

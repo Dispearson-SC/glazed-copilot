@@ -1,6 +1,7 @@
+import { useEffect, useState } from "react";
 import { useApi } from "../ApiContext";
 import ActionsFooter from "../components/ActionsFooter";
-import ActivityChart, { type ActivityPoint } from "../components/ActivityChart";
+import ActivityChart from "../components/ActivityChart";
 import HeroCard from "../components/HeroCard";
 import MetricCards from "../components/MetricCards";
 import PageHeader from "../components/PageHeader";
@@ -8,28 +9,23 @@ import PageShell from "../components/PageShell";
 import TopProducts from "../components/TopProducts";
 import FloatingChat from "../chat/FloatingChat";
 import { ErrorBox, useStores } from "../components";
-import { lastSevenDays, shiftDate } from "../format";
+import { shiftDate } from "../format";
 import { useSession } from "../SessionContext";
-import type { DaySummary, ForecastResponse } from "../types";
 import { useCurrentCase } from "../useCurrentCase";
-import { useOptionalPolling } from "../useOptionalPolling";
 import { usePolling } from "../usePolling";
 
-const PROJECTED_DAYS = 3;
-
-/** 7 actual days ending at `day` (from day summaries), then the next projected days from the forecast. */
-function buildPoints(day: string, forecast: ForecastResponse | null, trend: DaySummary[] | null): ActivityPoint[] {
-  const actuals = lastSevenDays(day).map((date): ActivityPoint => {
-    const value = trend?.find((d) => d.date === date)?.totals?.net_sales ?? null;
-    if (date === day) return { date, kind: "today", value };
-    return value == null ? { date, kind: "nodata", value: null } : { date, kind: "actual", value };
-  });
-  const future = (forecast?.points ?? [])
-    .filter((p) => p.date > day)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, PROJECTED_DAYS)
-    .map((p): ActivityPoint => ({ date: p.date, kind: "forecast", value: p.forecast }));
-  return [...actuals, ...future];
+/** Whole minutes since `stamp` last changed (null before the first load). */
+function useMinutesAgo(stamp: unknown): number | null {
+  const [at, setAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (stamp) setAt(Date.now());
+  }, [stamp]);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  return at == null ? null : Math.max(0, Math.floor((now - at) / 60_000));
 }
 
 export default function DashboardPage() {
@@ -47,50 +43,34 @@ export default function DashboardPage() {
     true,
     [caseId, simToday, session.refreshKey],
   );
-  const day = summary.data?.date;
-  const forecast = useOptionalPolling(
-    () => (caseId && simToday ? api.getForecast(caseId, { from: shiftDate(simToday, -7), to: shiftDate(simToday, 7), level: "store" }) : Promise.resolve(null)),
+  // Yesterday feeds the "vs ayer" delta.
+  const ayer = usePolling(
+    () => (caseId && simToday ? api.getDaySummary(caseId, shiftDate(simToday, -1)).catch(() => null) : Promise.resolve(null)),
     60_000,
-    false,
+    true,
     [caseId, simToday, session.refreshKey],
   );
-  // Actuals always come from day summaries (the forecast route only carries future days); the summary day is already loaded.
-  const trend = usePolling(
-    async () => {
-      if (!caseId || !day) return null;
-      const prev = lastSevenDays(day).slice(0, 6);
-      return [...(await Promise.all(prev.map((d) => api.getDaySummary(caseId, d)))), summary.data!];
-    },
-    60_000,
-    false,
-    [caseId, day, session.refreshKey],
-  );
+  const minutesAgo = useMinutesAgo(summary.data);
   const error = storesError ?? caseError;
   const data = summary.data;
   const ready = Boolean(data) && !summary.error;
-  const points = ready && day ? buildPoints(day, forecast.data, trend.data) : [];
   const store = stores.find((s) => s.store_id === storeId);
 
   return (
     <PageShell
-      subtitle="Resumen"
       columnClass="flex flex-col w-full space-y-space-lg max-w-[1024px] mx-auto"
-      floating={
-        currentCase ? (
-          <FloatingChat storeId={storeId} caseId={currentCase.case_id} storeName={store?.display_name} simToday={currentCase.sim_today} />
-        ) : null
-      }
+      floating={currentCase ? <FloatingChat storeId={storeId} caseId={currentCase.case_id} storeName={store?.display_name} /> : null}
     >
       <ErrorBox error={error} />
       <ErrorBox error={summary.error} />
-      {ready && data && (
+      {ready && data && currentCase && (
         <>
-          <PageHeader date={data.date} simToday={simToday ?? data.as_of} />
-          <HeroCard summary={data} />
+          <PageHeader date={data.date} mode={currentCase.mode} />
+          <HeroCard summary={data} ayer={ayer.data} />
           <MetricCards summary={data} />
-          {trend.data && <ActivityChart points={points} model={forecast.data?.model} />}
+          <ActivityChart />
           <TopProducts summary={data} />
-          <ActionsFooter asOf={data.as_of} />
+          <ActionsFooter minutesAgo={minutesAgo} />
         </>
       )}
       {!error && !loading && !currentCase && (

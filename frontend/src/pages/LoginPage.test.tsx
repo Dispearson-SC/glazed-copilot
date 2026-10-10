@@ -1,16 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { ApiProvider } from "../ApiContext";
-import { SessionProvider, useSession } from "../SessionContext";
-import { caseA, fakeApi, store2 } from "../test/helpers";
+import { SessionProvider } from "../SessionContext";
+import { fakeApi } from "../test/helpers";
 import LoginPage from "./LoginPage";
-
-function Probe() {
-  const s = useSession();
-  return <p data-testid="home">{`home:${s.storeId}:${s.caseId}`}</p>;
-}
 
 const open = (api = fakeApi()) =>
   render(
@@ -19,64 +14,79 @@ const open = (api = fakeApi()) =>
         <MemoryRouter initialEntries={["/login"]}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/" element={<Probe />} />
+            <Route path="/" element={<p data-testid="home">resumen</p>} />
           </Routes>
         </MemoryRouter>
       </SessionProvider>
     </ApiProvider>,
   );
 
-describe("LoginPage (store and case picker)", () => {
-  it("has no credential fields", async () => {
+/** Login.dc.html, element by element. */
+describe("Login (/login) matches Login.dc.html", () => {
+  it("header: logo, name, 'Resumen', Notificaciones and Iniciar sesión", async () => {
     open();
-    await screen.findByRole("option", { name: "Aeropuerto Norte · Glazed Centro" });
-    expect(screen.queryByLabelText(/contraseña|correo/i)).toBeNull();
+    const bar = await screen.findByRole("banner");
+    expect(within(bar).getByRole("img", { name: /Logo/ })).toBeInTheDocument();
+    expect(within(bar).getByText("Resumen")).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Notificaciones" })).toBeInTheDocument();
+    expect(within(bar).getByRole("link", { name: "Iniciar sesión" })).toBeInTheDocument();
   });
 
-  it("lists stores by display name and the cases of the chosen store", async () => {
-    const api = fakeApi({
-      listCases: async (q: { store_id?: string }) =>
-        q.store_id === "S031" ? [{ ...caseA, case_id: "c9", store_id: "S031", title: "Caso norte" }] : [caseA],
-    });
-    open(api);
-    await screen.findByRole("option", { name: "Caso uno" });
-    await userEvent.selectOptions(screen.getByLabelText("Sucursal"), "S031");
-    expect(await screen.findByRole("option", { name: "Caso norte" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Plaza Sur · Glazed Norte" })).toBeInTheDocument();
-    expect(store2.store_id).toBe("S031");
-  });
-
-  it("preselects the live case at the default simulation date", async () => {
-    const api = fakeApi({
-      listCases: async () => [caseA, { ...caseA, case_id: "cd", title: "Demo", sim_today: "2026-07-19" }],
-    });
-    open(api);
-    await screen.findByRole("option", { name: "Demo" });
-    expect(screen.getByLabelText("Caso")).toHaveValue("cd");
-  });
-
-  it("stores the choice in the session and goes home", async () => {
+  it("hero card: coffee_maker icon, title and subtitle", () => {
     open();
-    await screen.findByRole("option", { name: "Caso uno" });
-    await userEvent.click(screen.getByRole("button", { name: "Entrar al resumen" }));
-    expect(await screen.findByTestId("home")).toHaveTextContent("home:S030:c1");
+    expect(screen.getByRole("heading", { name: "Pasa detrás de la barra" })).toBeInTheDocument();
+    expect(screen.getByText("Ingresa con tu cuenta de turno para ver el resumen de hoy.")).toBeInTheDocument();
+    expect(screen.getByText("coffee_maker")).toBeInTheDocument();
   });
 
-  it("shows an error when stores cannot be loaded", async () => {
-    open(fakeApi({ listStores: async () => { throw new Error("sin red"); } }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("sin red");
-  });
-
-  it("follows the design: icon hero, pill fields with icons, back link and proxy note", async () => {
+  it("form: email and password fields with their icons, placeholders and the show-password toggle", async () => {
     open();
-    await screen.findByRole("option", { name: "Caso uno" });
-    expect(screen.getByRole("heading", { name: "Elige tu sucursal" })).toBeInTheDocument();
+    const email = screen.getByLabelText("Correo del turno");
+    expect(email).toHaveAttribute("type", "email");
+    expect(email).toHaveAttribute("placeholder", "turno@cafecentral.mx");
+    const pw = screen.getByLabelText("Contraseña");
+    expect(pw).toHaveAttribute("type", "password");
+    expect(pw).toHaveAttribute("placeholder", "Escribe tu contraseña");
+    const toggle = screen.getByRole("button", { name: "Mostrar contraseña" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(toggle);
+    expect(pw).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: "Ocultar contraseña" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("remember checkbox (checked), forgot link, submit, divider, back link and footer note", () => {
+    open();
+    expect(screen.getByLabelText("Mantener el turno abierto")).toBeChecked();
+    expect(screen.getByRole("link", { name: "¿Olvidaste la clave?" })).toHaveAttribute("href", "#");
+    expect(screen.getByRole("button", { name: "Entrar al resumen" })).toBeEnabled();
     expect(screen.getByRole("link", { name: /Volver al resumen/ })).toHaveAttribute("href", "/");
-    for (const label of ["Sucursal", "Caso"]) {
-      const pill = screen.getByLabelText(label).parentElement!;
-      expect(pill.className).toContain("rounded-full");
-      expect(pill.querySelector(".material-symbols-outlined")).not.toBeNull();
-    }
-    expect(screen.getByText(/proxy/i)).toBeInTheDocument();
+    expect(screen.getByText("Al entrar aceptas el uso operativo del resumen de turno.")).toBeInTheDocument();
+  });
+
+  it("shows the design's error for an invalid email or a short password and does not leave the page", async () => {
+    open();
+    await userEvent.type(screen.getByLabelText("Correo del turno"), "nope");
+    await userEvent.type(screen.getByLabelText("Contraseña"), "abc");
+    await userEvent.click(screen.getByRole("button", { name: "Entrar al resumen" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Revisa el correo o la contraseña e inténtalo de nuevo.");
+    expect(screen.queryByTestId("home")).toBeNull();
+  });
+
+  it("verifies ('Verificando…') and then goes to the summary with a valid email and password", async () => {
+    open();
+    await userEvent.type(screen.getByLabelText("Correo del turno"), "turno@cafecentral.mx");
+    await userEvent.type(screen.getByLabelText("Contraseña"), "clave1234");
+    await userEvent.click(screen.getByRole("button", { name: "Entrar al resumen" }));
+    expect(await screen.findByRole("button", { name: "Verificando…" })).toBeDisabled();
+    expect(await screen.findByTestId("home", {}, { timeout: 4000 })).toBeInTheDocument();
+  });
+
+  it("has no bottom navigation and none of the legacy store/case picker", () => {
+    open();
+    expect(screen.queryByRole("navigation")).toBeNull();
+    for (const legacy of [/Elige tu sucursal/, /Selecciona la sucursal/, /Sin credenciales/, /proxy/i]) expect(screen.queryByText(legacy)).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByLabelText("Sucursal")).toBeNull();
+    expect(screen.queryByLabelText("Caso")).toBeNull();
   });
 });

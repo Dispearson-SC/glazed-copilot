@@ -150,8 +150,13 @@ describe("AgentWindow", () => {
   it("sends a suggestion immediately", async () => {
     const chat = chatOf();
     render(<AgentWindow chat={chat} {...props} />, { wrapper: wrap });
-    await userEvent.click(screen.getByRole("button", { name: "¿Qué tengo que pedir hoy?" }));
-    expect(chat.send).toHaveBeenCalledWith("¿Qué tengo que pedir hoy?", undefined);
+    await userEvent.click(screen.getByRole("button", { name: "¿Qué pido hoy?" }));
+    expect(chat.send).toHaveBeenCalledWith("¿Qué pido hoy?", undefined);
+  });
+
+  it("offers the three suggestion chips of Copiloto.dc.html", () => {
+    render(<AgentWindow chat={chatOf()} {...props} />, { wrapper: wrap });
+    for (const c of ["¿Qué pido hoy?", "¿Por qué tiramos tanta dona?", "Resume las advertencias"]) expect(screen.getByRole("button", { name: c })).toBeInTheDocument();
   });
 
   it("keeps the microphone honest: it says 'Disponible pronto' instead of recording", async () => {
@@ -162,10 +167,11 @@ describe("AgentWindow", () => {
     expect(screen.queryByRole("status")).toBeNull(); // toast is rendered by the page; the click must not throw
   });
 
-  it("shows inline pending proposals and errors from useChat", () => {
+  it("shows errors from useChat with a retry, and no inline proposals (not in the design)", () => {
     const chat = chatOf({ proposals: [proposalA], messages: [{ id: "e", role: "error", text: "falló", retryText: "x" }] });
     render(<AgentWindow chat={chat} {...props} />, { wrapper: wrap });
-    expect(screen.getByTestId("proposal-p1")).toBeInTheDocument();
+    expect(screen.queryByTestId("proposal-p1")).toBeNull();
     expect(within(screen.getByRole("alert")).getByText("falló")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
   });
 });

@@ -24,7 +24,7 @@ describe("App routes", () => {
     expect(await screen.findByTestId("hero")).toBeInTheDocument();
   });
 
-  it("serves the store picker at /login", async () => {
+  it("serves the login at /login", async () => {
     open("/login");
     expect(await screen.findByRole("button", { name: "Entrar al resumen" })).toBeInTheDocument();
   });
@@ -44,7 +44,7 @@ describe("App routes", () => {
 });
 
 describe("top bar title", () => {
-  it("falls back to the full name and the page subtitle when there is no separator", async () => {
+  it("shows the full store name and the page subtitle 'Resumen' (Main.dc.html)", async () => {
     const plain = { store_id: "S030", name: "Tienda Única", format: "mall", site_id: "X", region: "N", display_name: "Tienda Única" };
     open("/", fakeApi({ listStores: async () => [plain] }));
     const bar = await screen.findByRole("banner");
@@ -59,21 +59,13 @@ describe("top bar title", () => {
 });
 
 describe("App shell", () => {
-  it("links only the three remaining screens in the bottom navigation (Chat became Copiloto)", async () => {
-    open();
-    const nav = await screen.findByRole("navigation", { name: "Navegación principal" });
-    const links = Array.from(nav.querySelectorAll("a")).map((a) => [a.textContent, a.getAttribute("href")]);
-    expect(links).toEqual([["dashboardResumen", "/"], ["forumCopiloto", "/copiloto"], ["storefrontSucursal", "/login"]]);
-  });
-
-  it("shows the store display name in the top bar and links to the picker", async () => {
+  it("shows the store display name in the top bar with the sign-in link", async () => {
     open();
     const bar = await screen.findByRole("banner");
-    expect(await within(bar).findByText("Aeropuerto Norte")).toBeInTheDocument();
-    expect(within(bar).getByText("Glazed Centro")).toBeInTheDocument();
-    expect(within(bar).queryByText("Resumen")).toBeNull();
-    expect(within(bar).queryByText(/·/)).toBeNull();
-    expect(screen.getByRole("link", { name: "Cambiar sucursal" })).toHaveAttribute("href", "/login");
+    expect(await within(bar).findByText("Aeropuerto Norte · Glazed Centro")).toBeInTheDocument();
+    expect(within(bar).getByText("Resumen")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Iniciar sesión" })).toHaveAttribute("href", "/login");
+    expect(screen.queryByRole("link", { name: "Cambiar sucursal" })).toBeNull();
   });
 
   it("marks the current page in the bottom navigation", async () => {
@@ -81,10 +73,10 @@ describe("App shell", () => {
     expect(await screen.findByRole("link", { name: /Resumen/, current: "page" })).toHaveAttribute("href", "/");
   });
 
-  it("keeps the full chat reachable at /chat even though the nav now points to the copilot", async () => {
-    open("/chat");
-    expect(await screen.findByTestId("chat-header")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Copiloto/ })).toHaveAttribute("href", "/copiloto");
+  it("the design's Chat entry opens /chat", async () => {
+    open("/");
+    await screen.findByRole("navigation", { name: "Navegación principal" });
+    expect(screen.getByRole("link", { name: /Chat/ })).toHaveAttribute("href", "/chat");
   });
 });
 

@@ -1,30 +1,17 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { ChatMessage } from "../chatHistory";
 import Markdown from "./Markdown";
-import type { Proposal } from "../types";
+import { clockTime } from "../format";
 import type { useChat } from "../useChat";
 
-export const SUGGESTIONS = [
-  "¿Qué tengo que pedir hoy?",
-  "¿Cómo me fue ayer vs lo normal?",
-  "¿Qué se me va a echar a perder esta semana?",
-  "¿Qué alertas son urgentes?",
-  "¿Qué pasó con las ventas esta semana?",
-];
+/** Chips of Chat.dc.html (the floating panel of Main.dc.html shows the first two). A chip fills the draft. */
+export const CHAT_CHIPS = ["¿Cómo van las ventas?", "Dame el ticket promedio", "¿Cuál es el favorito de hoy?"];
 
 type Chat = ReturnType<typeof useChat>;
 
-function MetaChip({ meta }: { meta: NonNullable<ChatMessage["meta"]> }) {
-  if (meta.elapsed_ms == null) return null;
-  const secs = (meta.elapsed_ms / 1000).toFixed(1);
-  return (
-    <div className="flex items-center gap-1.5 mt-1 font-label-sm text-label-sm text-on-surface-variant">
-      {meta.source === "fast" && (
-        <span className="px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant">Respuesta rápida</span>
-      )}
-      <span>{secs} s</span>
-    </div>
-  );
+function Time({ ts, className }: { ts?: string; className: string }) {
+  const t = clockTime(ts);
+  return t ? <p className={className}>{t}</p> : null;
 }
 
 function Bubble({ m, compact, onRetry }: { m: ChatMessage; compact: boolean; onRetry: () => void }) {
@@ -35,7 +22,7 @@ function Bubble({ m, compact, onRetry }: { m: ChatMessage; compact: boolean; onR
       <div className="flex justify-end">
         <div className={`max-w-[85%] ${radius} rounded-br-[6px] bg-secondary text-surface-container-lowest ${pad}`}>
           <p className="font-body-md text-body-md whitespace-pre-wrap">{m.text}</p>
-          {m.truncated && <p className="font-label-sm text-label-sm opacity-70">…(recortado)</p>}
+          <Time ts={m.ts} className="m-0 mt-1 text-right font-label-sm text-label-sm text-white/70" />
         </div>
       </div>
     );
@@ -55,63 +42,8 @@ function Bubble({ m, compact, onRetry }: { m: ChatMessage; compact: boolean; onR
       </div>
       <div className={`min-w-0 max-w-[85%] ${radius} rounded-bl-[6px] bg-surface border border-surface-container ${pad}`}>
         <div className="text-on-surface"><Markdown text={m.text} /></div>
-        {m.truncated && (
-          <p className="font-label-sm text-label-sm text-on-surface-variant">…(recortado)</p>
-        )}
-        {m.steps && m.steps.length > 0 && (
-          <details className="mt-1 font-label-sm text-label-sm text-on-surface-variant">
-            <summary className="cursor-pointer">Pasos intermedios ({m.steps.length})</summary>
-            <ul className="list-disc pl-4">
-              {m.steps.map((t, i) => <li key={i}>{t}</li>)}
-            </ul>
-          </details>
-        )}
-        {m.meta && <MetaChip meta={m.meta} />}
+        <Time ts={m.ts} className="m-0 mt-1 font-label-sm text-label-sm text-on-surface-variant" />
       </div>
-    </div>
-  );
-}
-
-export function ProposalCard({ p, onDecide }: { p: Proposal; onDecide: Chat["decide"] }) {
-  const [rejecting, setRejecting] = useState(false);
-  const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
-  async function go(approved: boolean) {
-    setBusy(true);
-    try {
-      await onDecide(p.proposal_id, approved, approved ? undefined : reason.trim());
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <div data-testid={`proposal-${p.proposal_id}`} className="rounded-[16px] border border-secondary-container bg-surface-container-low px-4 py-3 flex flex-col gap-space-xs">
-      <p className="font-label-sm text-label-sm text-on-surface-variant">Propuesta pendiente · {p.action_type} · {p.tier}</p>
-      <p className="font-body-md text-body-md text-on-surface">{p.rationale}</p>
-      {rejecting ? (
-        <div className="flex flex-col gap-space-xs">
-          <label className="font-label-sm text-label-sm">
-            Motivo del rechazo
-            <input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2"
-            />
-          </label>
-          <div className="flex gap-2">
-            <button type="button" disabled={busy || !reason.trim()} onClick={() => void go(false)}
-              className="px-4 py-2 rounded-full bg-error text-on-error disabled:opacity-40">Confirmar rechazo</button>
-            <button type="button" onClick={() => setRejecting(false)} className="px-4 py-2 rounded-full text-secondary">Cancelar</button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex gap-2">
-          <button type="button" disabled={busy} onClick={() => void go(true)}
-            className="px-4 py-2 rounded-full bg-secondary text-on-secondary disabled:opacity-40">Aprobar</button>
-          <button type="button" disabled={busy} onClick={() => setRejecting(true)}
-            className="px-4 py-2 rounded-full bg-surface-container text-secondary disabled:opacity-40">Rechazar</button>
-        </div>
-      )}
     </div>
   );
 }
@@ -121,7 +53,7 @@ export default function ChatView({ chat, compact = false, footer }: { chat: Chat
   const [draft, setDraft] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
   const busy = chat.status === "working";
-  const count = chat.messages.length + chat.proposals.length;
+  const count = chat.messages.length;
   useEffect(() => {
     bottom.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
   }, [count, chat.status]);
@@ -175,21 +107,11 @@ export default function ChatView({ chat, compact = false, footer }: { chat: Chat
         {chat.messages.map((m) => (
           <Bubble key={m.id} m={m} compact={compact} onRetry={() => void chat.retry(m.retryText)} />
         ))}
-        {chat.proposals.map((p) => <ProposalCard key={p.proposal_id} p={p} onDecide={chat.decide} />)}
-        {chat.decisionError && <div role="alert" className="rounded-[14px] bg-error-container text-on-error-container px-4 py-2.5 font-body-md text-body-md">{chat.decisionError.message}</div>}
-        {busy && (
-          <p role="status" className="font-label-sm text-label-sm text-on-surface-variant">
-            {chat.stillRunning ? "El copiloto sigue trabajando…" : "Esperando respuesta…"}
-          </p>
-        )}
-        {chat.status === "waiting_approval" && chat.proposals.length === 0 && (
-          <p className="font-label-sm text-label-sm text-on-surface-variant">Hay una acción esperando aprobación.</p>
-        )}
         <div ref={bottom}></div>
       </section>
-      {chat.messages.length === 0 && (
+      {
         <div className={compact ? "px-space-md pb-1 flex gap-2 overflow-x-auto flex-shrink-0" : "flex gap-2 overflow-x-auto pb-1"}>
-          {(compact ? SUGGESTIONS.slice(0, 2) : SUGGESTIONS).map((chip) => (
+          {(compact ? CHAT_CHIPS.slice(0, 2) : CHAT_CHIPS).map((chip) => (
             <button
               key={chip}
               type="button"
@@ -204,7 +126,7 @@ export default function ChatView({ chat, compact = false, footer }: { chat: Chat
             </button>
           ))}
         </div>
-      )}
+      }
       {compact ? (
         <div className="p-space-sm flex-shrink-0">
           {form}

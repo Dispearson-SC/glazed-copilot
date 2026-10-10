@@ -11,8 +11,8 @@ export default function TopProducts({ summary }: { summary: DaySummary }) {
     <section className="flex flex-col gap-space-sm">
       <div className="flex items-center justify-between px-1">
         <div>
-          <h2 className="font-headline-sm text-headline-sm text-primary">Favoritos del día</h2>
-          <p className="font-label-sm text-label-sm text-on-surface-variant">Productos con más ventas</p>
+          <h2 className="font-headline-sm text-headline-sm text-primary">Favoritos de hoy</h2>
+          <p className="font-label-sm text-label-sm text-on-surface-variant">Bebidas con mayor rotación en barra</p>
         </div>
         <span className="px-2.5 py-0.5 rounded-full bg-surface-container text-secondary font-label-md text-label-md">
           Top 3
@@ -44,7 +44,7 @@ export default function TopProducts({ summary }: { summary: DaySummary }) {
                     {p.product_name}
                   </h3>
                   <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
-                    {p.units > 0 ? `${money(p.net_sales / p.units)} por unidad` : "Sin unidades"}
+                    {p.units > 0 ? `Precio promedio • ${money(p.net_sales / p.units)}` : "Sin datos"}
                   </p>
                 </div>
                 <span className="font-headline-sm text-headline-sm text-primary font-bold flex-shrink-0">

@@ -9,3 +9,15 @@ export function useInbox(caseId: string, refreshKey = 0) {
   const agents = usePolling<AgentsStatusResponse | null>(async () => await api.getAgentsStatus().catch(() => null), 30_000, true, [refreshKey]);
   return { counts: counts.data, agents: agents.data, refreshCounts: counts.refresh };
 }
+
+/** GET /agents/status on its own (floating chat and Chat page). null while unknown or when the route is missing. */
+export function useAgents(): AgentsStatusResponse | null {
+  const api = useApi();
+  return usePolling<AgentsStatusResponse | null>(async () => await api.getAgentsStatus().catch(() => null), 30_000, true, []).data;
+}
+
+/** "Sin agente conectado" or "N agentes conectados". */
+export const agentsLabel = (a: AgentsStatusResponse | null): string => {
+  const n = a?.connected ? a.agents.filter((x) => x.status !== "down").length : 0;
+  return n === 0 ? "Sin agente conectado" : `${n} ${n === 1 ? "agente conectado" : "agentes conectados"}`;
+};

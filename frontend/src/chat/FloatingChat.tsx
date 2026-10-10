@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { agentsLabel, useAgents } from "../useInbox";
 import { useChat } from "../useChat";
 import ChatView from "./ChatView";
 
-export default function FloatingChat({ storeId, caseId, storeName, simToday }: {
-  storeId: string; caseId: string; storeName?: string; simToday?: string;
+export default function FloatingChat({ storeId, caseId }: {
+  storeId: string; caseId: string; storeName?: string;
 }) {
+  const agents = useAgents();
   const [open, setOpen] = useState(false);
   const chat = useChat(caseId, { storeId, enabled: open });
   if (!caseId) return null;
@@ -25,7 +27,7 @@ export default function FloatingChat({ storeId, caseId, storeName, simToday }: {
             <div className="relative z-10 flex-1 min-w-0 flex flex-col">
               <span className="font-headline-sm text-headline-sm tracking-tight leading-none">Chat del turno</span>
               <span className="font-label-sm text-label-sm text-surface-variant font-normal truncate">
-                {storeName ?? ""}{simToday ? ` · ${simToday}` : ""}
+                {agentsLabel(agents)}
               </span>
             </div>
             <button
