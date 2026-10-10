@@ -202,8 +202,14 @@ def _tidy(text: str) -> str:
     return text.strip()
 
 
+_VOICE_TAG = re.compile(r"\[\s*canal\s*:\s*voz\s*\]\s*", re.I)
+
+
 def clean_reply(text: str) -> ReplyCleaning:
     original, removed = text, []
+    if _VOICE_TAG.search(text):  # the channel tag is for the model only: never echo it to the manager
+        removed += [m.group(0).strip() for m in _VOICE_TAG.finditer(text)]
+        text = _VOICE_TAG.sub("", text)
     text = humanize_internal_names(_strip_think(text, removed))
     think_removed = bool(removed)
     foreign = _FOREIGN_RUN.findall(text)

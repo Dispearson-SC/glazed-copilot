@@ -112,6 +112,9 @@ class TurnTracker:
         return self._started.get(turn_id)
 
 
+VOICE_TAG = "[canal: voz] "
+
+
 class AskAgent:
     """Send a manager message to the orchestrator through the case's Core conversation."""
 
@@ -120,8 +123,8 @@ class AskAgent:
         self.cases, self.core, self.tracker, self.clock, self.turns = cases, core, tracker, clock, turns
 
     def execute(self, case_id: str, text: str, context: dict[str, Any] | None = None,
-                lookup: Any = None) -> str:
-        """`context` = {issue_id, option_id?, mode}: validated against the case, pinned in front of the message sent to
+                lookup: Any = None, voice: bool = False) -> str:
+        """`voice` prefixes the Core-bound text with VOICE_TAG (never stored or shown). `context` = {issue_id, option_id?, mode}: validated against the case, pinned in front of the message sent to
         the Core (computed by code) and echoed in reply_meta.context. The stored user_text is the manager's text only."""
         if not text.strip():
             raise DomainError("message text is required")
@@ -136,6 +139,8 @@ class AskAgent:
         if case.core_conversation_id is None:
             case.core_conversation_id = self.core.create_conversation(case.case_id, case.store_id)
             self.cases.update(case)
+        if voice:
+            sent = VOICE_TAG + sent
         turn_id = self.core.send_turn(case.core_conversation_id, case.store_id, sent)
         if self.tracker and self.clock:
             self.tracker.started(turn_id, self.clock.now())
@@ -387,7 +392,7 @@ class ListTurns:
             if _message_text(dict(e.get("payload") or {})).startswith(REWRITE_PROMPT[:40]):
                 continue  # our own rewrite request is not a manager message
             self.turns.add(TurnRecord(tid, case.case_id, case.store_id, datetime.fromisoformat(str(e["at"])),
-                                      _message_text(dict(e.get("payload") or {}))))
+                                      _message_text(dict(e.get("payload") or {})).removeprefix(VOICE_TAG)))
 
 
 class GetDaySummary:

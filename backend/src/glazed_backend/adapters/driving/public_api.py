@@ -35,6 +35,7 @@ class AskContext(BaseModel):
 class AskBody(BaseModel):
     text: str
     context: AskContext | None = None
+    voice: bool = False  # push-to-talk message: the Core answers as spoken language
 
 
 class AdvanceBody(BaseModel):
@@ -185,7 +186,7 @@ def build_public_router(c: Any, guard: AuthGuard) -> APIRouter:
         def lookup(case, issue_id):
             return uc_copilot.require_issue(c.alerts, c.metrics, c.served, case, issue_id)
         ctx = b.context.model_dump() if b.context else None
-        return {"turn_id": uc.AskAgent(c.cases, c.core, c.turn_tracker, c.clock, c.turns).execute(case_id, b.text, ctx, lookup)}
+        return {"turn_id": uc.AskAgent(c.cases, c.core, c.turn_tracker, c.clock, c.turns).execute(case_id, b.text, ctx, lookup, voice=b.voice)}
 
     def turn_getter() -> uc.GetTurn:
         return uc.GetTurn(c.cases, c.core, c.turn_tracker, c.clock, c.turn_timeout_s, turns=c.turns)
