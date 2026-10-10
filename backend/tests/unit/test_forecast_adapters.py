@@ -102,3 +102,13 @@ def test_file_forecast_origin_is_configurable(tmp_path):
 
 def test_baseline_quantile_method():
     assert BaselineForecast().quantile("S030", D, "A", date(2026, 3, 11), 0.5, hist()) == pytest.approx(13)
+
+
+def test_file_forecast_accepts_a_timestamp_date_column(tmp_path):
+    """The holdout job writes `date` as TIMESTAMP; rows must still compare with `date`."""
+    f = tmp_path / "f.parquet"
+    cols = [c.replace("date DATE", "date TIMESTAMP") for c in BASE_COLS]
+    write_parquet(f, [("S030", "A", "2026-07-20 00:00:00", 5.0, 3.0, 8.0, 4.0, False, "glm-1")], cols)
+    res = FileForecast(str(f)).forecast("S030", date(2026, 7, 25), ["A"], date(2026, 7, 20), date(2026, 7, 25), [])
+    (r,) = res.rows
+    assert r.date == date(2026, 7, 20) and type(r.date) is date

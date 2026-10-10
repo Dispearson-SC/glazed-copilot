@@ -73,7 +73,7 @@ class FileForecast(_Quantiles):
             cols = {r[0] for r in con.execute("DESCRIBE SELECT * FROM read_parquet(?)", [self.path]).fetchall()}
             if not {"store_id", "sku", "date", "forecast", "p10", "p90"} <= cols:
                 return None
-            sql = "SELECT * FROM read_parquet(?) WHERE store_id=? AND date BETWEEN ? AND ?"
+            sql = "SELECT * REPLACE (CAST(date AS DATE) AS date) FROM read_parquet(?) WHERE store_id=? AND date BETWEEN ? AND ?"
             args: list[Any] = [self.path, store_id, date_from, date_to]
             if skus:
                 sql += f" AND sku IN ({', '.join('?' * len(skus))})"
