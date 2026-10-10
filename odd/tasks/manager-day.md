@@ -48,3 +48,4 @@ Forecast is well over the ~400 line budget. Strategy: ask-on-risk. One commit pe
 - 2026-10-10: T3 done, commit 8f5fb52
 - 2026-10-10: T2 follow-up (live forecast verified on :8100: band is sum over SKUs, censored days apart, /forecast/accuracy table), 220 tests, build OK, commit 5609765
 - 2026-10-10: T4 done, commit 7b6e038
+- 2026-10-10: T5 done, commit 5882a87
