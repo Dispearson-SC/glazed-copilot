@@ -64,3 +64,18 @@ describe("design parity", () => {
     expect(sizes["headline-sm"][0]).toBe("18px");
   });
 });
+
+describe("copilot design tokens (handoff: missing tokens)", () => {
+  it("adds the partition and elevation colors", () => {
+    const colors = tailwind.theme?.extend?.colors as Record<string, string>;
+    expect(colors.partition).toBe("#e8dccb");
+    expect(colors.elevation).toBe("#fffcf7");
+  });
+
+  it("adds the card, hero and sheet shadows", () => {
+    const shadows = tailwind.theme?.extend?.boxShadow as Record<string, string>;
+    expect(shadows.card).toBe("0 1px 3px rgba(75,48,37,.04), 0 8px 24px -4px rgba(75,48,37,.07)");
+    expect(shadows.hero).toBe("0 12px 32px -6px rgba(75,48,37,.22)");
+    expect(shadows.sheet).toBe("0 -20px 40px -10px rgba(75,48,37,.18)");
+  });
+});

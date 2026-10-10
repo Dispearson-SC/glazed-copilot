@@ -81,3 +81,11 @@ describe("App shell", () => {
     expect(await screen.findByRole("link", { name: /Chat/, current: "page" })).toHaveAttribute("href", "/chat");
   });
 });
+
+describe("copilot route", () => {
+  it("serves /copiloto with the capsule navigation and the top bar", async () => {
+    open("/copiloto");
+    expect(await screen.findByRole("navigation", { name: "Ventanas del copiloto" })).toBeInTheDocument();
+    expect(screen.getByText("Glazed Co.")).toBeInTheDocument();
+  });
+});

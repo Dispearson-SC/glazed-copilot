@@ -53,6 +53,13 @@ const config: Config = {
                 'primary-fixed': '#ffdbce',
                 'on-surface': '#201b15',
                 'inverse-on-surface': '#fbefe4',
+                partition: '#e8dccb',
+                elevation: '#fffcf7',
+            },
+            boxShadow: {
+                card: '0 1px 3px rgba(75,48,37,.04), 0 8px 24px -4px rgba(75,48,37,.07)',
+                hero: '0 12px 32px -6px rgba(75,48,37,.22)',
+                sheet: '0 -20px 40px -10px rgba(75,48,37,.18)',
             },
             borderRadius: {
                 DEFAULT: '0.25rem',
