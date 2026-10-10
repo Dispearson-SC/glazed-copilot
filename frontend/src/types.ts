@@ -335,6 +335,9 @@ export interface InventoryItem {
   forecast_outflow_units?: number | null;
   scheduled_in_units?: number | null;
   next_delivery_date?: string | null;
+  closing_reason?: "sold_out" | "discarded_perishable" | "in_stock" | "no_movement";
+  /** Backend sentence that explains the closing stock, e.g. "Agotado hoy (6.9 h sin stock) · llegan 40 mañana". */
+  display_status_es?: string;
 }
 
 export interface InventoryResponse {

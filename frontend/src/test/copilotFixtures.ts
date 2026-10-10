@@ -216,3 +216,12 @@ export const inventoryWithStatus: InventoryResponse = {
     { sku: "SKU-100014", product_name: "Bagel Twist", on_hand: 5, avg_daily_demand: 2, days_of_cover: 2.5, forecast_outflow_units: 6, scheduled_in_units: 12, next_delivery_date: "2026-07-22", status: "watch", status_reason: "Seguimiento: la cobertura supera la entrega por menos de 1 día." },
   ],
 };
+
+export const inventoryMany: InventoryResponse = {
+  as_of: "2026-07-19", outflow_days: 3,
+  items: Array.from({ length: 12 }, (_, i) => ({
+    sku: `SKU-${i}`, product_name: `Producto ${i + 1}`, on_hand: i === 0 ? 0 : 5, avg_daily_demand: 2, days_of_cover: i === 0 ? 0 : 2.5,
+    closing_reason: i === 0 ? ("sold_out" as const) : ("in_stock" as const),
+    display_status_es: i === 0 ? "Agotado hoy (6.9 h sin stock) · llegan 40 mañana" : `En stock: 5 unidades · cubre 2.5 días (${i})`,
+  })),
+};

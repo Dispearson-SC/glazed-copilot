@@ -383,12 +383,14 @@ export interface InventoryRow {
   statusLabel: string;
   /** Backend explanation of the status. */
   reason: string;
+  /** Backend closing sentence (display_status_es); empty when the inventory does not serve it. */
+  display: string;
 }
 
 const num = (n: number): string => String(Math.round(n * 100) / 100);
 const STATUS_LABELS = { critical: "Crítico", watch: "Seguimiento", ok: "En orden" } as const;
 
-export function buildInventoryRows(inv: InventoryResponse | null, plan: OrderPlan | null, limit = 6): InventoryRow[] {
+export function buildInventoryRows(inv: InventoryResponse | null, plan: OrderPlan | null, limit = Infinity): InventoryRow[] {
   return (inv?.items ?? []).slice(0, limit).map((it) => {
     const line = plan?.lines.find((l) => l.sku === it.sku);
     const denom = Math.max(it.avg_daily_demand, it.on_hand);
@@ -412,6 +414,7 @@ export function buildInventoryRows(inv: InventoryResponse | null, plan: OrderPla
       status: it.status ?? null,
       statusLabel: it.status ? STATUS_LABELS[it.status] : "",
       reason: it.status_reason ?? "",
+      display: it.display_status_es ?? "",
     };
   });
 }

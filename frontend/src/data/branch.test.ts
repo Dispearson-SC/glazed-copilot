@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, hoySummary, inventoryWithStatus, metricForecasts, orderPlanA, outlookA } from "../test/copilotFixtures";
+import { inventoryMany, ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, hoySummary, inventoryWithStatus, metricForecasts, orderPlanA, outlookA } from "../test/copilotFixtures";
 import { buildDayView, isPlaceholder, buildInventoryRows, buildScheduled } from "./copilot";
 
 const input = { asOf: "2026-07-19", forecast: branchForecast, ayer: ayerSummary, hoy: hoySummary, expiring: branchExpiring };
@@ -174,5 +174,14 @@ describe("buildDayView with the live Wave 15 shapes (case d17217ea4550, as_of 20
     expect(v).toMatchObject({ expected: "$2,910.95", range: "$2,622 – $3,347", traffic: { value: "2996" }, orders: { value: "355" }, ticket: { value: "$8.69" }, conversion: { value: "11.8%" } });
     expect(v.waste.value).toBe("$6.90");
     expect(v.lost.value).toBe("$0 – $198");
+  });
+});
+
+describe("buildInventoryRows closing status", () => {
+  it("carries the backend sentence and keeps every row (no cap)", () => {
+    const rows = buildInventoryRows(inventoryMany, null);
+    expect(rows).toHaveLength(12);
+    expect(rows[0].display).toBe("Agotado hoy (6.9 h sin stock) · llegan 40 mañana");
+    expect(rows[0].now).toBe("0");
   });
 });

@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
-  ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, branchKpis, hoySummary, inventoryWithStatus, metricForecasts, orderPlanA, outlookA, pendingA,
+  ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, branchKpis, hoySummary, inventoryMany, inventoryWithStatus, metricForecasts, orderPlanA, outlookA, pendingA,
 } from "../test/copilotFixtures";
 import { caseA, fakeApi, renderPage } from "../test/helpers";
 import CopilotPage from "./CopilotPage";
@@ -99,6 +99,17 @@ describe("Sucursal window", () => {
     expect(within(row).getByText("Crítico")).toHaveAttribute("title", expect.stringContaining("se agota antes de la próxima entrega"));
     expect(within(row).getByText("51.31 en 3 días")).toBeInTheDocument();
     expect(within(row).getByText("+40 · llega lun 20")).toBeInTheDocument();
+  });
+
+  it("shows the closing sentence next to the stock and expands from 10 to the full list", async () => {
+    await openSucursal(api({ getInventory: async () => inventoryMany }));
+    const first = (await screen.findByText("Producto 1")).closest("div[data-row]") as HTMLElement;
+    expect(within(first).getByText("Agotado hoy (6.9 h sin stock) · llegan 40 mañana")).toBeInTheDocument();
+    expect(document.querySelectorAll("div[data-row]")).toHaveLength(10);
+    await userEvent.click(screen.getByRole("button", { name: "Ver todo (12)" }));
+    expect(document.querySelectorAll("div[data-row]")).toHaveLength(12);
+    await userEvent.click(screen.getByRole("button", { name: "Ver menos" }));
+    expect(document.querySelectorAll("div[data-row]")).toHaveLength(10);
   });
 
   it("lists inventory with stock, daily outflow and the order-plan purchase", async () => {
