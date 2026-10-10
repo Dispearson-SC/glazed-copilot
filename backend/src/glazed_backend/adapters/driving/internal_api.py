@@ -143,11 +143,11 @@ def build_internal_router(c: Any) -> APIRouter:
         return uc_forecast.FlowForecast(c.metrics, c.flow_forecaster).execute(case, target_date)
 
     @r.get("/inventory")
-    def inventory(case: Ctx, sort: str | None = None, limit: int | None = None, store_id: str | None = None,
-                  as_of: date | None = None):
+    def inventory(case: Ctx, sort: str | None = None, limit: int | None = None, days: int | None = None,
+                  store_id: str | None = None, as_of: date | None = None):
         """Stock, cover, turnover and slow movers; the same use case as the public /cases/{id}/inventory."""
         own_case(case, store_id, as_of)
-        return uc_manager.InventoryView(c.metrics, names).execute(case, sort, limit)
+        return uc_manager.InventoryView(c.metrics, names, c.forecasters).execute(case, sort, limit, days)
 
     @r.get("/expiring")
     def expiring(case: Ctx, days: int | None = None, limit: int | None = None, store_id: str | None = None,

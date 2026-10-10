@@ -286,8 +286,8 @@ def build_public_router(c: Any) -> APIRouter:
         return uc_forecast.ForecastAccuracy(c.cases, c.metrics, c.forecasters).execute(case_id, by, date_from, date_to)
 
     @r.get("/cases/{case_id}/inventory")
-    def inventory(case_id: str, sort: str | None = None, limit: int | None = None):
-        return uc_manager.InventoryView(c.metrics, names).execute(case_of(case_id), sort, limit)
+    def inventory(case_id: str, sort: str | None = None, limit: int | None = None, days: int | None = None):
+        return uc_manager.InventoryView(c.metrics, names, c.forecasters).execute(case_of(case_id), sort, limit, days)
 
     @r.get("/cases/{case_id}/expiring")
     def expiring(case_id: str, days: int | None = None, limit: int | None = None):

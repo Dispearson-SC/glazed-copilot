@@ -12,10 +12,12 @@ from ..metrics.expiry import MAX_SHELF_LIFE_DAYS, expiring_items, summarize_expi
 from ..metrics.staffing import WINDOW_DAYS, productivity_p50, recommended_hours
 from ..metrics.promos_view import STATUSES, in_window, promo_status, sort_promos
 from ..metrics.inventory_view import SORTS, inventory_item, sort_items
+from ..metrics.stockflow import STATUS_RULE, arrivals_by_sku, next_delivery, project_lost_sales, stock_status
 
 DEFAULT_LIMIT, MAX_LIMIT = 50, 500
 PROJECTION_HORIZON = 14
 SELLING_DAYS = 28
+FALLBACK_OUTFLOW_DAYS = 3
 
 
 def clamp_limit(limit: int | None, default: int = DEFAULT_LIMIT) -> int:
@@ -34,12 +36,20 @@ class _View:
 
 
 class InventoryView(_View):
-    SOURCE = "inventory_daily+sales_daily+products"
+    SOURCE = "inventory_daily+sales_daily+products+purchase_orders+forecast"
+    MAX_DAYS = 14
 
-    def execute(self, case: Case, sort: str | None = None, limit: int | None = None) -> dict[str, Any]:
+    def __init__(self, metrics: Any, names: Any, forecasters: list | None = None) -> None:
+        super().__init__(metrics, names)
+        self.forecasters = forecasters or []
+
+    def execute(self, case: Case, sort: str | None = None, limit: int | None = None, days: int | None = None) -> dict[str, Any]:
         sort = sort or "days_of_cover"
         if sort not in SORTS:
             raise DomainError(f"sort must be one of {', '.join(SORTS)}")
+        days = FALLBACK_OUTFLOW_DAYS if days is None else days
+        if not 1 <= days <= self.MAX_DAYS:
+            raise DomainError(f"days must be between 1 and {self.MAX_DAYS}")
         as_of, store = case.sim_today, case.store_id
         profile, catalog = self.metrics.store_profile(store), self.metrics.product_catalog(store)
         history = self.metrics.demand_history(store, as_of, None, as_of - timedelta(days=56))
@@ -56,8 +66,39 @@ class InventoryView(_View):
             if it["days_of_cover"] is not None and it["days_of_cover"] <= PROJECTION_HORIZON:
                 stock = self.metrics.inventory_projection(store, as_of, it["sku"], PROJECTION_HORIZON).get("projected_stockout_date")
             it["projected_stockout_date"], it["projected"] = stock, stock is not None
+        self._flow(case, shown, days)
         return self.envelope(case, coverage={"skus_with_inventory": len(items), "skus_selling": len(selling)},
-                             sort=sort, projection_horizon_days=PROJECTION_HORIZON, items=shown)
+                             sort=sort, projection_horizon_days=PROJECTION_HORIZON, outflow_days=days,
+                             status_rule=STATUS_RULE, items=shown)
+
+    def _flow(self, case: Case, shown: list[dict[str, Any]], days: int) -> None:
+        """Forecast outflow, scheduled inbound, next delivery and the status of each shown SKU (all after as_of: projected)."""
+        as_of, store = case.sim_today, case.store_id
+        window = [as_of + timedelta(days=i) for i in range(1, days + 1)]
+        units: dict[str, float] = {}
+        if self.forecasters and shown:
+            from .forecast import ForecastLoader
+            try:
+                res = ForecastLoader(self.metrics, self.forecasters).load(store, as_of, None, window[0], window[-1]).result
+                for r in (r for r in res.rows if r.date in window):
+                    units[r.sku] = units.get(r.sku, 0.0) + r.forecast
+            except NotFound:
+                pass
+        got = self.metrics.delivery_inputs(store, as_of, as_of + timedelta(days=PROJECTION_HORIZON))
+        arrivals = arrivals_by_sku(got["pos"], as_of)
+        sup_days = {s["supplier_id"]: s["delivery_days"] for s in got["suppliers"]}
+        catalog = self.metrics.product_catalog(store)
+        for it in shown:
+            sku = it["sku"]
+            arr = arrivals.get(sku, {})
+            nxt, src = next_delivery(arr, sup_days.get((catalog.get(sku) or {}).get("supplier_id")), as_of)
+            basis = "forecast" if sku in units else "avg_daily_demand"
+            it["forecast_outflow_units"] = round(units[sku] if sku in units else (it["avg_daily_demand"] or 0.0) * days, 2)
+            it["outflow_basis"] = basis
+            it["scheduled_in_units"] = round(sum(q for d, q in arr.items() if d <= window[-1]), 2)
+            it["next_delivery_date"], it["next_delivery_source"] = (nxt.isoformat() if nxt else None), src
+            it["status"], it["status_reason"] = stock_status(it["days_of_cover"], nxt, as_of, days)
+            it["projected"] = bool(it.get("projected") or nxt)
 
 
 class ExpiringView(_View):
@@ -250,7 +291,6 @@ class OutlookView(_View):
         return self.envelope(case, days=out)
 
     def _lost_sales(self, case: Case, dates: list[date], loader: Any) -> list[dict[str, float]]:
-        from ..metrics.stockflow import arrivals_by_sku, project_lost_sales
         as_of, store = case.sim_today, case.store_id
         total = [dict(ZERO) for _ in dates]
         try:
