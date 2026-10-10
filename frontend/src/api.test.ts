@@ -56,6 +56,15 @@ describe("api client", () => {
     expect(init.headers).toMatchObject({ "Idempotency-Key": "k-1", "Content-Type": "application/json", Accept: "application/json" });
   });
 
+  it("sendMessage adds voice: true only when asked", async () => {
+    const api = createApi("", fetchFn as unknown as typeof fetch);
+    await api.sendMessage("c1", "hola");
+    await api.sendMessage("c1", "hola", undefined, { voice: true });
+    await api.sendMessage("c1", "hola", { issue_id: "i", mode: "dialogo" }, { voice: false });
+    const bodies = fetchFn.mock.calls.map((c) => JSON.parse(((c as unknown as [string, RequestInit])[1].body as string)));
+    expect(bodies).toEqual([{ text: "hola" }, { text: "hola", voice: true }, { text: "hola", context: { issue_id: "i", mode: "dialogo" } }]);
+  });
+
   it("creates, forks and messages cases", async () => {
     const api = createApi("", fetchFn as unknown as typeof fetch);
     await api.createCase({ store_id: "S030", sim_today: "2026-03-01", mode: "live" });

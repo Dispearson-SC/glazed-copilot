@@ -50,8 +50,19 @@ class FakeAudio {
   src = "";
   onended: (() => void) | null = null;
   onerror: (() => void) | null = null;
-  play = vi.fn(async () => {});
-  pause = vi.fn();
+  currentTime = 0;
+  duration = NaN;
+  paused = true;
+  playbackRate = 1;
+  defaultPlaybackRate = 1;
+  preservesPitch = false;
+  private listeners: Record<string, Array<() => void>> = {};
+  play = vi.fn(async () => { this.paused = false; this.emit("play"); });
+  pause = vi.fn(() => { this.paused = true; this.emit("pause"); });
+  addEventListener(ev: string, fn: () => void) { (this.listeners[ev] ??= []).push(fn); }
+  emit(ev: string) { this.listeners[ev]?.forEach((f) => f()); }
+  /** Simulates metadata arriving / playback advancing. */
+  set(over: { duration?: number; currentTime?: number }, ev = "timeupdate") { Object.assign(this, over); this.emit(ev); }
   constructor() { FakeAudio.instances.push(this); }
 }
 
@@ -135,7 +146,7 @@ describe("push-to-talk (backend STT)", () => {
     expect(FakeRecorder.instances[0].mimeType).toBe("audio/webm;codecs=opus");
     now += 2000;
     fireEvent.pointerUp(mic()!);
-    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("¿Qué pido hoy?", undefined));
+    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("¿Qué pido hoy?", { voice: true }));
     const [blob, name] = (api.transcribe as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(blob).toBeInstanceOf(Blob);
     expect(name).toBe("voice.webm");
@@ -214,7 +225,7 @@ describe("push-to-talk (backend STT)", () => {
     fireEvent.pointerDown(mic()!, { button: 0 });
     await waitFor(() => expect(FakeRecorder.instances).toHaveLength(1));
     now += 5000;
-    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("largo", undefined));
+    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("largo", { voice: true }));
   });
 
   it("shows a clear message when the microphone permission is denied", async () => {
@@ -246,7 +257,7 @@ describe("push-to-talk (backend STT)", () => {
     FakeRecognition.instances[0].say("hola");
     now += 1500;
     fireEvent.pointerUp(mic()!);
-    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("hola", undefined));
+    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("hola", { voice: true }));
     expect(FakeRecognition.instances[0].lang).toBe("es-MX");
   });
 
@@ -270,7 +281,7 @@ describe("Web Speech and availability", () => {
     FakeRecognition.instances[0].say("desde el navegador");
     now += 1500;
     fireEvent.pointerUp(mic()!);
-    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("desde el navegador", undefined));
+    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("desde el navegador", { voice: true }));
     expect(FakeRecorder.instances).toHaveLength(0);
   });
 
@@ -344,6 +355,14 @@ describe("spoken replies", () => {
     expect(api.speak).not.toHaveBeenCalled();
   });
 
+  it("typed messages send no voice flag", async () => {
+    const chat = chatOf();
+    await ready(fakeApi(), chat);
+    fireEvent.change(screen.getByLabelText("Mensaje para el copiloto"), { target: { value: "hola" } });
+    fireEvent.submit(screen.getByLabelText("Mensaje para el copiloto").closest("form")!);
+    expect(chat.send).toHaveBeenCalledWith("hola", undefined);
+  });
+
   it("the speaker button plays on demand and a second press stops", async () => {
     const api = fakeApi();
     await ready(api, chatOf({ messages: [user, reply] }));
@@ -387,6 +406,100 @@ describe("spoken replies", () => {
     await ready(api, chatOf({ messages: [user, reply] }));
     fireEvent.click(screen.getByRole("button", { name: "Escuchar respuesta" }));
     await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("player bar", () => {
+  const reply: ChatMessage = { id: "a1", role: "assistant", text: "**Pide** 40 donas", ts: "2026-07-19T14:05:09Z" };
+  const user: ChatMessage = { id: "u1", role: "user", text: "hola" };
+  const bar = () => screen.queryByRole("group", { name: "Reproductor de voz" });
+  async function play(api = fakeApi()) {
+    await ready(api, chatOf({ messages: [user, reply] }));
+    fireEvent.click(screen.getByRole("button", { name: "Escuchar respuesta" }));
+    await waitFor(() => expect(bar()).not.toBeNull());
+    const a = FakeAudio.instances[0];
+    await waitFor(() => expect(a.play).toHaveBeenCalled());
+    return a;
+  }
+
+  it("appears on play with slider, time and speed; hides on ended", async () => {
+    const a = await play();
+    expect(screen.getByLabelText("Posición del audio")).toBeInTheDocument();
+    expect(screen.getByLabelText("Velocidad de reproducción")).toHaveTextContent("1×");
+    expect(screen.getByLabelText("Tiempo")).toHaveTextContent("0:00 / --:--"); // duration unknown until metadata
+    act(() => a.set({ duration: 75, currentTime: 5 }, "loadedmetadata"));
+    expect(screen.getByLabelText("Tiempo")).toHaveTextContent("0:05 / 1:15");
+    act(() => a.onended?.());
+    expect(bar()).toBeNull();
+  });
+
+  it("copes with an Infinity duration", async () => {
+    const a = await play();
+    act(() => a.set({ duration: Infinity }, "durationchange"));
+    expect(screen.getByLabelText("Posición del audio")).toBeDisabled();
+    expect(screen.getByLabelText("Tiempo")).toHaveTextContent("0:00 / --:--");
+  });
+
+  it("seeking sets currentTime", async () => {
+    const a = await play();
+    act(() => a.set({ duration: 60 }, "loadedmetadata"));
+    fireEvent.change(screen.getByLabelText("Posición del audio"), { target: { value: "30" } });
+    expect(a.currentTime).toBe(30);
+  });
+
+  it("pause and resume toggle the audio", async () => {
+    const a = await play();
+    fireEvent.click(screen.getByRole("button", { name: "Pausar" }));
+    expect(a.pause).toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole("button", { name: "Reanudar" }));
+    expect(a.play).toHaveBeenCalledTimes(2);
+    expect(bar()).not.toBeNull();
+  });
+
+  it("speed cycles, sets playbackRate, persists and applies to later playbacks", async () => {
+    const a = await play();
+    const speed = screen.getByLabelText("Velocidad de reproducción");
+    const seen: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      fireEvent.click(speed);
+      seen.push(speed.textContent ?? "");
+    }
+    expect(seen).toEqual(["1.25×", "1.5×", "2×", "0.75×", "1×"]);
+    fireEvent.click(speed);
+    expect(a.playbackRate).toBe(1.25);
+    expect(a.preservesPitch).toBe(true);
+    expect(localStorage.getItem("glazed.voice.rate")).toBe("1.25");
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar reproductor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Escuchar respuesta" }));
+    await waitFor(() => expect(bar()).not.toBeNull());
+    expect(a.playbackRate).toBe(1.25);
+    expect(screen.getByLabelText("Velocidad de reproducción")).toHaveTextContent("1.25×");
+  });
+
+  it("close stops playback and hides the bar", async () => {
+    const a = await play();
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar reproductor" }));
+    expect(a.pause).toHaveBeenCalled();
+    expect(bar()).toBeNull();
+    expect(screen.queryByRole("button", { name: "Detener lectura" })).toBeNull();
+  });
+
+  it("speechSynthesis fallback has no slider but keeps speed and stop; speed restarts the utterance", async () => {
+    const speak = vi.fn();
+    const cancel = vi.fn();
+    vi.stubGlobal("SpeechSynthesisUtterance", class { lang = ""; rate = 1; voice: unknown = null; onend: (() => void) | null = null; onerror: (() => void) | null = null; constructor(public text: string) {} });
+    Object.defineProperty(window, "speechSynthesis", { configurable: true, value: { speak, cancel, getVoices: () => [] } });
+    const api = fakeApi({ getVoiceConfig: vi.fn(async () => cfg({ tts: false })) });
+    await ready(api, chatOf({ messages: [user, reply] }));
+    fireEvent.click(screen.getByRole("button", { name: "Escuchar respuesta" }));
+    await waitFor(() => expect(bar()).not.toBeNull());
+    expect(screen.queryByLabelText("Posición del audio")).toBeNull();
+    fireEvent.click(screen.getByLabelText("Velocidad de reproducción"));
+    expect(speak).toHaveBeenCalledTimes(2);
+    expect(speak.mock.calls[1][0].rate).toBe(1.25);
+    expect(bar()).not.toBeNull(); // the cancelled utterance must not stop the player
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar reproductor" }));
+    expect(bar()).toBeNull();
   });
 });
 

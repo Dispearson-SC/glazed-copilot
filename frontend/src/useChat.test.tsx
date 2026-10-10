@@ -363,6 +363,13 @@ describe("useChat message context", () => {
     expect(api.sendMessage).toHaveBeenCalledWith("c1", "hola");
   });
 
+  it("passes voice: true to the API for push-to-talk sends", async () => {
+    const api = fakeApi();
+    const { result } = setup(api);
+    await act(async () => { await result.current.send("hola", { voice: true }); });
+    expect(api.sendMessage).toHaveBeenCalledWith("c1", "hola", undefined, { voice: true });
+  });
+
   it("resends the same context when the user retries", async () => {
     const api = fakeApi({ getTurn: vi.fn(async () => ({ turn_id: "t1", status: "failed", error: "se cayó" })) });
     const { result } = setup(api);

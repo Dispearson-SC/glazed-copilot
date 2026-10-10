@@ -66,6 +66,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
   const seq = useRef(0);
   const lastText = useRef("");
   const lastContext = useRef<MessageContext | undefined>(undefined);
+  const lastVoice = useRef(false);
 
   const liveCase = useRef(caseId);
   liveCase.current = caseId;
@@ -218,18 +219,19 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
   );
 
   const submit = useCallback(
-    async (text: string, isRetry: boolean, display?: string, context?: MessageContext) => {
+    async (text: string, isRetry: boolean, display?: string, context?: MessageContext, voice = false) => {
       const clean = text.trim();
       if (!clean || !caseId) return;
       const token = ++run.current;
       lastText.current = clean;
       lastContext.current = context;
+      lastVoice.current = voice;
       setLocal((l) => l.filter((m) => m.role !== "error"));
       if (!isRetry) addLocal({ role: "user", text: display?.trim() || clean });
       setStatus("working");
       setStillRunning(false);
       try {
-        const { turn_id } = context ? await api.sendMessage(caseId, clean, context) : await api.sendMessage(caseId, clean);
+        const { turn_id } = voice ? await api.sendMessage(caseId, clean, context, { voice: true }) : context ? await api.sendMessage(caseId, clean, context) : await api.sendMessage(caseId, clean);
         await pollTurn(turn_id, clean, token);
       } catch (e) {
         if (run.current !== token) return;
@@ -241,9 +243,9 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
   );
 
   /** `display` is the short text shown in the user bubble; `context` pins the message to an issue (POST /messages `context`). */
-  const send = useCallback((text: string, opts?: { display?: string; context?: MessageContext }) => submit(text, false, opts?.display, opts?.context), [submit]);
+  const send = useCallback((text: string, opts?: { display?: string; context?: MessageContext; voice?: boolean }) => submit(text, false, opts?.display, opts?.context, opts?.voice), [submit]);
   /** Resends the last message, with the same context when the retried text is the last one sent. */
-  const retry = useCallback((text?: string) => submit(text ?? lastText.current, true, undefined, !text || text.trim() === lastText.current ? lastContext.current : undefined), [submit]);
+  const retry = useCallback((text?: string) => submit(text ?? lastText.current, true, undefined, !text || text.trim() === lastText.current ? lastContext.current : undefined, !text || text.trim() === lastText.current ? lastVoice.current : false), [submit]);
 
   const decide = useCallback(
     async (proposalId: string, approved: boolean, reason?: string) => {

@@ -9,6 +9,7 @@ import type { ChatMessage } from "../../chatHistory";
 import type { AgentsStatusResponse } from "../../types";
 import type { useChat } from "../../useChat";
 import MicButton, { formatClock } from "../../voice/MicButton";
+import PlayerBar from "../../voice/PlayerBar";
 import { useVoiceConfig } from "../../voice/useVoiceConfig";
 import { useVoiceInput } from "../../voice/useVoiceInput";
 import { useVoiceOutput } from "../../voice/useVoiceOutput";
@@ -157,7 +158,10 @@ export default function AgentWindow({
     }
     voiceTurn.current = voice ? { afterId: lastId } : null;
     const ctx = state.ctx;
-    void chat.send(clean, ctx?.issueId ? { context: { issue_id: ctx.issueId, ...(ctx.optionId ? { option_id: ctx.optionId } : {}), mode: "dialogo" } } : undefined);
+    const context = ctx?.issueId ? { issue_id: ctx.issueId, ...(ctx.optionId ? { option_id: ctx.optionId } : {}), mode: "dialogo" as const } : undefined;
+    // Only push-to-talk turns carry voice: true (typed and chip messages send no voice field).
+    const opts = context || voice ? { ...(context ? { context } : {}), ...(voice ? { voice: true } : {}) } : undefined;
+    void chat.send(clean, opts);
   };
   const input = useVoiceInput({ config: voiceCfg, onTranscript: (t) => send(t, true), onNotice: showToast, onPress: out.unlock });
   const submit = (e: FormEvent) => {
@@ -177,7 +181,7 @@ export default function AgentWindow({
 
   return (
     <>
-      <div ref={scroller} className="fixed inset-x-0 bottom-[204px] top-[calc(var(--copilot-header-h,104px)_+_12px)] overflow-y-auto">
+      <div ref={scroller} className={`fixed inset-x-0 ${out.player ? "bottom-[260px]" : "bottom-[204px]"} top-[calc(var(--copilot-header-h,104px)_+_12px)] overflow-y-auto`}>
         <div className="mx-auto max-w-[640px] px-4 pb-4">
           <section className="flex flex-col items-center px-2 pb-4 pt-5 text-center">
             {out.speaking ? (
@@ -231,6 +235,7 @@ export default function AgentWindow({
       </div>
 
       <div className="fixed inset-x-4 bottom-[92px] z-30 mx-auto flex max-w-[608px] flex-col gap-2">
+        {out.player && <PlayerBar player={out.player} onToggle={out.togglePause} onSeek={out.seek} onRate={out.cycleRate} onClose={out.stop} />}
         {input.state !== "idle" ? (
           <div role="status" className="flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-surface-container px-3.5 py-2 text-[13px] leading-[18px] text-secondary">
             <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-secondary motion-safe:animate-pulse" />
