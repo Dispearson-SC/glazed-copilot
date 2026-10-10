@@ -65,7 +65,7 @@ def test_ask_creates_conversation_once_and_reuses(w):
     assert w.cases.get(c.case_id).core_conversation_id == f"conv-{c.case_id}"
     assert [s[0] for s in w.core.sent] == [f"conv-{c.case_id}"] * 2 and t1 != t2
     assert w.core.sent[0][1] == "S030"
-    assert GetTurn(w.cases, w.core).execute(c.case_id, t1)["text"] == "echo: hello"
+    assert GetTurn(w.cases, w.core).execute(c.case_id, t1)["reply"] == "echo: hello"
 
 
 def test_ask_rejects_blank_text(w):
@@ -277,3 +277,67 @@ def test_explain_metric_rejects_unknown_metric_listing_the_known_ones(w):
     c = start(w)
     with pytest.raises(DomainError, match="net_sales"):
         ExplainMetric(w.cases, _KpiStub()).execute(c.case_id, "vibes")
+
+
+# --- turn polling against the real Core quirks -------------------------------------------------
+from datetime import timedelta  # noqa: E402
+
+from glazed_backend.application import GetTurn, TurnTracker  # noqa: E402
+from glazed_backend.domain import NotFound  # noqa: E402
+
+
+def _turns(w, **kw):
+    tracker = TurnTracker()
+    ask = AskAgent(w.cases, w.core, tracker, w.clock)
+    get = GetTurn(w.cases, w.core, tracker, w.clock, **kw)
+    return ask, get
+
+
+def _sent_turn(w, ask, raw):
+    c = start(w)
+    tid = ask.execute(c.case_id, "hi")
+    w.core.turns[tid] = raw
+    return c, tid
+
+
+def test_turn_404_right_after_the_202_is_pending_then_an_error(w):
+    ask, get = _turns(w)
+    c = start(w)
+    tid = ask.execute(c.case_id, "hi")
+    del w.core.turns[tid]  # fake core raises KeyError today; make it a 404 like the real one
+    w.core.get_turn = lambda turn_id, store_id: (_ for _ in ()).throw(NotFound("no turn"))
+    assert get.execute(c.case_id, tid) == {"turn_id": tid, "status": "pending"}
+    w.clock._now += timedelta(seconds=30)
+    with pytest.raises(NotFound):
+        get.execute(c.case_id, tid)
+
+
+def test_turn_statuses_map_to_the_public_contract(w):
+    ask, get = _turns(w)
+    c, tid = _sent_turn(w, ask, {"turn_id": "x", "status": "running", "text": None})
+    assert get.execute(c.case_id, tid) == {"turn_id": tid, "status": "pending"}
+    w.core.turns[tid] = {"turn_id": tid, "status": "finished", "text": "all good"}
+    assert get.execute(c.case_id, tid) == {"turn_id": tid, "status": "done", "reply": "all good"}
+
+
+def test_waiting_is_pending_unless_an_approval_is_open(w):
+    ask, get = _turns(w)
+    c, tid = _sent_turn(w, ask, {"turn_id": "x", "status": "waiting", "text": None})
+    assert get.execute(c.case_id, tid)["status"] == "pending"  # suspended on a peer, not on the manager
+    w.core.transcript = [{"entry_id": "p1", "turn_id": tid, "kind": "pending_request", "at": "2026-03-10T10:00:00+00:00",
+                          "payload": {"kind": "approval", "answered_at": None}}]
+    assert get.execute(c.case_id, tid)["status"] == "waiting_approval"
+    w.core.transcript[0]["payload"]["answered_at"] = "2026-03-10T10:01:00+00:00"
+    assert get.execute(c.case_id, tid)["status"] == "pending"
+
+
+def test_stuck_turn_fails_after_the_overall_timeout(w):
+    ask, get = _turns(w, timeout_s=120)
+    c, tid = _sent_turn(w, ask, {"turn_id": "x", "status": "running", "text": None})
+    w.clock._now += timedelta(seconds=119)
+    assert get.execute(c.case_id, tid)["status"] == "pending"
+    w.clock._now += timedelta(seconds=2)
+    out = get.execute(c.case_id, tid)
+    assert out["status"] == "failed" and "120" in out["error"] and "timed out" in out["error"]
+    w.core.turns[tid] = {"turn_id": tid, "status": "finished", "text": "late"}
+    assert get.execute(c.case_id, tid)["status"] == "done"  # a real answer always wins over the timeout

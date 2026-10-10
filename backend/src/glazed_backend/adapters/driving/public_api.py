@@ -50,9 +50,6 @@ class TransitionBody(BaseModel):
     state: str
 
 
-_TURN_STATUS = {"running": "pending", "finished": "done", "waiting": "waiting_approval"}
-
-
 def build_public_router(c: Any) -> APIRouter:
     r = APIRouter(prefix="/api/v1")
 
@@ -82,18 +79,11 @@ def build_public_router(c: Any) -> APIRouter:
 
     @r.post("/cases/{case_id}/messages", status_code=202)
     def ask(case_id: str, b: AskBody):
-        return {"turn_id": uc.AskAgent(c.cases, c.core).execute(case_id, b.text)}
+        return {"turn_id": uc.AskAgent(c.cases, c.core, c.turn_tracker, c.clock).execute(case_id, b.text)}
 
     @r.get("/cases/{case_id}/turns/{turn_id}")
     def turn(case_id: str, turn_id: str):
-        raw = uc.GetTurn(c.cases, c.core).execute(case_id, turn_id)
-        status = _TURN_STATUS.get(raw.get("status", ""), raw.get("status", "pending"))
-        out: dict[str, Any] = {"turn_id": raw.get("turn_id", turn_id), "status": status}
-        if raw.get("text") is not None or raw.get("reply") is not None:
-            out["reply"] = raw.get("reply", raw.get("text"))
-        if raw.get("error"):
-            out["error"] = raw["error"]
-        return out
+        return uc.GetTurn(c.cases, c.core, c.turn_tracker, c.clock, c.turn_timeout_s).execute(case_id, turn_id)
 
     @r.get("/cases/{case_id}/day-summary")
     def day_summary(case_id: str, date: date | None = None):

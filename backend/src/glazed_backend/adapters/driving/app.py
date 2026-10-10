@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from ...application import TurnTracker
 from ...domain import DomainError, FutureDate, InvalidTransition, NotFound
 from ...domain.models import CoreError
 from .internal_api import build_internal_router
@@ -30,6 +31,8 @@ class Container:
     storage: str = "memory"
     core_status: str = "configured"
     cors_origins: list[str] | None = None  # None -> DEFAULT_CORS_ORIGINS
+    turn_timeout_s: float = 120.0  # a Core turn with no answer after this long is reported as failed
+    turn_tracker: Any = field(default_factory=TurnTracker)
 
 
 DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -93,11 +96,13 @@ def build_container(env: dict[str, str] | None = None) -> Container:
         return Container(metrics, core, store.cases, store.alerts, store.proposals, store.executions,
                          store.backtests, store.trace, SystemClock(),
                          BackboardMemory(key, store.assistants), "postgres",
-                         "configured" if core_url else "missing", cors)
+                         "configured" if core_url else "missing", cors,
+                         float(env.get("GLAZED_TURN_TIMEOUT_S", "120")))
     return Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
                      InMemoryBacktests(), InMemoryTrace(), SystemClock(),
                      BackboardMemory(key, InMemoryAssistants()), "memory",
-                     "configured" if core_url else "missing", cors)
+                     "configured" if core_url else "missing", cors,
+                         float(env.get("GLAZED_TURN_TIMEOUT_S", "120")))
 
 
 def create_app_from_env() -> FastAPI:

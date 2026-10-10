@@ -69,11 +69,25 @@ class ForkCase:
         return child
 
 
+class TurnTracker:
+    """When each Core turn was started (in-process): drives the 404 grace and the overall timeout."""
+
+    def __init__(self) -> None:
+        self._started: dict[str, datetime] = {}
+
+    def started(self, turn_id: str, at: datetime) -> None:
+        self._started[turn_id] = at
+
+    def started_at(self, turn_id: str) -> datetime | None:
+        return self._started.get(turn_id)
+
+
 class AskAgent:
     """Send a manager message to the orchestrator through the case's Core conversation."""
 
-    def __init__(self, cases: CaseRepository, core: CorePort) -> None:
-        self.cases, self.core = cases, core
+    def __init__(self, cases: CaseRepository, core: CorePort, tracker: TurnTracker | None = None,
+                 clock: Clock | None = None) -> None:
+        self.cases, self.core, self.tracker, self.clock = cases, core, tracker, clock
 
     def execute(self, case_id: str, text: str) -> str:
         if not text.strip():
@@ -82,16 +96,60 @@ class AskAgent:
         if case.core_conversation_id is None:
             case.core_conversation_id = self.core.create_conversation(case.case_id, case.store_id)
             self.cases.update(case)
-        return self.core.send_turn(case.core_conversation_id, case.store_id, text)
+        turn_id = self.core.send_turn(case.core_conversation_id, case.store_id, text)
+        if self.tracker and self.clock:
+            self.tracker.started(turn_id, self.clock.now())
+        return turn_id
 
 
 class GetTurn:
-    def __init__(self, cases: CaseRepository, core: CorePort) -> None:
-        self.cases, self.core = cases, core
+    """Poll a turn and normalize Core's quirks into the public contract
+    `{turn_id, status: pending|done|failed|waiting_approval, reply?, error?}`:
+    - Core answers 404 for about a second after the 202 -> pending during a short grace period.
+    - Core `waiting` means suspended on a peer OR on an approval -> waiting_approval only if an approval is open.
+    - A turn stuck in `running` (tool exception, model 400) never ends in Core -> failed after `timeout_s`."""
+
+    def __init__(self, cases: CaseRepository, core: CorePort, tracker: TurnTracker | None = None,
+                 clock: Clock | None = None, timeout_s: float = 120.0, grace_s: float = 10.0) -> None:
+        self.cases, self.core, self.tracker, self.clock = cases, core, tracker, clock
+        self.timeout_s, self.grace_s = timeout_s, grace_s
+
+    def _age(self, turn_id: str) -> float | None:
+        started = self.tracker.started_at(turn_id) if self.tracker and self.clock else None
+        return (self.clock.now() - started).total_seconds() if started else None
 
     def execute(self, case_id: str, turn_id: str) -> dict[str, Any]:
         case = _case(self.cases, case_id)
-        return self.core.get_turn(turn_id, case.store_id)
+        age = self._age(turn_id)
+        try:
+            raw = self.core.get_turn(turn_id, case.store_id)
+        except NotFound:
+            if age is not None and age < self.grace_s:
+                return {"turn_id": turn_id, "status": "pending"}
+            raise
+        out: dict[str, Any] = {"turn_id": turn_id}
+        core_status = str(raw.get("status", "")).lower()
+        text = raw.get("reply", raw.get("text"))
+        if core_status == "finished":
+            out["status"] = "done"
+            if text is not None:
+                out["reply"] = text
+            return out
+        if core_status in ("failed", "error"):
+            return {**out, "status": "failed", "error": raw.get("error") or text or "Agent-Core reported a failed turn"}
+        if age is not None and age > self.timeout_s:
+            return {**out, "status": "failed",
+                    "error": f"turn timed out after {self.timeout_s:g}s without an answer from Agent-Core"}
+        out["status"] = "waiting_approval" if core_status == "waiting" and self._approval_open(case, turn_id) else "pending"
+        return out
+
+    def _approval_open(self, case: Case, turn_id: str) -> bool:
+        try:
+            entries = self.core.list_transcript(case.core_conversation_id or case.case_id, case.store_id)
+        except Exception:  # noqa: BLE001 - cannot tell: keep polling
+            return False
+        return any(e.get("kind") == "pending_request" and str(e.get("turn_id")) == turn_id
+                   and not (e.get("payload") or {}).get("answered_at") for e in entries)
 
 
 class GetDaySummary:
