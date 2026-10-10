@@ -135,10 +135,20 @@ def test_history(m):
     assert h["weeks"] and max(w["week_start"] for w in h["weeks"]) <= "2026-03-10"
 
 
-def test_backtest_day_returns_both_arms(m):
+def test_backtest_day_returns_both_arms_with_the_new_policy(m):
     r = m.backtest_day(S, date(2026, 3, 2), "simple_v0")
-    assert set(r) >= {"current", "policy"} and r["policy"]["waste_usd"] <= r["current"]["waste_usd"]
-    assert r["policy"]["lost_sales_usd"] <= r["current"]["lost_sales_usd"]
+    assert set(r) >= {"current", "policy"} and r["method"] == "glazed_metrics_v1" and r["outcome_date"] == "2026-03-03"
+    for arm in ("current", "policy"):
+        assert r[arm]["waste_usd"] >= 0 and r[arm]["lost_sales_usd"] >= 0
+
+
+def test_backtest_week_policy_beats_current_practice_net(m):
+    cur = pol = 0.0
+    for k in range(1, 8):
+        r = m.backtest_day(S, date(2026, 3, k), "simple_v0")
+        cur += r["current"]["waste_usd"] + r["current"]["lost_sales_usd"]
+        pol += r["policy"]["waste_usd"] + r["policy"]["lost_sales_usd"]
+    assert pol < cur
 
 
 def test_stores_listing(m):

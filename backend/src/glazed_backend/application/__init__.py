@@ -362,7 +362,7 @@ class RunBacktest:
             daily.append({"date": day.isoformat(), **res})
             day, days = day + timedelta(days=1), days + 1
         results: dict[str, Any] = {"label": "backtest", "days": days, "daily": daily,
-                                   "note": "Estimates from a simple projection, not a guarantee."}
+                                   "note": "Backtest of the per-SKU service-level reorder policy, decided with data up to the supplier lead time before each day and scored on that day. Estimates, not a guarantee: supply is assumed to hit the target exactly (no case rounding, no minimum order value)."}
         for k, (cur, pol) in totals.items():
             results[k] = {"current": round(cur, 2), "policy": round(pol, 2), "delta": round(pol - cur, 2)}
         cur_net = sum(v[0] for v in totals.values())

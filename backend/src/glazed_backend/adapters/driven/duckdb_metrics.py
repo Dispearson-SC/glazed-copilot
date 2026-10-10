@@ -14,6 +14,7 @@ from typing import Any
 import duckdb
 
 from ...domain import FutureDate, NotFound
+from ...metrics.backtest import backtest_sku
 from ...metrics.issues import detect_issues
 from ...metrics.replay import calibrate
 from ...metrics.losses import lost_sales_window
@@ -361,29 +362,23 @@ class DuckDBMetrics:
 
     # -- Backtest ----------------------------------------------------------------
     def backtest_day(self, store_id: str, day: date, policy: str) -> dict[str, Any]:
-        """Decide with data <= day; measure on day+1. simple_v0 counterfactual: receive ceil(p74 demand)."""
+        """Score the reorder policy on day+1 (the only place that reads data after the decision day).
+
+        Each SKU's decision uses only data up to (day+1 - supplier lead time): an order that lands on day+1 had to be
+        placed that many days earlier. Supply = service-level quantile of that day's demand (see metrics.backtest)."""
         d1 = day + timedelta(days=1)
-        samples = self._same_weekday_dates(d1)
-        oh = self._q("SELECT coalesce(typical_open_hours, 12) FROM stores WHERE store_id=?", [store_id])
-        open_h = float(oh[0][0]) if oh and oh[0][0] else 12.0
-        rows = self._rows(
-            "SELECT i.received_qty, i.expired_qty, i.stockout_hours, p.unit_cost, p.list_price_base price,"
-            " (SELECT quantile_cont(h.units_sold, 0.74) FROM inventory_daily h WHERE h.store_id=i.store_id AND h.sku=i.sku"
-            "   AND list_contains(?, h.date)) tgt"
-            " FROM inventory_daily i JOIN products p USING (sku) WHERE i.store_id=? AND i.date=?", [samples, store_id, d1])
+        snap = self._snapshot(store_id, d1)
         cw = pw = cl = pl = 0.0
-        for r in rows:
-            target = math.ceil(r["tgt"] or 0)
-            cost, price = r["unit_cost"] or 0, r["price"] or 0
-            expired, rec = r["expired_qty"] or 0, r["received_qty"] or 0
-            w_cur = expired * cost
-            excess = max(0, rec - target)
-            w_pol = max(0, expired - excess) * cost
-            lost_units = (r["tgt"] or 0) * min(r["stockout_hours"] or 0, open_h) / open_h
-            l_cur = lost_units * price
-            recovered = min(lost_units, max(0, target - rec))
-            l_pol = (lost_units - recovered) * price
-            cw, pw, cl, pl = cw + w_cur, pw + w_pol, cl + l_cur, pl + l_pol
-        return {"date": day.isoformat(), "outcome_date": d1.isoformat(), "method": METHOD,
+        for sku, prod in snap.products.items():
+            outcome = next((r for r in reversed(snap.rows.get(sku, [])) if r.date == d1), None)
+            if outcome is None:
+                continue
+            lead = max(1, round(snap.profile(prod.supplier_id, day).lead_mean))
+            t_dec = min(day, d1 - timedelta(days=lead))
+            hist = [r for r in snap.rows[sku] if t_dec - timedelta(days=self.config.history_days) < r.date <= t_dec]
+            out = backtest_sku(hist, outcome, prod, snap.store.open_hours, self.config)
+            cw, cl = cw + out["current"]["waste_usd"], cl + out["current"]["lost_sales_usd"]
+            pw, pl = pw + out["policy"]["waste_usd"], pl + out["policy"]["lost_sales_usd"]
+        return {"date": day.isoformat(), "outcome_date": d1.isoformat(), "method": METRICS_METHOD,
                 "current": {"waste_usd": round(cw, 2), "lost_sales_usd": round(cl, 2)},
                 "policy": {"waste_usd": round(pw, 2), "lost_sales_usd": round(pl, 2)}}
