@@ -6,7 +6,7 @@ The store and the as-of date are never parameters: they come from the case named
 from datetime import date, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
@@ -37,15 +37,27 @@ class EventBody(BaseModel):
 
 
 def build_internal_router(c: Any) -> APIRouter:
+    def trace_read(case: Case, request: Request, agent: str | None) -> None:
+        """A data read by a named agent shows up in the trace as agent -> backend tool_call."""
+        if not agent or request.method != "GET":
+            return
+        tool = request.url.path.removeprefix("/internal/v1/").strip("/") or "root"
+        query = request.url.query
+        uc.RecordEvent(c.cases, c.trace, c.clock).execute(
+            case.case_id, agent, "backend", "tool_call",
+            {"tool": tool, "text": f"{tool}?{query}" if query else tool})
+
     r = APIRouter(prefix="/internal/v1")
 
-    def case_ctx(x_glazed_case: Annotated[str | None, Header()] = None) -> Case:
+    def case_ctx(request: Request, x_glazed_case: Annotated[str | None, Header()] = None,
+                 x_glazed_agent: Annotated[str | None, Header()] = None) -> Case:
         if not x_glazed_case:
             raise DomainError("X-Glazed-Case header is required")
         key = case_id_from_session(x_glazed_case)  # peer~<case>~<uuid> -> <case>
         case = c.cases.get(key) or c.cases.get_by_conversation(key)
         if case is None:
             raise DomainError(f"X-Glazed-Case {x_glazed_case!r} does not match any case")
+        trace_read(case, request, x_glazed_agent)
         return case
 
     Ctx = Annotated[Case, Depends(case_ctx)]

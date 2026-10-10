@@ -201,7 +201,8 @@ def test_internal_api_resolves_peer_session_ids_to_the_parent_case(env):
     ev = client.post("/internal/v1/events", headers=h, json={"from_agent": "glazed_supply", "to_agent": "orchestrator"})
     assert ev.status_code == 201 and ev.json()["case_id"] == c["case_id"]
     trace = client.get("/api/v1/trace", params={"case_id": c["case_id"]}).json()
-    assert [(e["from_agent"], e["case_id"]) for e in trace] == [("supply", c["case_id"])]
+    assert [(e["from_agent"], e["kind"], e["case_id"]) for e in trace] == [
+        ("supply", "tool_call", c["case_id"]), ("supply", "message", c["case_id"])]
     bad = client.get("/internal/v1/history", headers={"X-Glazed-Case": "peer~nope~u"})
     assert bad.status_code == 400
 
@@ -244,3 +245,19 @@ def test_internal_metrics_explain(env):
     assert ok.status_code == 200 and ok.json()["value"] == 1000.0 and ok.json()["formula"]
     bad = client.get("/internal/v1/metrics/explain", headers=h, params={"metric": "nope"})
     assert bad.status_code == 400 and "net_sales" in bad.json()["detail"]
+
+
+def test_internal_data_reads_are_traced_as_agent_tool_calls(env):
+    client, _ = env
+    case = mkcase(client)
+    h = {"X-Glazed-Case": case["case_id"], "X-Glazed-Agent": "glazed_supply"}
+    assert client.get("/internal/v1/order-plan", headers=h).status_code == 200
+    events = client.get("/api/v1/trace", params={"case_id": case["case_id"]}).json()
+    assert len(events) == 1
+    e = events[0]
+    assert (e["from_agent"], e["to_agent"], e["kind"]) == ("supply", "backend", "tool_call")
+    assert e["payload"]["tool"] == "order-plan"
+    assert "order-plan" in e["payload"]["text"]
+    # no agent header (e.g. a script) -> nothing recorded
+    client.get("/internal/v1/order-plan", headers={"X-Glazed-Case": case["case_id"]})
+    assert len(client.get("/api/v1/trace", params={"case_id": case["case_id"]}).json()) == 1
