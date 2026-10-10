@@ -2,6 +2,10 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
+import { ApiProvider } from "../../ApiContext";
+import { SessionProvider } from "../../SessionContext";
+import { CopilotProvider } from "../../state/copilotStore";
+import { fakeApi } from "../../test/helpers";
 import AgentOrb from "./AgentOrb";
 import CapsuleNav from "./CapsuleNav";
 import CopilotTopBar from "./CopilotTopBar";
@@ -45,7 +49,15 @@ describe("CapsuleNav", () => {
 describe("CopilotTopBar", () => {
   it("shows the brand, the store code and an accessible settings button", async () => {
     const onSettings = vi.fn();
-    render(<MemoryRouter><CopilotTopBar storeCode="S030" onSettings={onSettings} /></MemoryRouter>);
+    render(
+      <ApiProvider api={fakeApi()}>
+        <SessionProvider>
+          <CopilotProvider>
+            <MemoryRouter><CopilotTopBar storeCode="S030" onSettings={onSettings} /></MemoryRouter>
+          </CopilotProvider>
+        </SessionProvider>
+      </ApiProvider>,
+    );
     const bar = screen.getByRole("banner");
     expect(within(bar).getByText("Glazed Co.")).toBeInTheDocument();
     expect(within(bar).getByText(/Copiloto · Sucursal S030/)).toBeInTheDocument();
@@ -53,6 +65,25 @@ describe("CopilotTopBar", () => {
     expect(btn.className).toMatch(/w-11/);
     await userEvent.click(btn);
     expect(onSettings).toHaveBeenCalled();
+  });
+
+  it("keeps the new-conversation and earlier-conversations buttons on both sides of the day switcher", async () => {
+    render(
+      <ApiProvider api={fakeApi()}>
+        <SessionProvider>
+          <CopilotProvider>
+            <MemoryRouter><CopilotTopBar storeCode="S030" onSettings={() => {}} /></MemoryRouter>
+          </CopilotProvider>
+        </SessionProvider>
+      </ApiProvider>,
+    );
+    const bar = screen.getByRole("banner");
+    const left = await within(bar).findByRole("button", { name: "Nueva conversación" });
+    const right = within(bar).getByRole("button", { name: "Conversaciones anteriores" });
+    const day = within(bar).getByRole("group", { name: "Cambiar día" });
+    expect(left.className).toMatch(/w-11/);
+    expect(left.compareDocumentPosition(day) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(day.compareDocumentPosition(right) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 

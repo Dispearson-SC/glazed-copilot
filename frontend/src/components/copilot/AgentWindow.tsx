@@ -11,7 +11,6 @@ import AgentOrb from "./AgentOrb";
 import AnalysisCard from "./AnalysisCard";
 import { ChatSkeleton } from "./Skeleton";
 import TransferOptions from "./TransferOptions";
-import ConversationBar from "./ConversationBar";
 
 type Chat = ReturnType<typeof useChat>;
 
@@ -149,8 +148,6 @@ export default function AgentWindow({
             <h1 className="m-0 mt-2 font-headline-lg text-headline-lg tracking-tight text-primary">¿Qué decidimos hoy?</h1>
             <p className="m-0 mt-1 font-body-md text-body-md text-on-surface-variant">{pendingLine}</p>
           </section>
-
-          <ConversationBar storeId={storeId} simToday={simToday} caseId={caseId} />
 
           {state.ctx && (
             <div className="mb-3 flex items-center gap-2 rounded-full bg-surface-container-high py-2 pl-3.5 pr-2 text-primary">

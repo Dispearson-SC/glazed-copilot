@@ -1,4 +1,5 @@
 import DaySwitcher from "../DaySwitcher";
+import ConversationBar from "./ConversationBar";
 import StoreSwitcher from "../StoreSwitcher";
 
 /** Fixed 64px top bar: logo, brand, store code and the settings button. */
@@ -27,7 +28,9 @@ export default function CopilotTopBar({ storeCode, onSettings }: { storeCode: st
           <span aria-hidden="true" className="material-symbols-outlined text-[22px]">tune</span>
         </button>
       </div>
-      <DaySwitcher storeId={storeCode} className="pb-1" />
+      <ConversationBar storeId={storeCode} className="pb-1">
+        <DaySwitcher storeId={storeCode} />
+      </ConversationBar>
     </header>
   );
 }
