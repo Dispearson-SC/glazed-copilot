@@ -9,13 +9,16 @@ export const MIN_RECORDING_MS = 500;
 const DEFAULT_MAX_SECONDS = 60;
 /** How far outside the button the pointer may drift before the recording is cancelled. */
 const SLIDE_MARGIN_PX = 12;
+/** Max wait for recognition.onend after stop(). */
+const STOP_GUARD_MS = 4000;
 
 export const MSG_PERMISSION = "Permite el micrófono para hablar con el copiloto";
 export const MSG_HINT = "Mantén presionado el micrófono para hablar";
 const MSG_NO_MIC = "No se encontró un micrófono";
-const MSG_NO_SPEECH = "No te escuché; intenta de nuevo";
+const MSG_NO_SPEECH = "No te escuché, intenta de nuevo";
 const MSG_BAD_AUDIO = "No se pudo procesar el audio; intenta de nuevo con un mensaje más corto";
-const MSG_FALLBACK = "No se pudo transcribir con el servidor; mantén presionado para usar el dictado del navegador";
+const MSG_SPEECH_FAILED = "El dictado del navegador falló; mantén presionado de nuevo para intentarlo";
+const MSG_SPEECH_DOWN = "El dictado del navegador no está disponible; intenta de nuevo";
 
 /** Minimal Web Speech typings (not part of lib.dom). */
 interface SpeechRecognitionLike {
@@ -53,11 +56,13 @@ interface Opts {
   onPress?: () => void;
 }
 
-/** Hold-to-talk. Backend STT (MediaRecorder + POST /voice/transcribe) with the Web Speech API as fallback. */
+/** Hold-to-talk. Web Speech API first; backend STT (MediaRecorder + POST /voice/transcribe) as fallback. */
 export function useVoiceInput({ config: cfg, onTranscript, onNotice, onPress }: Opts) {
   const api = useApi();
   const [state, setStateRaw] = useState<VoiceInputState>("idle");
   const [seconds, setSeconds] = useState(0);
+  /** Live interim+final text of the current Web Speech hold. */
+  const [preview, setPreview] = useState("");
   const stateRef = useRef<VoiceInputState>("idle");
   const r = useRef({
     token: 0,
@@ -67,7 +72,9 @@ export function useVoiceInput({ config: cfg, onTranscript, onNotice, onPress }: 
     recognition: null as SpeechRecognitionLike | null,
     tick: 0 as unknown as ReturnType<typeof setInterval>,
     limit: 0 as unknown as ReturnType<typeof setTimeout>,
-    backendFailed: false,
+    speechFailed: false,
+    speechStop: null as (() => void) | null,
+    stopGuard: 0 as unknown as ReturnType<typeof setTimeout>,
   });
   const cb = useRef({ onTranscript, onNotice, onPress });
   cb.current = { onTranscript, onNotice, onPress };
@@ -80,6 +87,7 @@ export function useVoiceInput({ config: cfg, onTranscript, onNotice, onPress }: 
   const maxSeconds = cfg.config?.max_seconds || DEFAULT_MAX_SECONDS;
   // While the config loads the backend is assumed; once settled only an enabled stt counts.
   const backendOk = canRecord() && (cfg.loaded ? Boolean(cfg.config?.enabled && cfg.config.stt) : true);
+  // Web Speech is primary and works even when the backend stt is off.
   const speechOk = speechCtor() !== null;
   const available = backendOk || speechOk;
   const maxRef = useRef(maxSeconds);
@@ -90,6 +98,8 @@ export function useVoiceInput({ config: cfg, onTranscript, onNotice, onPress }: 
     const s = r.current;
     clearInterval(s.tick);
     clearTimeout(s.limit);
+    clearTimeout(s.stopGuard);
+    s.speechStop = null;
     if (s.recorder) {
       s.recorder.ondataavailable = null;
       s.recorder.onstop = null;
@@ -117,6 +127,7 @@ export function useVoiceInput({ config: cfg, onTranscript, onNotice, onPress }: 
     r.current.token++;
     release();
     setSeconds(0);
+    setPreview("");
     setState("idle");
   }, [release]);
 
@@ -170,46 +181,75 @@ export function useVoiceInput({ config: cfg, onTranscript, onNotice, onPress }: 
   };
   const chunks = useRef<Blob[]>([]);
 
+  /** Web Speech (primary). Runs synchronously inside the pointerdown gesture: no await before start(). */
   const startSpeech = (token: number) => {
     const Ctor = speechCtor();
     const s = r.current;
     if (!Ctor) return cancel();
+    const join = (...parts: string[]) => parts.join(" ").replace(/\s+/g, " ").trim();
+    let acc = ""; // text of recognition sessions Chrome ended on its own while the button was held
     let finals = "";
     let interim = "";
-    let errored = false;
+    let settled = false;
+    const live = () => s.token === token && s.recognition !== null;
+    const finalize = () => {
+      if (settled || s.token !== token) return;
+      settled = true;
+      const text = join(acc, finals) || join(acc, interim);
+      release();
+      setSeconds(0);
+      setPreview("");
+      setState("idle");
+      deliver(text);
+    };
+    const fail = (message: string) => {
+      if (s.token !== token) return;
+      settled = true;
+      cancel();
+      cb.current.onNotice(message);
+    };
     try {
       const rec = new Ctor();
       rec.lang = "es-MX";
       rec.continuous = true;
       rec.interimResults = true;
       rec.onresult = (e) => {
-        finals = "";
-        interim = "";
-        for (let i = 0; i < e.results.length; i++) {
-          const res = e.results[i];
-          if (res.isFinal) finals += res[0].transcript;
-          else interim += res[0].transcript;
-        }
+        if (!live()) return;
+        const fin: string[] = [];
+        const int: string[] = [];
+        for (let i = 0; i < e.results.length; i++) (e.results[i].isFinal ? fin : int).push(e.results[i][0].transcript);
+        finals = join(...fin);
+        interim = join(...int);
+        setPreview(join(acc, finals, interim));
       };
       rec.onerror = (e) => {
-        if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-          errored = true;
-          cb.current.onNotice(MSG_PERMISSION);
+        if (!live()) return;
+        if (e.error === "not-allowed") fail(MSG_PERMISSION);
+        else if (e.error === "network" || e.error === "service-not-allowed") {
+          // The audio of this hold is gone: later holds use the backend (when there is one).
+          if (backendOk) s.speechFailed = true;
+          fail(backendOk ? MSG_SPEECH_FAILED : MSG_SPEECH_DOWN);
         }
+        // no-speech / aborted: nothing to do; onend decides (empty, or restart while held).
       };
       rec.onend = () => {
-        if (s.token !== token) return;
-        release();
-        setSeconds(0);
-        setState("idle");
-        if (!errored) deliver(finals || interim);
+        if (!live()) return;
+        if (stateRef.current !== "listening") return finalize();
+        // Chrome ends recognition on long pauses: keep the text and restart while the button is held.
+        acc = join(acc, finals || interim);
+        finals = interim = "";
+        try {
+          rec.start();
+        } catch {
+          finalize();
+        }
       };
       s.recognition = rec;
+      s.speechStop = finalize;
       rec.start();
       startTimers(token);
     } catch {
-      cancel();
-      cb.current.onNotice(MSG_NO_MIC);
+      fail(MSG_NO_MIC);
     }
   };
 
@@ -219,9 +259,11 @@ export function useVoiceInput({ config: cfg, onTranscript, onNotice, onPress }: 
     const token = ++r.current.token;
     setSeconds(0);
     setState("listening");
-    const useBackend = backendOk && (!r.current.backendFailed || !speechOk);
-    if (useBackend) void startBackend(token);
-    else startSpeech(token);
+    setPreview("");
+    // Web Speech first (synchronously, inside the gesture); the backend only when it is missing or failed.
+    if (speechOk && !(r.current.speechFailed && backendOk)) startSpeech(token);
+    else if (backendOk) void startBackend(token);
+    else cancel();
   };
 
   const finish = () => {
@@ -238,7 +280,14 @@ export function useVoiceInput({ config: cfg, onTranscript, onNotice, onPress }: 
     clearTimeout(s.limit);
     setState("transcribing");
     if (s.recognition) {
-      s.recognition.stop();
+      // Wait for onend; the guard covers browsers that never fire it.
+      const done = s.speechStop;
+      s.stopGuard = setTimeout(() => done?.(), STOP_GUARD_MS);
+      try {
+        s.recognition.stop();
+      } catch {
+        done?.();
+      }
       return;
     }
     const rec = s.recorder!;
@@ -260,13 +309,8 @@ export function useVoiceInput({ config: cfg, onTranscript, onNotice, onPress }: 
           if (s.token !== token) return;
           setSeconds(0);
           setState("idle");
-          // 400 = unusable audio (empty, too big): retrying elsewhere would not help. 503/502/network: use the browser.
-          const badAudio = e instanceof ApiError && e.status === 400;
-          if (badAudio) cb.current.onNotice(MSG_BAD_AUDIO);
-          else if (speechOk) {
-            s.backendFailed = true;
-            cb.current.onNotice(MSG_FALLBACK);
-          } else cb.current.onNotice(e.message || "No se pudo transcribir el audio");
+          // 400 = unusable audio (empty, too big).
+          cb.current.onNotice(e instanceof ApiError && e.status === 400 ? MSG_BAD_AUDIO : e.message || "No se pudo transcribir el audio");
         });
     };
     try {
@@ -317,5 +361,5 @@ export function useVoiceInput({ config: cfg, onTranscript, onNotice, onPress }: 
     },
   };
 
-  return { available, state, seconds, maxSeconds, bind };
+  return { available, state, seconds, maxSeconds, preview, bind };
 }

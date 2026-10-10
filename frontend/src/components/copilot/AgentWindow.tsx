@@ -251,9 +251,12 @@ export default function AgentWindow({
       <div className="fixed inset-x-4 bottom-[92px] z-30 mx-auto flex max-w-[608px] flex-col gap-2">
         {out.player && <PlayerBar player={out.player} onToggle={out.togglePause} onSeek={out.seek} onRate={out.cycleRate} onClose={out.stop} />}
         {input.state !== "idle" ? (
-          <div role="status" className="flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-surface-container px-3.5 py-2 text-[13px] leading-[18px] text-secondary">
-            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-secondary motion-safe:animate-pulse" />
-            {input.state === "listening" ? `Escuchando… ${formatClock(input.seconds)}` : "Transcribiendo…"}
+          <div role="status" className="flex min-h-[44px] flex-col items-center justify-center gap-0.5 rounded-3xl bg-surface-container px-3.5 py-2 text-[13px] leading-[18px] text-secondary">
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-secondary motion-safe:animate-pulse" />
+              {input.state === "listening" ? `Escuchando… ${formatClock(input.seconds)}` : "Transcribiendo…"}
+            </div>
+            {input.preview && <p data-testid="voice-preview" className="m-0 line-clamp-2 max-w-full break-words text-center text-on-surface">{input.preview}</p>}
           </div>
         ) : (
         <div className="flex gap-2 overflow-x-auto">
