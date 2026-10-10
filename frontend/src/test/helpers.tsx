@@ -29,6 +29,11 @@ export function ev(ts: string, from: string, to: string, kind: TraceEvent["kind"
 
 export function fakeApi(over: Partial<Record<keyof Api, unknown>> = {}): Api {
   const base = {
+    setOnUnauthorized: vi.fn(),
+    getHealth: vi.fn(async () => ({})),
+    me: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    login: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    logout: vi.fn(async () => ({})),
     listStores: vi.fn(async () => [store, store2]),
     listCases: vi.fn(async () => [caseA]),
     createCase: vi.fn(async () => caseA),
