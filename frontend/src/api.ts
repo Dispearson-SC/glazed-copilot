@@ -1,4 +1,4 @@
-import type { AdvanceResult, Alert, Case, CaseMode, Execution, Kpis, OrderPlan, Proposal, Store, TraceEvent, Turn } from "./types";
+import type { AdvanceResult, Alert, Case, CaseMode, ComplianceRecord, Execution, InjectBody, Kpis, OrderPlan, Proposal, Store, TraceEvent, Turn } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -71,6 +71,8 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
     getKpis: (caseId: string) => request<Kpis>(`/cases/${caseId}/kpis`),
     proposeOption: (b: { case_id: string; issue_id: string; option_id: string; rationale: string }) =>
       request<Proposal>("/proposals", send("POST", b)),
+    getCompliance: (caseId: string) => request<ComplianceRecord[]>(`/cases/${caseId}/compliance`),
+    inject: (caseId: string, b: InjectBody) => request<unknown>(`/cases/${caseId}/inject`, send("POST", b)),
     getTrace: (storeId: string, caseId: string) =>
       request<TraceEvent[]>("/trace", {}, { store_id: storeId, case_id: caseId }),
   };

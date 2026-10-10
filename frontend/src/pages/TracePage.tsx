@@ -1,3 +1,4 @@
+import CentinelaPanel from "../CentinelaPanel";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useApi } from "../ApiContext";
@@ -140,6 +141,7 @@ export default function TracePage() {
           <Lanes events={events} />
         </>
       )}
+      {caseId && <CentinelaPanel caseId={caseId} />}
     </section>
   );
 }

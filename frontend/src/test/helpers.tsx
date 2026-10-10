@@ -51,6 +51,8 @@ export function fakeApi(over: Partial<Record<keyof Api, unknown>> = {}): Api {
     advance: vi.fn(async () => ({ sim_today: "2026-03-02", new_alerts: [] })),
     getOrderPlan: vi.fn(async () => planA),
     getKpis: vi.fn(async () => kpisA),
+    getCompliance: vi.fn(async () => []),
+    inject: vi.fn(async () => ({})),
     proposeOption: vi.fn(async () => ({ ...proposalA, proposal_id: "p9", issue_id: issueA.issue_id })),
   };
   return { ...base, ...over } as unknown as Api;

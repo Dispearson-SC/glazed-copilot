@@ -55,3 +55,30 @@ describe("misc helpers", () => {
     expect(wasteMid({ low: 1, mid: 2, high: 3 })).toBe(2);
   });
 });
+
+import { actionLabel, alertTypeLabel, kindLabel, severityCell } from "./issues";
+
+describe("wave 6 labels", () => {
+  it("names the new alert types and kinds", () => {
+    expect(alertTypeLabel(21)).toBe("Cumplimiento (Centinela)");
+    expect(alertTypeLabel(5)).toBe("Pedido");
+    expect(alertTypeLabel(7)).toBe("Promoción");
+    expect(alertTypeLabel(19)).toBe("Calendario");
+    expect(alertTypeLabel(9)).toBe("Integridad de datos");
+    expect(kindLabel("compliance_deviation")).toBe("Desviación de cumplimiento");
+    expect(kindLabel("inflated_order")).toBe("Pedido inflado");
+    expect(kindLabel("misleading_promo")).toBe("Auditoría de promoción");
+    expect(kindLabel("calendar_uplift")).toBe("Alza por calendario");
+    expect(kindLabel("sku_key_mismatch")).toBe("SKU con llave inconsistente");
+    expect(kindLabel("orphan_sku")).toBe("SKU huérfano");
+    expect(kindLabel("mystery")).toBe("mystery");
+    expect(actionLabel("data_fix_task")).toBe("Tarea de corrección de datos");
+    expect(actionLabel("place_order")).toBe("place_order");
+  });
+
+  it("shows exposure instead of severity for integrity issues", () => {
+    expect(severityCell({ severity_usd: 5, issue: { category: "integrity", exposure_usd: 1234.5 } })).toBe("Exposición $1234.50");
+    expect(severityCell({ severity_usd: 58.92, issue: { kind: "orphan_sku", exposure_usd: 10 } })).toBe("Exposición $10.00");
+    expect(severityCell({ severity_usd: 12.3, issue: {} })).toBe("12.30");
+  });
+});

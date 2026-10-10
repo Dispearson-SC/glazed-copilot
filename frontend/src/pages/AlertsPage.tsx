@@ -2,14 +2,16 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useApi } from "../ApiContext";
 import { ErrorBox, StoreSelect, useStores } from "../components";
+import CentinelaPanel from "../CentinelaPanel";
 import IssueDetail from "../IssueDetail";
+import { actionLabel, alertTypeLabel, kindLabel, severityCell } from "../issues";
 import { useSession } from "../SessionContext";
 import type { Alert, Issue, Proposal } from "../types";
 import { usePolling } from "../usePolling";
 
 const REFRESH_MS = 10_000;
 
-function ProposalCard({ proposal, onDecided }: { proposal: Proposal; onDecided: () => void }) {
+function ProposalCard({ proposal, onDecided }: { proposal: Proposal; onDecided: (rejected?: Proposal) => void }) {
   const api = useApi();
   const [reason, setReason] = useState("");
   const [error, setError] = useState<Error | null>(null);
@@ -21,7 +23,17 @@ function ProposalCard({ proposal, onDecided }: { proposal: Proposal; onDecided: 
     }
     try {
       await api.decide(proposal.proposal_id, approved ? { approved } : { approved, reason: reason.trim() });
-      onDecided();
+      if (approved) return onDecided();
+      // The decision response is the execution; Jev's label lives on the stored proposal.
+      let stored: Proposal | undefined;
+      try {
+        stored = (await api.listProposals({ case_id: proposal.case_id, status: "rejected" })).find(
+          (p) => p.proposal_id === proposal.proposal_id,
+        );
+      } catch {
+        /* the label is optional */
+      }
+      onDecided(stored ?? proposal);
     } catch (e) {
       setError(e as Error);
     }
@@ -29,7 +41,7 @@ function ProposalCard({ proposal, onDecided }: { proposal: Proposal; onDecided: 
 
   return (
     <div className="card">
-      <strong>{proposal.action_type}</strong> <span className="badge">{proposal.tier}</span>
+      <strong>{actionLabel(proposal.action_type)}</strong> <span className="badge">{proposal.tier}</span>
       <p>{proposal.rationale}</p>
       <pre>{JSON.stringify(proposal.params, null, 2)}</pre>
       <label>
@@ -46,6 +58,7 @@ function AlertDetail({ alert, onClose }: { alert: Alert; onClose: () => void }) 
   const proposals = usePolling(() => api.listProposals({ case_id: alert.case_id, status: "pending" }), REFRESH_MS, true, [
     alert.case_id,
   ]);
+  const [rejected, setRejected] = useState<Proposal | null>(null);
   return (
     <aside aria-label="Detalle de alerta" className="panel">
       <button onClick={onClose} style={{ float: "right" }}>Cerrar</button>
@@ -59,8 +72,22 @@ function AlertDetail({ alert, onClose }: { alert: Alert; onClose: () => void }) 
       <ErrorBox error={proposals.error} />
       {proposals.data?.length === 0 && <p className="muted">Sin propuestas pendientes</p>}
       {proposals.data?.map((p) => (
-        <ProposalCard key={p.proposal_id} proposal={p} onDecided={() => void proposals.refresh()} />
+        <ProposalCard
+          key={p.proposal_id}
+          proposal={p}
+          onDecided={(r) => {
+            if (r) setRejected(r);
+            void proposals.refresh();
+          }}
+        />
       ))}
+      {rejected?.reason_category && (
+        <p className="badge" role="status">
+          Motivo clasificado: {rejected.reason_category}
+          {typeof rejected.reason_confidence === "number" && ` (confianza ${Math.round(rejected.reason_confidence * 100)}%)`}
+        </p>
+      )}
+      <CentinelaPanel caseId={alert.case_id} />
     </aside>
   );
 }
@@ -90,13 +117,16 @@ export default function AlertsPage() {
       <div className="split">
         <table>
           <thead>
-            <tr><th>Tipo</th><th>Severidad (USD)</th><th>Estado</th><th>Creada</th><th>Caso</th><th /></tr>
+            <tr><th>Tipo</th><th>Severidad / exposición (USD)</th><th>Estado</th><th>Creada</th><th>Caso</th><th /></tr>
           </thead>
           <tbody>
             {alerts.data?.map((a) => (
               <tr key={a.alert_id} data-testid={`alert-${a.alert_id}`}>
-                <td>{a.alert_type}</td>
-                <td>{a.severity_usd.toFixed(2)}</td>
+                <td>
+                  <div>{alertTypeLabel(a.alert_type)}</div>
+                  {typeof a.issue.kind === "string" && <div className="muted">{kindLabel(a.issue.kind)}</div>}
+                </td>
+                <td>{severityCell(a)}</td>
                 <td><span className="badge">{a.state}</span></td>
                 <td>{new Date(a.created_at).toLocaleString()}</td>
                 <td><Link to={`/stores/${a.store_id}/trace?case=${a.case_id}`}>{a.case_id}</Link></td>

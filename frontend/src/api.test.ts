@@ -82,6 +82,17 @@ describe("api client", () => {
     const api = createApi("", failing as unknown as typeof fetch);
     await expect(api.listStores()).rejects.toMatchObject({ status: 0 });
   });
+
+  it("reads compliance and injects demo events", async () => {
+    const api = createApi("", fetchFn as unknown as typeof fetch);
+    await api.getCompliance("c1");
+    expect((fetchFn.mock.calls[0] as unknown as [string])[0]).toBe("/api/v1/cases/c1/compliance");
+    await api.inject("c1", { execution: { proposal_id: "p1", status: "not_executed", detail: "x" } });
+    const [url, init] = fetchFn.mock.calls[1] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/v1/cases/c1/inject");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ execution: { proposal_id: "p1", status: "not_executed", detail: "x" } });
+  });
 });
 
 describe("api client (Wave 5)", () => {

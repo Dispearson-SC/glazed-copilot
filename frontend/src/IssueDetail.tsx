@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useApi } from "./ApiContext";
-import { bestOption, isLowConfidence, rangeText, tierInfo, usd } from "./issues";
+import { actionLabel, bestOption, isLowConfidence, rangeText, tierInfo, usd } from "./issues";
 import type { Issue, Option } from "./types";
 
 function ConfidenceBar({ score }: { score: number }) {
@@ -51,7 +51,7 @@ function OptionCard({ issue, option, caseId, best }: { issue: Issue; option: Opt
 
   return (
     <div className={`card option${best ? " best" : ""}`} data-testid={`option-${option.option_id}`}>
-      <strong>{nothing ? "No hacer nada" : option.action_type}</strong>{" "}
+      <strong>{nothing ? "No hacer nada" : actionLabel(option.action_type)}</strong>{" "}
       <span className={`badge ${tier.className}`}>{tier.label}</span>
       {best && <span className="badge badge-best"> más viable</span>}
       <p>

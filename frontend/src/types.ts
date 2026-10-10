@@ -50,6 +50,8 @@ export interface Proposal {
   rationale: string;
   status: string;
   reason: string;
+  reason_category?: string | null;
+  reason_confidence?: number | null;
   agent_id: string;
   created_at: string;
 }
@@ -129,6 +131,8 @@ export interface Issue {
   store_display_name: string;
   as_of: string;
   severity_usd: number;
+  category?: string | null;
+  exposure_usd?: number | null;
   evidence: Evidence[];
   data_caveats: string[];
   options: Option[];
@@ -172,3 +176,27 @@ export interface AdvanceResult {
   sim_today: string;
   new_alerts: Alert[];
 }
+
+// ---- Wave 6: Sentinel (Centinela) ----
+export type ExecutionStatus = "executed" | "not_executed" | "partial";
+export type Diagnosis = "not_executed" | "within_range" | "external_event" | "forecast_error";
+
+export interface ComplianceRecord {
+  decision_id: string;
+  issue_id: string | null;
+  action_type: string | null;
+  status: string;
+  applicable: boolean;
+  execution: { status: string; source: string; detail?: string; executed_at?: string } | null;
+  execution_status: ExecutionStatus | null;
+  horizon: { decision_date: string; days: number; ends: string; passed: boolean } | null;
+  simulated: { net_usd_mid: number; net_usd_low?: number | null; net_usd_high?: number | null; label: string } | null;
+  observed: { net_usd: number; label: string } | null;
+  events: { type: string; date_from: string; date_to: string; note?: string }[];
+  diagnosis: Diagnosis | null;
+  explanation: string;
+}
+
+export type InjectBody =
+  | { execution: { proposal_id: string; status: "not_executed" | "partial"; detail?: string } }
+  | { event: { type: string; date_from: string; date_to?: string; note?: string } };

@@ -2,7 +2,7 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api";
-import { alertA, fakeApi, renderPage } from "../test/helpers";
+import { alertA, proposalA, fakeApi, renderPage } from "../test/helpers";
 import AlertsPage from "./AlertsPage";
 
 const open = (api = fakeApi()) => renderPage(api, "/alerts", "/alerts", <AlertsPage />);
@@ -16,7 +16,7 @@ describe("AlertsPage", () => {
     const row = await screen.findByTestId("alert-a1");
     expect(within(row).getByText(/123\.50/)).toBeInTheDocument();
     expect(within(row).getByText("nueva")).toHaveClass("badge");
-    expect(within(row).getByText("2")).toBeInTheDocument(); // alert type
+    expect(within(row).getByText("Quiebre")).toBeInTheDocument(); // alert type
     expect(api.listAlerts).toHaveBeenCalledWith({ store_id: "S030" });
   });
 
@@ -95,6 +95,20 @@ describe("AlertsPage", () => {
     open(fakeApi({ listAlerts: vi.fn(async () => []) }));
     expect(await screen.findByText("Sin alertas")).toBeInTheDocument();
   });
+
+  it("shows the category and confidence Jev assigned to a rejection", async () => {
+    const api = fakeApi({
+      listProposals: vi.fn(async (q: { status?: string }) =>
+        q.status === "rejected"
+          ? [{ ...proposalA, status: "rejected", reason_category: "precio", reason_confidence: 0.81 }]
+          : [proposalA]),
+    });
+    open(api);
+    await userEvent.click(await screen.findByText("Ver detalle"));
+    await userEvent.type(await screen.findByLabelText("Motivo"), "muy caro");
+    await userEvent.click(screen.getByRole("button", { name: "Rechazar" }));
+    expect(await screen.findByText(/Motivo clasificado: precio \(confianza 81%\)/)).toBeInTheDocument();
+  });
 });
 
 describe("AlertsPage issue detail (Wave 5)", () => {
@@ -104,5 +118,14 @@ describe("AlertsPage issue detail (Wave 5)", () => {
     open(api);
     await userEvent.click(await screen.findByText("Ver detalle"));
     expect(await screen.findByTestId("option-o-n3")).toBeInTheDocument();
+  });
+
+  it("shows exposure instead of severity for integrity alerts and the Centinela label for type 21", async () => {
+    const integ = { ...alertA, alert_id: "a9", alert_type: 9, issue: { kind: "orphan_sku", category: "integrity", exposure_usd: 777 } };
+    const comp = { ...alertA, alert_id: "a21", alert_type: 21, issue: { kind: "compliance_deviation" } };
+    open(fakeApi({ listAlerts: async () => [integ, comp] }));
+    expect(await screen.findByText("Exposición $777.00")).toBeInTheDocument();
+    expect(screen.getByText("Cumplimiento (Centinela)")).toBeInTheDocument();
+    expect(screen.getByText("SKU huérfano")).toBeInTheDocument();
   });
 });
