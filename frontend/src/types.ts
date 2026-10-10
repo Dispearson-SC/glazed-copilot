@@ -423,7 +423,8 @@ export interface PendingTechnical {
   why: string;
   impact_chips: string[];
   deadline: string | null;
-  confidence: number | null;
+  /** Wave 15: {score, calibrated}; older backends send a bare number. */
+  confidence: number | { score: number | null; calibrated?: boolean } | null;
   tier: string | null;
   label: string;
   warning?: string;

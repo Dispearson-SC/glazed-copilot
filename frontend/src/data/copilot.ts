@@ -123,6 +123,9 @@ function benefitText(r: Range3 | null | undefined): string {
   return one ? `+${usd(one)}` : "";
 }
 
+/** Technical confidence: a bare number (old) or {score, calibrated} (Wave 15). */
+const confScore = (c: PendingResponse["technical"][number]["confidence"] | undefined): number | null => (c == null ? null : typeof c === "number" ? c : (c.score ?? null));
+
 const confText = (score: number | null | undefined): string => (score == null ? "Sin datos" : pct(score));
 
 /** Maps GET /decisions/pending to cards. Approvals and technical come split by the backend; a technical line with no issue/option is read-only. */
@@ -139,7 +142,7 @@ export function buildPendingItems(pending: PendingResponse | null, simToday: str
     return {
       id: t.issue_id ?? `line|${t.sku}`, issueId: t.issue_id ?? "", optionId: t.option_id ?? "", kind: "tech", readOnly: !decidable, tier: t.tier ?? "",
       icon: t.expected_delivery || t.qty ? "shopping_basket" : "bolt", level: t.tier ? tierLabel(t.tier) : "", title: t.label, summary: "",
-      value: benefitText(null), conf: t.confidence ?? 0, confPct: confText(t.confidence), deadline: deadlineText(t.deadline, simToday),
+      value: benefitText(null), conf: confScore(t.confidence) ?? 0, confPct: confText(confScore(t.confidence)), deadline: deadlineText(t.deadline, simToday),
       supplier: t.supplier_name ?? t.supplier_id ?? "", arrive: t.expected_delivery ? `llega ${weekdayDay(t.expected_delivery)}` : "",
       cost: t.cost_usd?.mid ? usd(t.cost_usd.mid) : "", why: t.why, chips: t.impact_chips ?? [], warn: t.warning ?? "",
     };

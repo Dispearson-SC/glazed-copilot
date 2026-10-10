@@ -39,6 +39,15 @@ describe("buildPendingItems", () => {
     expect(buildPendingItems(p, SIM)[0]).toMatchObject({ deadline: "Sin fecha límite", confPct: "Sin datos" });
   });
 
+  it("accepts the Wave 15 technical confidence {score, calibrated} (live d17217ea4550 shape) and the old number", () => {
+    const live = { ...pendingA.technical[0], confidence: { score: 0.2939, calibrated: true } } as unknown as (typeof pendingA.technical)[number];
+    expect(buildPendingItems({ ...pendingA, technical: [live] }, SIM)[0]).toMatchObject({ conf: 0.2939, confPct: "29%" });
+    const noScore = { ...live, confidence: { score: null, calibrated: false } } as unknown as (typeof pendingA.technical)[number];
+    expect(buildPendingItems({ ...pendingA, technical: [noScore] }, SIM)[0]).toMatchObject({ conf: 0, confPct: "Sin datos" });
+    const old = { ...pendingA.technical[0], confidence: 0.41 };
+    expect(buildPendingItems({ ...pendingA, technical: [old] }, SIM)[0]).toMatchObject({ confPct: "41%" });
+  });
+
   it("marks a technical line without issue or option as read-only", () => {
     const p = { ...pendingA, technical: [{ ...pendingA.technical[0], issue_id: null, option_id: null }] };
     expect(buildPendingItems(p, SIM)[0]).toMatchObject({ id: "line|SKU-100263", readOnly: true, optionId: "", issueId: "" });

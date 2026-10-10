@@ -52,6 +52,13 @@ describe("Memorias window", () => {
     expect(screen.getByText("Sin memorias que coincidan")).toBeInTheDocument();
   });
 
+  it("shows the empty state (not 'Sin datos', not an error) when /memories returns []", async () => {
+    await open(/^Memorias/, api({ getMemories: async () => [] }));
+    expect(await screen.findByText("Aún no hay memorias. Se irán sumando con tus decisiones.")).toBeInTheDocument();
+    expect(screen.queryByText("Sin datos")).toBeNull();
+    expect(screen.queryByText(/No se pudieron cargar/)).toBeNull();
+  });
+
   it("says 'Disponible pronto' when the route answers 404 and the error otherwise", async () => {
     const { ApiError } = await import("../api");
     await open(/^Memorias/, api({ getMemories: async () => { throw new ApiError(404, "nf"); } }));

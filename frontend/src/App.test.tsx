@@ -19,8 +19,13 @@ const open = (path = "/", api = fakeApi()) =>
   );
 
 describe("App routes", () => {
-  it("serves the dashboard at /", async () => {
+  it("opens the copilot by default at /", async () => {
     open();
+    expect(await screen.findByRole("navigation", { name: "Ventanas del copiloto" })).toBeInTheDocument();
+  });
+
+  it("serves the dashboard at /resumen", async () => {
+    open("/resumen");
     expect(await screen.findByTestId("hero")).toBeInTheDocument();
   });
 
@@ -35,10 +40,10 @@ describe("App routes", () => {
   });
 
   it.each(["/alerts", "/cases", "/purchases", "/decisions", "/inventory", "/week", "/trace", "/stores/S030/trace"])(
-    "sends the removed route %s to the dashboard",
+    "sends the removed route %s to the copilot",
     async (path) => {
       open(path);
-      expect(await screen.findByTestId("hero")).toBeInTheDocument();
+      expect(await screen.findByRole("navigation", { name: "Ventanas del copiloto" })).toBeInTheDocument();
     },
   );
 });
@@ -46,7 +51,7 @@ describe("App routes", () => {
 describe("top bar title", () => {
   it("shows the full store name and the page subtitle 'Resumen' (Main.dc.html)", async () => {
     const plain = { store_id: "S030", name: "Tienda Única", format: "mall", site_id: "X", region: "N", display_name: "Tienda Única" };
-    open("/", fakeApi({ listStores: async () => [plain] }));
+    open("/resumen", fakeApi({ listStores: async () => [plain] }));
     const bar = await screen.findByRole("banner");
     expect(await within(bar).findByText("Tienda Única")).toBeInTheDocument();
     expect(within(bar).getByText("Resumen")).toBeInTheDocument();
@@ -60,7 +65,7 @@ describe("top bar title", () => {
 
 describe("App shell", () => {
   it("shows the store display name in the top bar with the sign-in link", async () => {
-    open();
+    open("/resumen");
     const bar = await screen.findByRole("banner");
     expect(await within(bar).findByText("Aeropuerto Norte · Glazed Centro")).toBeInTheDocument();
     expect(within(bar).getByText("Resumen")).toBeInTheDocument();
@@ -69,12 +74,12 @@ describe("App shell", () => {
   });
 
   it("marks the current page in the bottom navigation", async () => {
-    open("/");
-    expect(await screen.findByRole("link", { name: /Resumen/, current: "page" })).toHaveAttribute("href", "/");
+    open("/resumen");
+    expect(await screen.findByRole("link", { name: /Resumen/, current: "page" })).toHaveAttribute("href", "/resumen");
   });
 
   it("the design's Chat entry opens /chat", async () => {
-    open("/");
+    open("/resumen");
     await screen.findByRole("navigation", { name: "Navegación principal" });
     expect(screen.getByRole("link", { name: /Chat/ })).toHaveAttribute("href", "/chat");
   });

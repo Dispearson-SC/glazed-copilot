@@ -156,3 +156,23 @@ describe("buildScheduled", () => {
     ]);
   });
 });
+
+describe("buildDayView with the live Wave 15 shapes (case d17217ea4550, as_of 2026-07-19)", () => {
+  const outlook = {
+    as_of: "2026-07-19",
+    days: [
+      { date: "2026-07-20", projected: true, net_sales: { low: 2622.1181, mid: 2910.9459, high: 3347.4488 }, transactions: { low: 328.3, mid: 354.5, high: 436.1 }, avg_ticket: { low: 8.32, mid: 8.69, high: 9.25 }, expected_waste_usd: { low: 6.9, mid: 6.9, high: 6.9 }, expected_lost_sales_usd: { low: 0.0, mid: 4.21, high: 198.13 }, weather: null, weather_note: "Sin pronóstico" },
+    ],
+  };
+  const pt = (date: string, forecast: number, projected: boolean) => ({ date, forecast, p10: forecast * 0.9, p90: forecast * 1.1, baseline: forecast, actual: projected ? null : forecast, censored: false, projected });
+  const mk = (metric: string, vals: [number, number]) =>
+    ({ store_id: "S001", sku: null, level: "store", as_of: "2026-07-19", forecast_origin: "2026-07-19", model: "flow-weekday-8w", model_version: "", unit: "", horizon_days: 1, metric, conversion_valid: metric === "conversion" ? true : null, metrics_to_date: {}, points: [pt("2026-07-19", vals[0], false), pt("2026-07-20", vals[1], true)] }) as never;
+  const metrics = { footfall: mk("footfall", [3581.5, 2996]), transactions: mk("transactions", [400, 354.5]), avg_ticket: mk("avg_ticket", [8.8, 8.69]), conversion: mk("conversion", [0.1136, 0.118]) };
+
+  it("fills Mañana from the live outlook and metric forecasts", () => {
+    const v = buildDayView("manana", { asOf: "2026-07-19", forecast: null, ayer: null, hoy: null, expiring: null, outlook, metrics });
+    expect(v).toMatchObject({ expected: "$2,910.95", range: "$2,622 – $3,347", traffic: { value: "2996" }, orders: { value: "355" }, ticket: { value: "$8.69" }, conversion: { value: "11.8%" } });
+    expect(v.waste.value).toBe("$6.90");
+    expect(v.lost.value).toBe("$0 – $198");
+  });
+});

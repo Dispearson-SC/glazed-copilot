@@ -111,7 +111,7 @@ describe("Chat (/chat) matches Chat.dc.html", () => {
 describe("floating chat on Main (Main.dc.html)", () => {
   it("opens a compact panel with two chips and the footer link, and sends a message", async () => {
     const api = fakeApi();
-    open("/", api);
+    open("/resumen", api);
     await userEvent.click(await screen.findByRole("button", { name: "Abrir chat del turno" }));
     const panel = screen.getByRole("region", { name: "Chat flotante del turno" });
     expect(within(panel).getByRole("link", { name: "Abrir chat completo" })).toHaveAttribute("href", "/chat");
@@ -123,7 +123,7 @@ describe("floating chat on Main (Main.dc.html)", () => {
   });
 
   it("uses the compact design: small send button and the link inside the footer block", async () => {
-    open("/");
+    open("/resumen");
     await userEvent.click(await screen.findByRole("button", { name: "Abrir chat del turno" }));
     const panel = screen.getByRole("region", { name: "Chat flotante del turno" });
     const send = within(panel).getByRole("button", { name: "Enviar mensaje" });
@@ -132,7 +132,7 @@ describe("floating chat on Main (Main.dc.html)", () => {
   });
 
   it("the FAB toggles to a close icon and back", async () => {
-    open("/");
+    open("/resumen");
     const fab = await screen.findByRole("button", { name: "Abrir chat del turno" });
     await userEvent.click(fab);
     expect(screen.getByRole("button", { name: "Cerrar chat del turno" })).toHaveAttribute("aria-expanded", "true");

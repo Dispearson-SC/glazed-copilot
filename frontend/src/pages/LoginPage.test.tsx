@@ -59,7 +59,7 @@ describe("Login (/login) matches Login.dc.html", () => {
     expect(screen.getByLabelText("Mantener el turno abierto")).toBeChecked();
     expect(screen.getByRole("link", { name: "¿Olvidaste la clave?" })).toHaveAttribute("href", "#");
     expect(screen.getByRole("button", { name: "Entrar al resumen" })).toBeEnabled();
-    expect(screen.getByRole("link", { name: /Volver al resumen/ })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: /Volver al resumen/ })).toHaveAttribute("href", "/resumen");
     expect(screen.getByText("Al entrar aceptas el uso operativo del resumen de turno.")).toBeInTheDocument();
   });
 

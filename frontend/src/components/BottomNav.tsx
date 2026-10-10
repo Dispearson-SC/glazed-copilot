@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 
 const ITEMS = [
-  { to: "/", label: "Resumen", icon: "dashboard", end: true },
+  { to: "/resumen", label: "Resumen", icon: "dashboard", end: true },
   { to: "/copiloto?tab=decisiones", label: "Pedidos", icon: "receipt_long", end: false },
   { to: "/copiloto?tab=sucursal", label: "Productos", icon: "local_cafe", end: false },
   { to: "/chat", label: "Chat", icon: "chat", end: false },

@@ -95,7 +95,7 @@ export default function LoginPage() {
         </form>
         <div className="my-space-md border-t border-surface-container"></div>
         <Link
-          to="/"
+          to="/resumen"
           className="w-full py-3 px-space-md bg-surface-container-high text-primary font-body-md text-body-md font-medium rounded-full flex items-center justify-center gap-2 hover:bg-surface-variant transition-all active:scale-[0.98]"
         >
           <span aria-hidden="true" className="material-symbols-outlined text-[18px] text-secondary">arrow_back</span>
