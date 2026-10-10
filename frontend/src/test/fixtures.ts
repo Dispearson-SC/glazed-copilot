@@ -1,4 +1,4 @@
-import type { Issue, Kpis, Option, OrderPlan } from "../types";
+import type { Briefing, DaySummary, Issue, Kpis, Option, OrderPlan } from "../types";
 
 const base = {
   cost_usd: 0,
@@ -66,4 +66,35 @@ export const planA: OrderPlan = {
       vs_current_practice: { received_to_sold: 0.9, qty_delta: 2 }, min_order_warning: null,
     },
   ],
+};
+
+export const daySummaryA: DaySummary = {
+  store_id: "S030", date: "2026-03-10", as_of: "2026-03-11",
+  totals: { footfall: 852, transactions: 74, units_sold: 138, net_sales: 733.91, staff_hours: 36.2 },
+  by_department: [{ department: "Beverage", net_sales: 379.08, units: 70 }],
+  top_skus: [
+    { sku: "SKU-1", product_name: "50 Donut Holes", net_sales: 105, units: 5 },
+    { sku: "SKU-2", product_name: "Frozen Blend Lg", net_sales: 92.17, units: 13 },
+    { sku: "SKU-3", product_name: "Vanilla Chai", net_sales: 45.43, units: 7 },
+    { sku: "SKU-4", product_name: "Cuarto lugar", net_sales: 40, units: 2 },
+  ],
+  context: {
+    weekday: "Tue", is_weekend: false, is_holiday: true, holiday_name: "Día de prueba", is_school_break: false,
+    weather: { temp_max_c: 24.7, temp_min_c: 16.7, precip_mm: 0 },
+  },
+  vs_same_weekday_avg: { baseline_net_sales: 617.92, weeks_used: 8, delta_pct: 18.8 },
+  store_display_name: "Aeropuerto Norte · Glazed Centro",
+};
+
+export const briefingA: Briefing = {
+  snapshot: {
+    as_of: "2026-03-11",
+    kpis: { lost_sales_usd: { low: 39.62, mid: 430.77, high: 565.38 } },
+    order_plan: { due_today: [{}], due_tomorrow: [{}, {}], top_lines: [], total_lines: 5, deadline_passed: 1 },
+  },
+  headline: [
+    { key: "waste_7d", text: "Merma 7 días $1,361", value: 1360.94, unit: "USD" },
+    { key: "lost_sales", text: "Venta perdida estimada $40–$565", value: 430.77, unit: "USD", low: 39.62, high: 565.38 },
+  ],
+  suggested_focus: ["i1", "i2"],
 };

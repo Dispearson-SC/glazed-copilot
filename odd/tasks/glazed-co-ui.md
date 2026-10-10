@@ -37,7 +37,7 @@ Mode: strict (project mode, source: Core / project config). Runner: `cd frontend
 ## Tasks
 - [x] T1 Theme tooling: Tailwind + Artisanal Roast tokens, fonts, Material Symbols, logo/icons, manifest colors; vite proxy default 8100. Route: delegated writer. Evidence: RED (theme.test.ts failed on missing tailwind.config), GREEN 108 tests, build ok. Tailwind v3.4 + postcss; legacy CSS moved to legacy.css, shell rules scoped to `.app > header`.
 - [x] T2 Shell: TopBar + BottomNav layout, LoginPage as store/case picker (`/login`), existing routes preserved. Route: delegated writer. Evidence: RED (LoginPage missing, 2 shell tests failed), GREEN 115 tests, build ok. SimControl kept in a strip under the top bar; SessionContext gained caseId; pickCase prefers the chosen case.
-- [ ] T3 Dashboard (HomePage) with real data: hero, metric cards, 7-day trend, top products, briefing headline + lost-sales range, empty/error states. Route: delegated writer.
+- [x] T3 Dashboard (HomePage) with real data: hero, metric cards, 7-day trend, top products, briefing headline + lost-sales range, empty/error states. Route: delegated writer. Evidence: RED (10 new tests failed), GREEN 125 tests, build ok, dev server on :8100 proxy served / and /api. Applied coordinator contract: Sin datos keyed on totals===null, HTTP errors = error state, avg ticket guard, no staff_hours, weather labelled 'Clima observado'. Legacy KPI cards/semaphore kept (existing tests) below the dashboard.
 - [ ] T4 Restyle Alerts, Cases, Purchases, Trace with theme tokens (no behavior change). Route: delegated writer.
 - [ ] T5 Docs: frontend README (env, ports, pages, data mapping). Route: delegated writer.
 
@@ -51,3 +51,4 @@ Strategy: ask-on-risk. Forecast ~1,500 authored lines (UI port) → exceeds the 
 ## Progress
 - 2026-10-10: worktree created, contract agreed with Core.
 - T1 commit 807ec47
+- T2 commit dbfc06a

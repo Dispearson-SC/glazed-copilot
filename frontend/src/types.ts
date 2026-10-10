@@ -203,3 +203,53 @@ export interface ComplianceRecord {
 export type InjectBody =
   | { execution: { proposal_id: string; status: "not_executed" | "partial"; detail?: string } }
   | { event: { type: string; date_from: string; date_to?: string; note?: string } };
+
+// ---- Dashboard: day summary and briefing (any field may be missing or null) ----
+export interface DayTotals {
+  footfall?: number | null;
+  transactions?: number | null;
+  units_sold?: number | null;
+  net_sales?: number | null;
+  staff_hours?: number | null;
+}
+
+export interface DaySummary {
+  store_id: string;
+  date: string;
+  as_of: string;
+  /** null = the store has no data for that day (HTTP 200, not an error). */
+  totals: DayTotals | null;
+  by_department?: { department: string; net_sales: number; units: number }[];
+  top_skus?: { sku: string; product_name: string; net_sales: number; units: number }[];
+  context?: {
+    weekday?: string;
+    is_weekend?: boolean;
+    is_holiday?: boolean;
+    holiday_name?: string | null;
+    is_school_break?: boolean;
+    /** Observed weather of that day, not a forecast. */
+    weather?: { temp_max_c?: number | null; temp_min_c?: number | null; precip_mm?: number | null } | null;
+  };
+  vs_same_weekday_avg?: { baseline_net_sales: number; weeks_used: number; delta_pct: number } | null;
+  store_display_name?: string;
+}
+
+export interface HeadlineItem {
+  key: string;
+  text: string;
+  value?: number | null;
+  unit?: string;
+  source?: string;
+  low?: number;
+  high?: number;
+}
+
+export interface Briefing {
+  snapshot?: {
+    as_of?: string;
+    kpis?: { lost_sales_usd?: Range3 | null } & Record<string, unknown>;
+    order_plan?: { due_today?: unknown[]; due_tomorrow?: unknown[]; top_lines?: unknown[]; total_lines?: number; deadline_passed?: number };
+  };
+  headline?: HeadlineItem[];
+  suggested_focus?: string[];
+}
