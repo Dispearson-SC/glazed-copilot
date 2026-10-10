@@ -1,6 +1,6 @@
 """Public API /api/v1/* for the CLI and the frontend."""
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from fastapi import APIRouter
@@ -41,6 +41,13 @@ class BacktestBody(BaseModel):
     date_from: date
     date_to: date
     policy: str = "simple_v0"
+
+
+class ProposeBody(BaseModel):
+    case_id: str
+    issue_id: str
+    option_id: str
+    rationale: str = ""
 
 
 class OutcomeBody(BaseModel):
@@ -121,6 +128,27 @@ def build_public_router(c: Any) -> APIRouter:
     @r.get("/proposals")
     def proposals(case_id: str | None = None, store_id: str | None = None, status: str | None = None):
         return jsonable_encoder(c.proposals.list(case_id, store_id, status))
+
+    @r.post("/proposals", status_code=201)
+    def propose(b: ProposeBody):
+        return jsonable_encoder(uc.ProposeOption(c.cases, c.proposals, c.alerts, c.metrics, c.served)
+                                .execute(b.case_id, b.issue_id, b.option_id, b.rationale))
+
+    @r.get("/cases/{case_id}/order-plan")
+    def order_plan(case_id: str):
+        case = uc.ResumeCase(c.cases).execute(case_id)
+        plan = c.metrics.order_plan(case.store_id, case.sim_today)
+        for line in plan.get("lines", []):
+            if line.get("issue"):
+                c.served[(case.case_id, line["issue"]["issue_id"])] = line["issue"]
+        return names.tag({**plan, "case_id": case.case_id, "store_id": case.store_id})
+
+    @r.get("/cases/{case_id}/kpis")
+    def kpis(case_id: str, date_from: date | None = None, date_to: date | None = None):
+        case = uc.ResumeCase(c.cases).execute(case_id)
+        end = date_to or case.sim_today
+        out = c.metrics.kpis(case.store_id, case.sim_today, date_from or end - timedelta(days=6), end)
+        return names.tag({**out, "case_id": case.case_id})
 
     @r.post("/proposals/{proposal_id}/decision")
     def decide(proposal_id: str, b: DecisionBody):

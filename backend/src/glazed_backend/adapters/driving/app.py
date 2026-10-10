@@ -33,6 +33,7 @@ class Container:
     cors_origins: list[str] | None = None  # None -> DEFAULT_CORS_ORIGINS
     turn_timeout_s: float = 120.0  # a Core turn with no answer after this long is reported as failed
     turn_tracker: Any = field(default_factory=TurnTracker)
+    served: dict = field(default_factory=dict)  # (case_id, issue_id) -> issue as served, for option lookup
 
 
 DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]

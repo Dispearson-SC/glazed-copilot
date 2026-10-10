@@ -223,6 +223,44 @@ class SubmitProposal:
         return proposal
 
 
+class ProposeOption:
+    """Turn (issue_id, option_id) into a pending proposal. action_type, params and tier are copied from the stored
+    option; whatever the caller sends for them is ignored, so an agent can neither invent an action nor pick a tier.
+
+    The option is found in what was served to this case, then in the alert's stored issue, then recomputed
+    deterministically from the metrics at the case date. Anything else is a 400."""
+
+    def __init__(self, cases: CaseRepository, proposals: ProposalRepository, alerts: AlertRepository,
+                 metrics: MetricsPort, served: dict | None = None) -> None:
+        self.cases, self.proposals, self.alerts, self.metrics = cases, proposals, alerts, metrics
+        self.served = served if served is not None else {}
+
+    def _issue(self, case: Case, issue_id: str) -> dict[str, Any] | None:
+        issue = self.served.get((case.case_id, issue_id))
+        if issue is None:
+            alert = self.alerts.get_by_issue_key(issue_id)
+            issue = alert.issue if alert is not None and alert.store_id == case.store_id else None
+        if issue is None or not issue.get("options"):
+            issue = next((i for i in self.metrics.issues(case.store_id, case.sim_today, 1000)
+                          if i.get("issue_id") == issue_id), None)
+        return issue
+
+    def execute(self, case_id: str, issue_id: str, option_id: str | None, rationale: str = "",
+                agent_id: str = "") -> Proposal:
+        case = _case(self.cases, case_id)
+        if not option_id:
+            raise DomainError("option_id is required: propose one of the options returned with the issue")
+        issue = self._issue(case, issue_id)
+        option = next((o for o in (issue or {}).get("options", []) if o.get("option_id") == option_id), None)
+        if option is None:
+            raise DomainError(f"unknown option {option_id!r} for issue {issue_id!r}")
+        proposal = Proposal.new(case.case_id, case.store_id, issue_id, option["action_type"],
+                                {**option.get("params", {}), "option_id": option_id},
+                                option.get("tier") or "N2", rationale, agent_id)
+        self.proposals.add(proposal)
+        return proposal
+
+
 class DecideProposal:
     def __init__(self, cases: CaseRepository, proposals: ProposalRepository, executions: ExecutionRepository,
                  alerts: AlertRepository, memory: ExperienceMemoryPort | None = None) -> None:

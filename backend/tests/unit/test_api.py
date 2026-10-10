@@ -7,7 +7,12 @@ from glazed_backend.adapters.driving.app import Container, create_app
 from tests.fakes import (FakeClock, FakeCore, FakeMetrics, InMemoryAlerts, InMemoryBacktests, InMemoryCases,
                          InMemoryExecutions, InMemoryProposals, InMemoryTrace)
 
-ISSUE = {"issue_id": "S030|stockout_risk|SKU-1", "kind": "stockout_risk", "severity_usd": 50.0, "sku": "SKU-1"}
+OPT = {"option_id": "opt-place", "action_type": "place_order", "params": {"sku": "SKU-1", "qty": 12}, "tier": "N1",
+       "tier_reasons": ["calibrated"], "net_usd_mid": 20.0}
+OPT_NOTHING = {"option_id": "opt-none", "action_type": "do_nothing", "params": {}, "tier": "N0", "tier_reasons": [],
+               "net_usd_mid": 0.0}
+ISSUE = {"issue_id": "S030|stockout_risk|SKU-1", "kind": "stockout_risk", "severity_usd": 50.0, "sku": "SKU-1",
+         "options": [OPT, OPT_NOTHING]}
 
 
 @pytest.fixture
@@ -66,9 +71,9 @@ def test_advance_alerts_proposals_decision_flow(env):
     alert = client.get("/api/v1/alerts", params={"store_id": "S030"}).json()[0]
     assert alert["state"] == "nueva" and alert["alert_type"] == 2
     prop = client.post("/internal/v1/proposals", headers={"X-Glazed-Case": alert["case_id"], "X-Glazed-Agent": "supply"},
-                       json={"issue_id": ISSUE["issue_id"], "action_type": "place_order", "params": {"sku": "SKU-1"},
-                             "tier": "N2", "rationale": "r"})
+                       json={"issue_id": ISSUE["issue_id"], "option_id": "opt-place", "rationale": "r"})
     assert prop.status_code == 201 and prop.json()["agent_id"] == "supply"
+    assert prop.json()["action_type"] == "place_order" and prop.json()["params"]["qty"] == 12 and prop.json()["tier"] == "N1"
     pending = client.get("/api/v1/proposals", params={"case_id": alert["case_id"], "status": "pending"}).json()
     assert len(pending) == 1
     assert client.post(f"/api/v1/proposals/{pending[0]['proposal_id']}/decision",
@@ -207,23 +212,78 @@ def test_internal_api_resolves_peer_session_ids_to_the_parent_case(env):
     assert bad.status_code == 400
 
 
+def advanced_case(client):
+    c = mkcase(client)
+    client.post(f"/api/v1/cases/{c['case_id']}/advance", json={"days": 1})
+    return client.get("/api/v1/alerts", params={"store_id": "S030"}).json()[0]["case_id"]
+
+
 def test_proposal_agent_is_stored_as_canonical_id(env):
     client, _ = env
-    c = mkcase(client)
-    r = client.post("/internal/v1/proposals", headers={"X-Glazed-Case": c["case_id"], "X-Glazed-Agent": "glazed_supply"},
-                    json={"issue_id": "S030|stockout_risk|SKU-1", "action_type": "place_order", "tier": "N1"})
+    case_id = advanced_case(client)
+    r = client.post("/internal/v1/proposals", headers={"X-Glazed-Case": case_id, "X-Glazed-Agent": "glazed_supply"},
+                    json={"issue_id": ISSUE["issue_id"], "option_id": "opt-place", "rationale": "r"})
     assert r.status_code == 201, r.text
     assert "glazed_supply" not in r.text
 
 
-def test_proposal_from_core_tool_shape_without_tier(env):
+def test_proposal_copies_action_params_and_tier_from_the_stored_option_ignoring_agent_values(env):
+    client, _ = env
+    case_id = advanced_case(client)
+    r = client.post("/internal/v1/proposals", headers={"X-Glazed-Case": case_id, "X-Glazed-Agent": "glazed_orchestrator"},
+                    json={"issue_id": ISSUE["issue_id"], "option_id": "opt-place", "action_type": "transfer_stock",
+                          "params": {"sku": "HACK", "qty": 9999}, "tier": "N1", "rationale": "r"})
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["action_type"] == "place_order" and body["params"] == {"sku": "SKU-1", "qty": 12, "option_id": "opt-place"}
+    assert body["tier"] == "N1" and body["agent_id"] == "orchestrator" and body["rationale"] == "r"
+    dn = client.post("/internal/v1/proposals", headers={"X-Glazed-Case": case_id},
+                     json={"issue_id": ISSUE["issue_id"], "option_id": "opt-none", "rationale": "wait"})
+    assert dn.json()["action_type"] == "do_nothing" and dn.json()["tier"] == "N0"
+
+
+def test_unknown_option_or_issue_is_a_400_and_old_shape_without_option_id_too(env):
+    client, _ = env
+    case_id = advanced_case(client)
+    h = {"X-Glazed-Case": case_id}
+    assert client.post("/internal/v1/proposals", headers=h, json={"issue_id": ISSUE["issue_id"], "option_id": "nope"}).status_code == 400
+    assert client.post("/internal/v1/proposals", headers=h, json={"issue_id": "S030|x|y", "option_id": "opt-place"}).status_code == 400
+    assert client.post("/internal/v1/proposals", headers=h, json={"issue_id": ISSUE["issue_id"], "action_type": "place_order"}).status_code == 400
+    assert client.get("/api/v1/proposals").json() == []
+
+
+def test_options_served_by_issues_are_remembered_for_proposals(env):
+    client, c = env
+    case = mkcase(client, sim_today="2026-03-11")  # no alert exists for this issue yet
+    h = {"X-Glazed-Case": case["case_id"]}
+    assert client.get("/internal/v1/issues", headers=h).json()[0]["options"]
+    r = client.post("/internal/v1/proposals", headers=h, json={"issue_id": ISSUE["issue_id"], "option_id": "opt-place"})
+    assert r.status_code == 201, r.text
+
+
+def test_public_proposal_route_reuses_the_option_lookup(env):
+    client, _ = env
+    case_id = advanced_case(client)
+    r = client.post("/api/v1/proposals", json={"case_id": case_id, "issue_id": ISSUE["issue_id"],
+                                               "option_id": "opt-place", "rationale": "go"})
+    assert r.status_code == 201 and r.json()["status"] == "pending" and r.json()["tier"] == "N1"
+    bad = client.post("/api/v1/proposals", json={"case_id": case_id, "issue_id": ISSUE["issue_id"], "option_id": "zzz"})
+    assert bad.status_code == 400
+    assert client.post("/api/v1/proposals", json={"case_id": "nope", "issue_id": "i", "option_id": "o"}).status_code == 404
+    pid = r.json()["proposal_id"]
+    assert client.post(f"/api/v1/proposals/{pid}/decision", json={"approved": True, "reason": "ok"}).status_code == 200
+
+
+def test_public_order_plan_and_kpis_routes(env):
     client, _ = env
     c = mkcase(client)
-    r = client.post("/internal/v1/proposals", headers={"X-Glazed-Case": c["case_id"], "X-Glazed-Agent": "glazed_orchestrator"},
-                    json={"issue_id": "S030|stockout_risk|SKU-1", "option_id": "A", "action_type": "place_order",
-                          "params": {"sku": "SKU-1"}, "rationale": "r"})
-    assert r.status_code == 201, r.text
-    assert r.json()["tier"] == "N2" and r.json()["agent_id"] == "orchestrator"
+    plan = client.get(f"/api/v1/cases/{c['case_id']}/order-plan").json()
+    assert plan["case_id"] == c["case_id"] and plan["store_id"] == "S030" and plan["as_of"] == "2026-03-10"
+    assert plan["store_display_name"] and isinstance(plan["lines"], list)
+    k = client.get(f"/api/v1/cases/{c['case_id']}/kpis").json()
+    assert k["case_id"] == c["case_id"] and k["date_to"] == "2026-03-10" and k["lost_sales_usd"]["mid"] >= 0
+    assert client.get(f"/api/v1/cases/{c['case_id']}/kpis", params={"date_to": "2026-03-12"}).status_code == 400
+    assert client.get("/api/v1/cases/nope/order-plan").status_code == 404
 
 
 def test_record_event_from_core_tool_shape(env):

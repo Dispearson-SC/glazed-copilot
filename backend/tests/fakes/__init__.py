@@ -37,7 +37,8 @@ class FakeMetrics:
     def kpis(self, store_id, as_of, date_from, date_to):
         self._guard(as_of, date_to)
         self.calls.append(("kpis", store_id, as_of, date_from, date_to))
-        return {"store_id": store_id, "net_sales": 1000.0, "date_from": str(date_from), "date_to": str(date_to)}
+        return {"store_id": store_id, "net_sales": 1000.0, "date_from": str(date_from), "date_to": str(date_to),
+                "waste_usd": 12.0, "lost_sales_usd": {"low": 1.0, "mid": 2.0, "high": 3.0}}
 
     def day_summary(self, store_id, as_of, day):
         self._guard(as_of, day)
@@ -52,7 +53,7 @@ class FakeMetrics:
         return {"sku": sku, "as_of": str(as_of), "horizon": horizon}
 
     def order_plan(self, store_id, as_of):
-        return {"method": "simple_v0", "lines": []}
+        return {"store_id": store_id, "as_of": str(as_of), "method": "simple_v0", "lines": []}
 
     def supplier_performance(self, store_id, as_of):
         return [{"supplier_id": "SUP01", "on_time_pct": 90.0}]

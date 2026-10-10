@@ -16,12 +16,13 @@ from ...domain import Case, DomainError, canonical_agent_id, case_id_from_sessio
 
 
 class ProposalBody(BaseModel):
+    """The agent names an option; action_type/params/tier below are legacy fields that are ignored."""
     issue_id: str
     option_id: str | None = None
-    action_type: str
-    params: dict[str, Any] = {}
-    tier: str = "N2"  # agents do not pick the approval tier; the manager always decides
     rationale: str = ""
+    action_type: str | None = None
+    params: dict[str, Any] = {}
+    tier: str | None = None
 
 
 class EventBody(BaseModel):
@@ -79,7 +80,10 @@ def build_internal_router(c: Any) -> APIRouter:
 
     @r.get("/issues")
     def issues(case: Ctx, limit: int = 5):
-        return names.tag(c.metrics.issues(case.store_id, case.sim_today, max(1, min(limit, 20))), case.store_id)
+        found = names.tag(c.metrics.issues(case.store_id, case.sim_today, max(1, min(limit, 20))), case.store_id)
+        for issue in found:
+            c.served[(case.case_id, issue["issue_id"])] = issue
+        return found
 
     @r.get("/inventory/projection")
     def projection(case: Ctx, sku: str, horizon: int = 7):
@@ -112,9 +116,8 @@ def build_internal_router(c: Any) -> APIRouter:
 
     @r.post("/proposals", status_code=201)
     def post_proposal(case: Ctx, b: ProposalBody, x_glazed_agent: Annotated[str | None, Header()] = None):
-        return jsonable_encoder(uc.SubmitProposal(c.cases, c.proposals).execute(
-            case.case_id, b.issue_id, b.action_type, {**b.params, **({"option_id": b.option_id} if b.option_id else {})},
-            b.tier, b.rationale, canonical_agent_id(x_glazed_agent or "")))
+        return jsonable_encoder(uc.ProposeOption(c.cases, c.proposals, c.alerts, c.metrics, c.served).execute(
+            case.case_id, b.issue_id, b.option_id, b.rationale, canonical_agent_id(x_glazed_agent or "")))
 
     @r.post("/events", status_code=201)
     def post_event(case: Ctx, b: EventBody, x_glazed_agent: Annotated[str | None, Header()] = None):
