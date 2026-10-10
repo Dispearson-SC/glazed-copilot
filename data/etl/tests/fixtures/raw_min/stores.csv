@@ -1,0 +1,2 @@
+store_id,site_id,store_name,format,operator_type,opening_time,closing_time,opened_date,closed_date,sqft,seats
+S001,ST01,food court – full counter 1,Full Counter,Owned F&B,05:00,21:00,2020-01-01,,100,5

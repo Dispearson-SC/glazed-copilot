@@ -1,0 +1,3 @@
+store_id,date,footfall,transactions,units_sold,net_sales,staff_hours,open_hours
+S001,2026-01-05,100,10,5,14.00,40,16
+S001,2026-01-06,100,5,5,12.00,999,16

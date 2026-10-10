@@ -1,0 +1,5 @@
+# Runtime dependencies of the data pipeline (ETL + forecast job). Pinned to the versions the shipped results were built with.
+duckdb==1.5.6
+numpy==2.5.3
+pandas==3.0.6
+pyarrow==26.0.0

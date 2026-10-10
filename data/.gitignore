@@ -1,0 +1,7 @@
+# Derived artifacts: rebuilt by `make data` from vendor/dataset-road2tech.
+clean/
+forecast/out/
+.deps/
+.venv/
+__pycache__/
+.pytest_cache/

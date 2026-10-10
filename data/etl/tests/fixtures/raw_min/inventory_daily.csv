@@ -1,0 +1,2 @@
+date,store_id,sku,opening_qty,received_qty,units_sold,expired_qty,damaged_qty,closing_qty,on_order_qty,stockout_hours
+2026-01-05,S001,SKU-100001,0,10,3,0,0,9,0,0

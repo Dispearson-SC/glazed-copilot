@@ -1,0 +1,2 @@
+price_id,store_id,sku,unit_price,currency,effective_from,effective_to,price_list,last_updated
+PRC1,S001,SKU-100001,2.0,Usd,01/01/2025,,STANDARD,2025-01-01

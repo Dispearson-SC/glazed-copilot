@@ -1,0 +1,2 @@
+promo_id,promo_name,promo_type,start_date,end_date,discount_pct,department,category,region_scope,expected_uplift_pct
+PR001,Fall,Percent Off,2026-01-01,2026-01-31,10,Bakery,,ALL,10

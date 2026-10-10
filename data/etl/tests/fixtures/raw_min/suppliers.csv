@@ -1,0 +1,2 @@
+supplier_id,supplier_name,category_focus,standard_lead_time_days,contract_fill_rate,contract_on_time_rate,min_order_value,delivery_days
+SUP01,Northfield,Bakery,1,0.95,0.93,150,Daily

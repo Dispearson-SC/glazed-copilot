@@ -1,0 +1,3 @@
+sku,product_name,department,category,subcategory,brand,supplier_id,unit_cost,list_price_base,case_size,shelf_life_days,is_perishable,storage_type,inventory_tracked,is_seasonal,launch_date,discontinued_date,status
+SKU-100001,Plain Donut,Bakery,Bakery,Breakfast Pastry,House,SUP01,0.5,2.0,12,1,1,Ambient,1,0,2024-01-01,,Active
+SKU-100002,Sandwich,Food,Sandwiches,Hot,House,SUP01,1.5,4.0,6,3,1,Chilled,1,0,2024-01-01,,Active

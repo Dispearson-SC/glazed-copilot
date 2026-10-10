@@ -1,0 +1,2 @@
+po_id,store_id,supplier_id,sku,order_date,expected_date,received_date,qty_ordered,qty_received,unit_cost,status
+PO1,S001,SUP99,SKU-100001,2026-01-04,,2026-01-05,10,10,0,Delivered
