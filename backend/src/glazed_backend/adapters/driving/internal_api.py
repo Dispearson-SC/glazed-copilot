@@ -11,6 +11,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
+from ...application import sentinel
 from .store_names import StoreNames
 from ...domain import Case, DomainError, canonical_agent_id, case_id_from_session
 
@@ -116,6 +117,11 @@ def build_internal_router(c: Any) -> APIRouter:
     @r.post("/promos/audit")
     def promo_audit(case: Ctx, b: PromoAuditBody):
         return c.metrics.promo_audit(case.store_id, case.sim_today, b.department, b.discount_pct)
+
+    @r.get("/compliance")
+    def compliance(case: Ctx, decision_id: str | None = None):
+        chk = sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace)
+        return jsonable_encoder(chk.one(case.case_id, decision_id) if decision_id else chk.for_case(case.case_id))
 
     @r.get("/history")
     def history(case: Ctx):

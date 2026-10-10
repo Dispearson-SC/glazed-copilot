@@ -235,7 +235,10 @@ def test_proposal_copies_action_params_and_tier_from_the_stored_option_ignoring_
                           "params": {"sku": "HACK", "qty": 9999}, "tier": "N1", "rationale": "r"})
     assert r.status_code == 201, r.text
     body = r.json()
-    assert body["action_type"] == "place_order" and body["params"] == {"sku": "SKU-1", "qty": 12, "option_id": "opt-place"}
+    assert body["action_type"] == "place_order"
+    assert {k: v for k, v in body["params"].items() if k not in ("decision_as_of", "expected")} == {
+        "sku": "SKU-1", "qty": 12, "option_id": "opt-place"}
+    assert body["params"]["decision_as_of"] == "2026-03-11" and body["params"]["expected"]["net_usd_mid"] == 20.0
     assert body["tier"] == "N1" and body["agent_id"] == "orchestrator" and body["rationale"] == "r"
     dn = client.post("/internal/v1/proposals", headers={"X-Glazed-Case": case_id},
                      json={"issue_id": ISSUE["issue_id"], "option_id": "opt-none", "rationale": "wait"})

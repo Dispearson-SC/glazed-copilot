@@ -35,7 +35,7 @@ def canonical_agent_id(agent_id: str) -> str:
 _KIND_TO_ALERT_TYPE = {
     "expiring": 1, "overstock_waste": 1, "stockout_risk": 2, "staffing": 3,
     "min_order": 5, "inflated_order": 5, "misleading_promo": 7, "calendar_uplift": 19,
-    "sku_key_mismatch": 9, "orphan_sku": 9, "short_shipment": 8, "promo": 7,
+    "sku_key_mismatch": 9, "orphan_sku": 9, "compliance_deviation": 21, "short_shipment": 8, "promo": 7,
     "late_delivery": 20, "supplier_variability": 20,
 }
 
@@ -192,8 +192,8 @@ class Alert:
     @classmethod
     def new(cls, alert_type: int, store_id: str, case_id: str, severity_usd: float,
             issue: dict[str, Any], issue_key: str, as_of: date) -> "Alert":
-        if not 1 <= alert_type <= 20:
-            raise DomainError("alert_type must be in the catalog range 1..20")
+        if not 1 <= alert_type <= 21:
+            raise DomainError("alert_type must be in the catalog range 1..20, or 21 (Sentinel compliance)")
         return cls(new_id(), alert_type, store_id, case_id, float(severity_usd), AlertState.NUEVA,
                    issue, issue_key, as_of, utcnow())
 

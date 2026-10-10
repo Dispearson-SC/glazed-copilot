@@ -24,6 +24,7 @@ class FakeMetrics:
     def __init__(self, issues_by_date: dict[date, list[dict]] | None = None) -> None:
         self.calls: list[tuple] = []
         self.issues_by_date = issues_by_date or {}
+        self.observed = {"net_usd": 20.0, "window": ["2026-03-12", "2026-03-14"]}
 
     def _guard(self, as_of: date, d: date) -> None:
         if d > as_of:
@@ -65,6 +66,10 @@ class FakeMetrics:
         self.calls.append(("promo_audit", store_id, as_of, department, discount_pct))
         return {"department": department, "discount_pct": discount_pct, "verdict": "block", "recommendation": "do_nothing",
                 "similar": [{"promo_id": "PR002"}, {"promo_id": "PR005"}], "alternative": {"promo_id": "PR009"}}
+
+    def observed_outcome(self, store_id, as_of, action_type, params):
+        self.calls.append(("observed_outcome", store_id, as_of, action_type))
+        return self.observed
 
     def history(self, store_id, as_of):
         return {"as_of": str(as_of)}

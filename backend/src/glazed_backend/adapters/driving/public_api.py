@@ -8,6 +8,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
+from ...application import sentinel
 from ...domain import AlertState, DomainError, NotFound
 from .store_names import StoreNames
 
@@ -54,6 +55,25 @@ class OutcomeBody(BaseModel):
     summary: str
 
 
+class InjectExecutionBody(BaseModel):
+    proposal_id: str
+    status: str
+    detail: str = ""
+
+
+class InjectEventBody(BaseModel):
+    type: str
+    date_from: date | None = None
+    date_to: date | None = None
+    note: str = ""
+
+
+class InjectBody(BaseModel):
+    """Demo only: inject a not_executed/partial execution (source demo_injected) or an event (bloqueo, ...)."""
+    execution: InjectExecutionBody | None = None
+    event: InjectEventBody | None = None
+
+
 class TransitionBody(BaseModel):
     state: str
 
@@ -61,6 +81,9 @@ class TransitionBody(BaseModel):
 def build_public_router(c: Any) -> APIRouter:
     r = APIRouter(prefix="/api/v1")
     names = StoreNames(c.metrics)
+
+    def checker() -> sentinel.CheckCompliance:
+        return sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace)
 
     @r.get("/health")
     def health() -> dict[str, Any]:
@@ -101,8 +124,26 @@ def build_public_router(c: Any) -> APIRouter:
     @r.post("/cases/{case_id}/advance")
     def advance(case_id: str, b: AdvanceBody | None = None):
         b = b or AdvanceBody()
-        res = uc.AdvanceSimClock(c.cases, c.alerts, c.metrics).execute(case_id, b.days, b.to)
+        res = uc.AdvanceSimClock(c.cases, c.alerts, c.metrics, compliance=checker()).execute(case_id, b.days, b.to)
         return {"sim_today": res["sim_today"], "new_alerts": names.tag(jsonable_encoder(res["alerts"]))}
+
+    @r.get("/cases/{case_id}/compliance")
+    def compliance(case_id: str):
+        return jsonable_encoder(checker().for_case(case_id))
+
+    @r.post("/cases/{case_id}/inject", status_code=201)
+    def inject(case_id: str, b: InjectBody):
+        if b.execution is None and b.event is None:
+            raise DomainError("inject needs an `execution` or an `event`")
+        out: dict[str, Any] = {}
+        if b.execution is not None:
+            out["execution"] = jsonable_encoder(sentinel.InjectExecution(c.cases, c.proposals, c.executions).execute(
+                case_id, b.execution.proposal_id, b.execution.status, b.execution.detail))
+        if b.event is not None:
+            ev = sentinel.InjectEvent(uc.RecordEvent(c.cases, c.trace, c.clock)).execute(
+                case_id, b.event.type, b.event.date_from, b.event.date_to, b.event.note)
+            out["event"] = {**ev.payload, "event_id": ev.event_id}
+        return out
 
     @r.get("/alerts")
     def alerts(store_id: str | None = None, state: str | None = None):

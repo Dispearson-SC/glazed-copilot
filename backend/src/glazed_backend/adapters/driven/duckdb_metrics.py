@@ -20,6 +20,10 @@ from ...metrics.integrity import integrity_issues, scan_sales
 from ...metrics.issues import detect_issues
 from ...metrics.replay import calibrate
 from ...metrics.losses import lost_sales_window
+from ...metrics.confidence import realized_add_net, realized_reduce_net
+from ...metrics.demand import uncensor
+from ...metrics.inventory import is_short_life
+from ...metrics.sentinel import HORIZON_DAYS
 from ...metrics.calendar_effect import calendar_issue, event_effect
 from ...metrics.plan import apply_min_order, plan_line
 from ...metrics.promo_audit import BASELINE, PromoRef, audit_promo, promo_issue
@@ -495,6 +499,27 @@ class DuckDBMetrics:
         for r in rows:
             r["waste_usd"] = waste.get(r["week_start"], 0.0)
         return {"store_id": store_id, "as_of": as_of.isoformat(), "weeks": rows}
+
+    # -- Sentinel ----------------------------------------------------------------
+    def observed_outcome(self, store_id: str, as_of: date, action_type: str, params: dict[str, Any]) -> dict[str, Any] | None:
+        sku, d0 = params.get("sku"), params.get("decision_as_of")
+        if not sku or not d0 or action_type not in ("place_order", "adjust_order_qty", "skip_order"):
+            return None
+        d0 = date.fromisoformat(d0)
+        snap = self._snapshot(store_id, as_of)
+        prod, rows = snap.products.get(sku), snap.rows.get(sku, [])
+        win = [r for r in rows if d0 < r.date <= d0 + timedelta(days=HORIZON_DAYS) and r.date <= as_of]
+        if prod is None or len(win) < HORIZON_DAYS:
+            return None
+        qty = float(params.get("qty") or 0)
+        if params.get("typical_qty") is not None:  # a reduction against the usual order
+            net = realized_reduce_net(win, float(params["typical_qty"]) - qty, prod.price, prod.unit_cost)
+        else:
+            net = realized_add_net(win, uncensor(rows, snap.store.open_hours).demand, qty, prod.price, prod.unit_cost,
+                                   is_short_life(prod.shelf_life_days))
+        return {"net_usd": round(net, 2), "window": [win[0].date.isoformat(), win[-1].date.isoformat()],
+                "units_sold": sum(r.sold for r in win), "units_expired": sum(r.expired for r in win),
+                "method": "replay of the calibration rule on the decision window"}
 
     # -- Backtest ----------------------------------------------------------------
     def backtest_day(self, store_id: str, day: date, policy: str) -> dict[str, Any]:

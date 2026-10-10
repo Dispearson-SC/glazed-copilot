@@ -248,3 +248,13 @@ def test_without_the_raw_layer_orphans_come_from_the_dq_log_only(m):
     assert [i["kind"] for i in found] == ["orphan_sku"]
     assert {e["metric"]: e["value"] for e in found[0]["evidence"]}["orphan_rows"] == 400
     assert any("raw layer" in c for c in found[0]["data_caveats"])
+
+
+def test_observed_outcome_measures_a_reduction_only_after_the_window_closes(m):
+    over = next(i for i in m.issues(S, AS_OF, limit=1000) if i["kind"] == "inflated_order")
+    opt = next(o for o in over["options"] if o["action_type"] in ("adjust_order_qty", "skip_order"))
+    params = {**opt["params"], "decision_as_of": AS_OF.isoformat()}
+    assert m.observed_outcome(S, date(2026, 3, 12), opt["action_type"], params) is None  # window incomplete at as_of
+    got = m.observed_outcome(S, date(2026, 3, 14), opt["action_type"], params)
+    assert isinstance(got["net_usd"], float) and got["window"] == ["2026-03-11", "2026-03-13"]
+    assert m.observed_outcome(S, date(2026, 3, 14), "run_promo", params) is None

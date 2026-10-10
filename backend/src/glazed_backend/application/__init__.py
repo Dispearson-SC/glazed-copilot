@@ -167,10 +167,12 @@ class GetDaySummary:
 class AdvanceSimClock:
     """Move the case's simulated 'today' forward and run detectors for the store.
 
-    Each detected issue becomes one Alert, and opens its own case (idempotent per issue key)."""
+    Each detected issue becomes one Alert, and opens its own case (idempotent per issue key). The Sentinel check runs
+    too: an approved decision that was not executed, or missed its simulated range, raises a compliance alert."""
 
-    def __init__(self, cases: CaseRepository, alerts: AlertRepository, metrics: MetricsPort, limit: int = 5) -> None:
-        self.cases, self.alerts, self.metrics, self.limit = cases, alerts, metrics, limit
+    def __init__(self, cases: CaseRepository, alerts: AlertRepository, metrics: MetricsPort, limit: int = 5,
+                 compliance: Any = None) -> None:
+        self.cases, self.alerts, self.metrics, self.limit, self.compliance = cases, alerts, metrics, limit, compliance
 
     def execute(self, case_id: str, days: int = 1, to: date | None = None) -> dict[str, Any]:
         case = _case(self.cases, case_id)
@@ -183,25 +185,29 @@ class AdvanceSimClock:
 
     def detect(self, case_id: str) -> list[Alert]:
         case = _case(self.cases, case_id)
-        out: list[Alert] = []
-        for issue in self.metrics.issues(case.store_id, case.sim_today, self.limit):
-            key = issue["issue_id"]
-            alert = self.alerts.get_by_issue_key(key)
-            if alert is not None and "options" not in alert.issue:  # raised before issues carried options
-                alert.issue, alert.severity_usd = issue, float(issue.get("severity_usd", alert.severity_usd))
-                self.alerts.update(alert)
-            if alert is None:
-                opened = self.cases.get_by_issue_key(key)
-                if opened is None:
-                    opened = Case.new(case.store_id, case.sim_today, case.mode,
-                                      f"{issue.get('kind', 'issue')} {issue.get('sku') or ''}".strip(),
-                                      parent_case_id=case.case_id, issue_key=key)
-                    self.cases.add(opened)
-                alert = Alert.new(alert_type_for_kind(issue.get("kind", "")), case.store_id, opened.case_id,
-                                  issue.get("severity_usd", 0.0), issue, key, case.sim_today)
-                self.alerts.add(alert)
-            out.append(alert)
+        out: list[Alert] = [self._raise(case, issue) for issue in self.metrics.issues(case.store_id, case.sim_today, self.limit)]
+        if self.compliance is not None:
+            from .sentinel import deviation_issue
+            out += [self._raise(case, deviation_issue(res, case.sim_today)) for res in self.compliance.deviations(case.case_id)]
         return out
+
+    def _raise(self, case: Case, issue: dict[str, Any]) -> Alert:
+        key = issue["issue_id"]
+        alert = self.alerts.get_by_issue_key(key)
+        if alert is not None and "options" not in alert.issue:  # raised before issues carried options
+            alert.issue, alert.severity_usd = issue, float(issue.get("severity_usd", alert.severity_usd))
+            self.alerts.update(alert)
+        if alert is None:
+            opened = self.cases.get_by_issue_key(key)
+            if opened is None:
+                opened = Case.new(case.store_id, case.sim_today, case.mode,
+                                  f"{issue.get('kind', 'issue')} {issue.get('sku') or ''}".strip(),
+                                  parent_case_id=case.case_id, issue_key=key)
+                self.cases.add(opened)
+            alert = Alert.new(alert_type_for_kind(issue.get("kind", "")), case.store_id, opened.case_id,
+                              issue.get("severity_usd", 0.0), issue, key, case.sim_today)
+            self.alerts.add(alert)
+        return alert
 
 
 class ListAlerts:
@@ -257,8 +263,14 @@ class ProposeOption:
         option = next((o for o in (issue or {}).get("options", []) if o.get("option_id") == option_id), None)
         if option is None:
             raise DomainError(f"unknown option {option_id!r} for issue {issue_id!r}")
+        ben, cost = option.get("expected_benefit_usd") or {}, option.get("cost_usd")
+        lo, hi = ben.get("low"), ben.get("high")
+        expected = {"net_usd_mid": option.get("net_usd_mid"), "cost_usd": cost,
+                    "net_usd_low": None if lo is None or cost is None else round(lo - cost, 2),
+                    "net_usd_high": None if hi is None or cost is None else round(hi - cost, 2)}
         proposal = Proposal.new(case.case_id, case.store_id, issue_id, option["action_type"],
-                                {**option.get("params", {}), "option_id": option_id},
+                                {**option.get("params", {}), "option_id": option_id,
+                                 "decision_as_of": case.sim_today.isoformat(), "expected": expected},
                                 option.get("tier") or "N2", rationale, agent_id)
         self.proposals.add(proposal)
         return proposal
