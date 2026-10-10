@@ -43,7 +43,7 @@ export default function AnalysisCard({
           {(
             [
               ["Impacto", item.value || "Sin datos", "text-tertiary-fixed-dim"],
-              ["Confianza", item.confPct, ""],
+              [item.confLabel, item.confPct, ""],
               ["Límite", item.deadline, ""],
             ] as const
           ).map(([label, value, tone]) => (

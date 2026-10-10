@@ -1,6 +1,6 @@
 import { useApi } from "../../ApiContext";
 import { isUnavailable } from "../../api";
-import { SOON_TEXT } from "../../data/copilot";
+import { SOON_TEXT, confLabelFor } from "../../data/copilot";
 import { usd } from "../../format";
 import type { Range3, TransferOptionsResponse } from "../../types";
 import { usePolling } from "../../usePolling";
@@ -59,7 +59,7 @@ export default function TransferOptions({ caseId }: { caseId: string }) {
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-label-sm text-label-sm font-normal text-on-surface-variant">
             <span>Costo {usd(o.transfer_cost_usd)}</span>
             <span>Neto {netText(o.net_usd)}</span>
-            <span>Confianza {o.confidence.score == null ? "Sin datos" : `${Math.round(o.confidence.score * 100)}%`}</span>
+            <span>{confLabelFor(o.confidence.calibrated)} {o.confidence.score == null ? "Sin datos" : `${Math.round(o.confidence.score * 100)}%`}</span>
             <span>Vence el {o.expires_on}</span>
           </div>
           <p className="m-0 text-[13px] leading-[19px] text-on-surface">{o.rationale_es}</p>

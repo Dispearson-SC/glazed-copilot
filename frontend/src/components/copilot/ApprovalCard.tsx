@@ -27,7 +27,7 @@ export default function ApprovalCard({ item, onAnalyze }: { item: DecisionItem; 
         <span className="font-headline-sm text-headline-sm font-bold text-primary">{item.value || "Sin datos"}</span>
         <div className="flex flex-1 flex-col gap-1">
           <div className="flex justify-between font-label-sm text-label-sm font-normal text-on-surface-variant">
-            <span>Confianza calibrada</span>
+            <span>{item.confLabel}</span>
             <span className="font-bold text-primary">{item.confPct}</span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-surface-container">

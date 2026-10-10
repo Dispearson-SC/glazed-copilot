@@ -35,7 +35,7 @@ describe("TransferOptions", () => {
     expect(card).toHaveTextContent("8 unidades");
     expect(card).toHaveTextContent("Costo $15.80");
     expect(card).toHaveTextContent("Neto +$17.84 a +$20.92");
-    expect(card).toHaveTextContent("Confianza 30%");
+    expect(card).toHaveTextContent("Confianza estimada (sin calibrar) 30%");
     expect(card).toHaveTextContent("Vence el 2026-07-20");
     expect(card).toHaveTextContent("Trasladar 8 cuesta $15.80 y evita merma.");
     expect(screen.queryByRole("status", { name: /Cargando traslados/ })).toBeNull();

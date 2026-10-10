@@ -23,7 +23,7 @@ describe("AnalysisCard", () => {
     expect(screen.getByRole("heading", { name: approval.title })).toBeInTheDocument();
     expect(screen.getByText("Impacto").nextSibling).toHaveTextContent("+$58.92");
     expect(screen.getByText(/Reduce la merma en \$58.92/)).toBeInTheDocument();
-    expect(screen.getByText("Confianza").nextSibling).toHaveTextContent("74%");
+    expect(screen.getByText("Confianza calibrada").nextSibling).toHaveTextContent("74%");
     expect(screen.getByText("Límite").nextSibling).toHaveTextContent("Hoy");
     for (const l of ["Problema", "Recomendación", "Pros", "Contras", "Requiere tu aprobación"]) expect(screen.getByText(l)).toBeInTheDocument();
   });
