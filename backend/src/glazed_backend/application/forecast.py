@@ -105,7 +105,10 @@ class GetForecast:
     def execute(self, case_id: str, sku: str | None = None, date_from: date | None = None, date_to: date | None = None,
                 level: str | None = None) -> dict[str, Any]:
         from . import _case
-        case = _case(self.cases, case_id)
+        return self.for_case(_case(self.cases, case_id), sku, date_from, date_to, level)
+
+    def for_case(self, case, sku: str | None = None, date_from: date | None = None, date_to: date | None = None,
+                 level: str | None = None) -> dict[str, Any]:
         as_of = case.sim_today
         level = level or ("sku" if sku else "store")
         if level not in ("sku", "store"):
@@ -301,19 +304,25 @@ class StoreMetricForecast:
 
     def execute(self, case_id: str, metric: str | None = None, date_from: date | None = None, date_to: date | None = None,
                 level: str | None = None, sku: str | None = None) -> dict[str, Any]:
+        from . import _case
+        return self.for_case(_case(self.cases, case_id), metric, date_from, date_to, level, sku)
+
+    def execute_case(self, case, metric: str, date_from: date, date_to: date) -> dict[str, Any]:
+        return self.for_case(case, metric, date_from, date_to, "store")
+
+    def for_case(self, case, metric: str | None = None, date_from: date | None = None, date_to: date | None = None,
+                 level: str | None = None, sku: str | None = None) -> dict[str, Any]:
         metric = metric or "net_sales"
         if metric not in METRICS:
             raise DomainError(f"metric must be one of {', '.join(METRICS)}")
         if metric != "net_sales" and (sku or level not in (None, "store")):
             raise DomainError(f"metric {metric} is only available at level=store")
         if metric == "net_sales":
-            out = GetForecast(self.cases, self.metrics, self.forecasters).execute(case_id, sku, date_from, date_to, level)
+            out = GetForecast(self.cases, self.metrics, self.forecasters).for_case(case, sku, date_from, date_to, level)
             as_of = out["as_of"]
             out["points"] = [{**p, "projected": p["date"] > as_of} for p in out["points"]]
             return {**out, "metric": "net_sales", "source": "store_daily_kpis+sku forecast",
                     "store_display_name": self.names.of(out["store_id"]) if self.names else out["store_id"]} if out["level"] == "store" else out
-        from . import _case
-        case = _case(self.cases, case_id)
         as_of = case.sim_today
         date_from = date_from or as_of - timedelta(days=DEFAULT_PAST_DAYS)
         date_to = date_to or as_of + timedelta(days=DEFAULT_AHEAD_DAYS)

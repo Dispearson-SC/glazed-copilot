@@ -200,3 +200,82 @@ class StaffingView(_View):
                                               "n_store_days": n, "window_days": WINDOW_DAYS},
                              days=out, note=self.NOTE,
                              planned_hours_note="no roster in the data; staff hours dated after the case date are never read")
+
+
+ZERO = {"low": 0.0, "mid": 0.0, "high": 0.0}
+
+
+class OutlookView(_View):
+    """Tomorrow onwards, day by day: net sales, transactions and average ticket as ranges, plus expected waste (lots
+    that expire, from the expiring view) and expected lost sales (stock vs the SKU forecast quantiles, counting the
+    open purchase orders). Every day is a projection. There is no weather feed: weather is null."""
+    SOURCE = "forecast+inventory_daily+purchase_orders"
+    MAX_DAYS = 7
+    WEATHER_NOTE = "Sin pronóstico"
+
+    def __init__(self, metrics: Any, names: Any, forecasters: list, flow_forecaster: Any) -> None:
+        super().__init__(metrics, names)
+        self.forecasters, self.flow_forecaster = forecasters, flow_forecaster
+
+    def execute(self, case: Case, days: int | None = None) -> dict[str, Any]:
+        from ..domain import Unprocessable  # noqa: F401
+        from .forecast import FlowForecast, ForecastLoader, StoreMetricForecast
+        days = 2 if days is None else days
+        if not 1 <= days <= self.MAX_DAYS:
+            raise DomainError(f"days must be between 1 and {self.MAX_DAYS}")
+        as_of = case.sim_today
+        dates = [as_of + timedelta(days=i) for i in range(1, days + 1)]
+        sales = {}
+        try:
+            got = StoreMetricForecast(None, self.metrics, self.forecasters, self.flow_forecaster, self.names)
+            sales = {p["date"]: p for p in got.execute_case(case, "net_sales", dates[0], dates[-1])["points"]}
+        except NotFound:
+            pass
+        flow = FlowForecast(self.metrics, self.flow_forecaster)
+        waste = {d["date"]: d["waste_usd"] for d in ExpiringView(self.metrics, self.names).execute(case, days)["by_day"]}
+        lost = self._lost_sales(case, dates, ForecastLoader(self.metrics, self.forecasters))
+        out = []
+        for i, d in enumerate(dates):
+            iso = d.isoformat()
+            try:
+                f = flow.execute(case, d)
+            except NotFound:
+                f = {"transactions": None, "avg_ticket": None}
+            s = sales.get(iso)
+            out.append({"date": iso, "projected": True,
+                        "net_sales": {"low": s["p10"], "mid": s["forecast"], "high": s["p90"]} if s else None,
+                        "transactions": _range(f["transactions"]), "avg_ticket": _range(f["avg_ticket"]),
+                        "expected_waste_usd": waste.get(iso, dict(ZERO)),
+                        "expected_lost_sales_usd": lost[i], "weather": None, "weather_note": self.WEATHER_NOTE})
+        return self.envelope(case, days=out)
+
+    def _lost_sales(self, case: Case, dates: list[date], loader: Any) -> list[dict[str, float]]:
+        from ..metrics.stockflow import arrivals_by_sku, project_lost_sales
+        as_of, store = case.sim_today, case.store_id
+        total = [dict(ZERO) for _ in dates]
+        try:
+            loaded = loader.load(store, as_of, None, dates[0], dates[-1])
+        except NotFound:
+            return total
+        got = self.metrics.delivery_inputs(store, as_of, as_of + timedelta(days=PROJECTION_HORIZON))
+        arrivals = arrivals_by_sku([p for p in got["pos"] if p["order_date"] <= as_of], as_of)
+        rows: dict[str, dict[date, Any]] = {}
+        for r in loaded.result.rows:
+            rows.setdefault(r.sku, {})[r.date] = r
+        for s in loaded.history:
+            known = [r for r in s.rows if r.date <= as_of]  # NO LOOK-AHEAD
+            if not known or s.sku not in rows or not any(r.sold > 0 for r in known if r.date > as_of - timedelta(days=SELLING_DAYS)):
+                continue  # inactive SKUs do not sell tomorrow either
+            fc = rows[s.sku]
+            if any(d not in fc for d in dates):
+                continue
+            demand = [(fc[d].quantile(0.1) or 0.0, fc[d].forecast, fc[d].quantile(0.9) or 0.0) for d in dates]
+            arr = [arrivals.get(s.sku, {}).get(d, 0.0) for d in dates]
+            for i, day in enumerate(project_lost_sales(float(max(known, key=lambda r: r.date).closing), s.price, demand, arr)):
+                for k in ZERO:
+                    total[i][k] += day[k]
+        return [{k: round(v, 2) for k, v in t.items()} for t in total]
+
+
+def _range(band: dict[str, float] | None) -> dict[str, float] | None:
+    return None if not band else {"low": band["p10"], "mid": band["p50"], "high": band["p90"]}

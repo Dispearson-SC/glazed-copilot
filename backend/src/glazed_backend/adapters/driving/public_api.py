@@ -326,6 +326,10 @@ def build_public_router(c: Any) -> APIRouter:
     def staffing(case_id: str, days: int | None = None):
         return uc_manager.StaffingView(c.metrics, names, c.flow_forecaster).execute(case_of(case_id), days)
 
+    @r.get("/cases/{case_id}/outlook")
+    def outlook(case_id: str, days: int | None = None):
+        return uc_manager.OutlookView(c.metrics, names, c.forecasters, c.flow_forecaster).execute(case_of(case_id), days)
+
     @r.get("/cases/{case_id}/executions")
     def executions(case_id: str):
         uc.ResumeCase(c.cases).execute(case_id)
