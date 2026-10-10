@@ -306,9 +306,9 @@ def test_turn_404_right_after_the_202_is_pending_then_an_error(w):
     tid = ask.execute(c.case_id, "hi")
     del w.core.turns[tid]  # fake core raises KeyError today; make it a 404 like the real one
     w.core.get_turn = lambda turn_id, store_id: (_ for _ in ()).throw(NotFound("no turn"))
-    assert get.execute(c.case_id, tid) == {"turn_id": tid, "status": "pending"}
+    assert get.execute(c.case_id, tid) == {"turn_id": tid, "status": "pending", "progress": []}
     w.clock._now += timedelta(seconds=90)  # a turn queued behind another one in the conversation stays 404 for ~90s
-    assert get.execute(c.case_id, tid) == {"turn_id": tid, "status": "pending"}
+    assert get.execute(c.case_id, tid) == {"turn_id": tid, "status": "pending", "progress": []}
     w.clock._now += timedelta(seconds=60)
     with pytest.raises(NotFound):
         get.execute(c.case_id, tid)
@@ -317,9 +317,9 @@ def test_turn_404_right_after_the_202_is_pending_then_an_error(w):
 def test_turn_statuses_map_to_the_public_contract(w):
     ask, get = _turns(w)
     c, tid = _sent_turn(w, ask, {"turn_id": "x", "status": "running", "text": None})
-    assert get.execute(c.case_id, tid) == {"turn_id": tid, "status": "pending"}
+    assert get.execute(c.case_id, tid) == {"turn_id": tid, "status": "pending", "progress": []}
     w.core.turns[tid] = {"turn_id": tid, "status": "finished", "text": "all good"}
-    assert get.execute(c.case_id, tid) == {"turn_id": tid, "status": "done", "reply": "all good"}
+    assert get.execute(c.case_id, tid) == {"turn_id": tid, "status": "done", "reply": "all good", "progress": []}
 
 
 def test_waiting_is_pending_unless_an_approval_is_open(w):

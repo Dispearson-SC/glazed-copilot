@@ -8,7 +8,7 @@ from typing import Any
 
 from ..domain import (Alert, AlertState, BacktestRun, Case, DomainError, Execution, Experience, FutureDate, InvalidTransition, NotFound,
                       Proposal, TraceEvent, TurnRecord, alert_type_for_kind, canonical_agent_id, case_id_from_session, new_id)
-from .reply_sanitizer import clean_reply, sanitize_reply  # noqa: F401 - sanitize_reply stays importable from here
+from .reply_sanitizer import clean_reply, role_name_es, sanitize_reply  # noqa: F401 - sanitize_reply stays importable from here
 from ..ports import (AlertRepository, BacktestRepository, CaseRepository, Clock, CorePort,
                      ExecutionRepository, ExperienceMemoryPort, MetricsPort, ProposalRepository, TracePort,
                      TurnRepository)
@@ -151,6 +151,9 @@ class GetTurn:
             return self._stored(turn_id, rec)  # final and already judged: stable, never rewritten again
         meta: dict[str, Any] = {}
         out = self._poll(case, turn_id, meta)
+        out["progress"] = self._progress(case, turn_id, out.get("status") in ("done", "failed"))
+        if out["progress"] and out.get("status") == "done":
+            meta["progress"] = out["progress"]
         self._persist(turn_id, out, meta)
         ctx = ((rec.reply_meta or {}).get("context")) if rec is not None else None
         if ctx:  # the pinned issue context is echoed on every read of the turn
@@ -164,7 +167,39 @@ class GetTurn:
             out["reply_meta"] = {"rewritten": True, "sanitized": True}
         if rec.reply_meta and rec.reply_meta.get("context"):
             out["reply_meta"] = {**out.get("reply_meta", {}), "context": rec.reply_meta["context"]}
+        out["progress"] = list((rec.reply_meta or {}).get("progress") or [])
         return out
+
+    def _progress(self, case: Case, turn_id: str, finished: bool) -> list[dict[str, str]]:
+        """[{agent_id, display_name_es, state: consulting|done}] from the orchestrator's peer asks in this turn: an ask
+        is consulting until its peer_exchange carries an answer; a finished turn has no open consultation."""
+        if not case.core_conversation_id:
+            return []
+        try:
+            entries = self.core.list_transcript(case.core_conversation_id, case.store_id)
+        except Exception:  # noqa: BLE001 - progress is cosmetic: never fail a poll over it
+            return []
+        order: list[str] = []
+        state: dict[str, str] = {}  # the latest event about an agent decides
+        for e in entries:
+            if str(e.get("turn_id")) != turn_id:
+                continue
+            payload, kind = dict(e.get("payload") or {}), e.get("kind")
+            if kind == "tool_call" and payload.get("tool") == "ask_peer":
+                args = payload.get("arguments") or {}
+                target = args.get("target") or args.get("agent_id") or args.get("target_agent_id")
+                answered = False
+            elif kind == "peer_exchange":
+                target = payload.get("target_agent_id")
+                answered = bool(payload.get("answer")) or str(payload.get("state", "")).lower() in ("answered", "done", "completed", "finished")
+            else:
+                continue
+            if target:
+                agent = canonical_agent_id(str(target))
+                if agent not in order:
+                    order.append(agent)
+                state[agent] = "done" if answered else "consulting"
+        return [{"agent_id": a, "display_name_es": role_name_es(a), "state": "done" if finished else state[a]} for a in order]
 
     def _persist(self, turn_id: str, out: dict[str, Any], meta: dict[str, Any]) -> None:
         """Keep the final status and the FULL sanitized reply (history reads it from here, not from /trace)."""

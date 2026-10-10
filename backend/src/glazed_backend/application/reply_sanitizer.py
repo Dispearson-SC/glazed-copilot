@@ -49,6 +49,13 @@ _NUMERIC = re.compile(r"-?\$?\d[\d,]*(?:\.\d+)?%?")
 _SENTENCE_START = re.compile(r"(?:^|[.!?:]\s+|\n\s*(?:[-*#>]+\s*)?|^\s*#+\s*)$")
 
 
+def role_name_es(agent_id: str) -> str:
+    """Spanish display name of an agent role (`supply` or `glazed_supply`), as a label: no leading article."""
+    role = _ROLES.get(agent_id.removeprefix("glazed_"), "un agente especialista")
+    role = re.sub(r"^(?:el|la|un|una) ", "", role)
+    return role[0].upper() + role[1:]
+
+
 def _role(text: str, m: re.Match[str]) -> str:
     role = _ROLES.get(m.group(1), "un agente especialista")
     return role[0].upper() + role[1:] if _SENTENCE_START.search(text[:m.start()]) else role
