@@ -1,19 +1,22 @@
 import { useCallback, useRef } from "react";
 import AgentWindow from "../components/copilot/AgentWindow";
+import AlertsWindow from "../components/copilot/AlertsWindow";
 import BranchWindow from "../components/copilot/BranchWindow";
 import CapsuleNav, { type CapsuleBadges } from "../components/copilot/CapsuleNav";
 import CopilotTopBar from "../components/copilot/CopilotTopBar";
 import DecisionsWindow from "../components/copilot/DecisionsWindow";
+import MemoriesWindow from "../components/copilot/MemoriesWindow";
 import RejectSheet from "../components/copilot/RejectSheet";
 import Toast from "../components/copilot/Toast";
 import { useStores } from "../components";
-import { buildDayView, buildInventoryRows, buildScheduled, chatContextText, type DecisionItem } from "../data/copilot";
+import { buildDayView, buildInventoryRows, buildMemories, buildScheduled, buildWarnings, chatContextText, type DecisionItem, type WarningItem } from "../data/copilot";
 import { splitStoreName } from "../format";
 import { CopilotProvider, useCopilot } from "../state/copilotStore";
 import { useSession } from "../SessionContext";
 import { storeLabel } from "../types";
 import { useChat } from "../useChat";
 import { useBranchData } from "../useBranchData";
+import { useMemoryData, useWarningsData } from "../useMemoryData";
 import { useCopilotData } from "../useCopilotData";
 import { useCurrentCase } from "../useCurrentCase";
 import { useDecide } from "../useDecide";
@@ -30,6 +33,8 @@ function CopilotShell() {
   const chat = useChat(caseId, { storeId });
   const data = useCopilotData(caseId, simToday, session.refreshKey);
   const branch_ = useBranchData(caseId, simToday, state.tab === "sucursal", session.refreshKey);
+  const warningsData = useWarningsData(storeId, caseId, session.refreshKey);
+  const memoryData = useMemoryData(caseId, state.tab === "memorias", session.refreshKey);
   const decide = useDecide(caseId, data.refresh);
   const [site, branch] = splitStoreName(active ? storeLabel(active) : "Sucursal");
 
@@ -40,7 +45,8 @@ function CopilotShell() {
   const approvals = visible.filter((i) => i.kind === "approval").length;
   const techs = visible.length - approvals;
   const pendingLine = `${approvals} esperan tu opinión · ${techs} listas para aceptar`;
-  const badges: CapsuleBadges = { decisiones: visible.length };
+  const warnings = warningsData ? buildWarnings(warningsData) : [];
+  const badges: CapsuleBadges = { decisiones: visible.length, memorias: state.learned.length, alertas: warnings.length };
 
   const openCard = useCallback(
     (item: DecisionItem, mode: "analizar" | "dialogo") => {
@@ -53,6 +59,13 @@ function CopilotShell() {
 
   const b = branch_.data;
   const dayView = b ? buildDayView(state.day, { asOf: simToday, forecast: b.forecast, ayer: b.ayer, hoy: b.hoy, kpis: b.kpis, expiring: b.expiring, outlook: b.outlook }) : null;
+
+  const ask = (w: WarningItem) => {
+    const userText = `Explícame: ${w.title}`;
+    dispatch({ type: "ctx", ctx: { id: w.id, title: w.title } });
+    dispatch({ type: "tab", tab: "agente" });
+    void chat.send(chatContextText(userText, { issueId: w.id, title: w.title, mode: "advertencia" }), { display: userText });
+  };
 
   const reject = state.rejectFor ? known.current.get(state.rejectFor) : undefined;
 
@@ -96,7 +109,15 @@ function CopilotShell() {
           onGoDecisiones={() => dispatch({ type: "tab", tab: "decisiones" })}
         />
       )}
-      {state.tab !== "agente" && state.tab !== "decisiones" && state.tab !== "sucursal" && <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-16" data-window={state.tab} />}
+      {state.tab === "memorias" && (
+        <MemoriesWindow
+          memories={buildMemories({ history: memoryData.data?.history ?? null, suppliers: memoryData.data?.suppliers ?? null, learned: state.learned })}
+          filter={state.memFilter}
+          onFilter={(value) => dispatch({ type: "memFilter", value })}
+          loading={memoryData.loading}
+        />
+      )}
+      {state.tab === "alertas" && <AlertsWindow warnings={warnings} filter={state.alertFilter} onFilter={(value) => dispatch({ type: "alertFilter", value })} onAsk={ask} />}
       <CapsuleNav tab={state.tab} onChange={(tab) => dispatch({ type: "tab", tab })} badges={badges} />
       <Toast text={state.toast} />
       {reject && (

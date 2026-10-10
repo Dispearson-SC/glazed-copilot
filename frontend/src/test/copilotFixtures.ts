@@ -107,3 +107,27 @@ export const branchDeliveries: DeliveriesResponse = {
     ] },
   ],
 };
+
+// ---- Memorias / Advertencias (real shapes) ----
+import type { AlertRecord, HistoryResponse, Issue as IssueT, SupplierPerformance } from "../types";
+
+export const historyA: HistoryResponse = {
+  as_of: "2026-07-19",
+  decision_log: [
+    { decision_id: "d1", issue_id: "S030|overstock_waste|SKU-100473", kind: "overstock_waste", sku: null, action_type: "skip_order", tier: "N2", status: "rejected", rationale: "t", reason: "Prefiero quedarme corto", created_at: "2026-10-10T05:55:37Z" },
+    { decision_id: "d2", issue_id: "S030|overstock_waste|SKU-100502", kind: "overstock_waste", sku: "SKU-100502", action_type: "skip_order", tier: "N2", status: "approved", rationale: "t", reason: "", created_at: "2026-10-09T05:55:02Z" },
+    { decision_id: "d3", issue_id: "S030|calendar_uplift", kind: "calendar_uplift", sku: null, action_type: "adjust_order_qty", tier: "N2", status: "approved", rationale: "", reason: "", created_at: "2026-10-08T05:55:02Z" },
+    { decision_id: "d4", issue_id: "S030|overstock_waste|SKU-100304", kind: "overstock_waste", sku: "SKU-100304", action_type: "place_order", tier: "N2", status: "pending", rationale: "", reason: "", created_at: "2026-10-07T05:55:02Z" },
+  ],
+};
+export const suppliersA: SupplierPerformance[] = [
+  { supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", received_pos: 667, lead_time_mean_days: 2.17, on_time_pct: 90.1, fill_pct: 99.9, window_days: 180 },
+];
+export const alertsA: AlertRecord[] = [
+  { alert_id: "al1", alert_type: 1, store_id: "S030", case_id: "x", severity_usd: 687.4, state: "nueva", as_of: "2026-03-11", issue: { kind: "overstock_waste", sku: "SKU-100502", product_name: "12 Croiss-Ant Donuts" } },
+  { alert_id: "al2", alert_type: 19, store_id: "S030", case_id: "x", severity_usd: 202.9, state: "nueva", as_of: "2026-03-14", issue: { kind: "calendar_uplift", event: { name: "School break" } } as never },
+  { alert_id: "al3", alert_type: 21, store_id: "S030", case_id: "x", severity_usd: 58.92, state: "nueva", as_of: "2026-05-30", issue: { kind: "compliance_deviation" } },
+];
+export const integrityA: IssueT[] = [
+  { issue_id: "S030|orphan_sku|SKU-7xxxxx", kind: "orphan_sku", integrity: true, category: "integrity", exposure_usd: 14537.12, as_of: "2026-07-19" } as IssueT,
+];

@@ -40,8 +40,8 @@ Strict. Runner: `cd frontend && npm test -- --run`; plus `npm run build` and `np
 - [x] T1 (dfecad6) Tokens and fonts per the handoff (partition, elevation, card/hero/sheet shadows; Playfair/Plus Jakarta), plus the shared copilot shell: CopilotTopBar, CapsuleNav with badges, AgentOrb, Toast, `/copiloto` route and state store. Route: delegated writer.
 - [x] T2 (e9d9ced) Agente window over useChat (orb, status, pinned context, suggestions, composer, AnalysisCard). Route: delegated writer.
 - [x] T3 (ca8bf87) Decisiones window (ApprovalCard, TechDecisionCard, ⋯ menu, RejectSheet) wired to proposals/decision. Route: delegated writer.
-- [x] T4 Sucursal window (Ayer/Hoy/Mañana, sales card, weather, KPIs, inventory, scheduled purchases). Route: delegated writer.
-- [ ] T5 Memorias and Advertencias windows. Route: delegated writer.
+- [x] T4 (d803d40) Sucursal window (Ayer/Hoy/Mañana, sales card, weather, KPIs, inventory, scheduled purchases). Route: delegated writer.
+- [x] T5 Memorias and Advertencias windows. Route: delegated writer.
 - [ ] T6 Realign Main, Login and Chat to their `.dc.html`; BottomNav "Chat" → "Copiloto". Route: delegated writer.
 - [ ] T7 390px screenshots vs the designs, README, and the GAP LIST (design field → backend status). Route: delegated writer.
 
@@ -53,6 +53,8 @@ Strict. Runner: `cd frontend && npm test -- --run`; plus `npm run build` and `np
 - T3 done: RED observed (CopilotPage.test 11 failing), GREEN 246/246, build ok, tsc ok. Decisiones window (ApprovalCard, TechDecisionCard, ⋯ menu, RejectSheet) wired to `POST /proposals` + `POST /proposals/{id}/decision` with Idempotency-Key; local state changes only after the backend accepts. `useCopilotData`, `useDecide`.
 
 - T4 done: RED observed (branch.test 7 and CopilotBranch.test 9 failing), GREEN 265/265, build ok, tsc ok. Sucursal window (Ayer/Hoy/Mañana) over forecast, day-summary (Ayer), kpis, expiring, inventory, deliveries, order-plan; Hoy/Mañana adapter prefers `/outlook` when it answers. Hoy never shows actual sales. Inventory pill shows days of cover (no invented status).
+
+- T5 done: RED observed (memories.test and CopilotMemAlerts.test failing), GREEN 282/282, build ok, tsc ok. Memorias (decision_log + supplier performance + session learnings) and Advertencias (open alerts + integrity issues; no Revertir; Automáticas empty state; Preguntar sends the question to the chat with context).
 
 ## Coordinator decisions applied (2026-10-10)
 - Approvals = `/issues` whose recommended option tier is N2/N3; technical = order-plan lines plus issue options with tier N1. Tiers are the backend's. Order-plan lines without issue/option are read-only with "Disponible pronto".
@@ -81,6 +83,7 @@ Format: design element | needed field/endpoint | current backend status | sugges
 | Expected waste per day | per-day waste forecast and per-day real waste | partial (`/expiring.by_day` forward; `/kpis.waste_usd` 7-day) | `/kpis?date=` or `/expiring` for a given day |
 | Inventory pill critical/follow-up/ok | status fields | missing (UI shows days of cover instead) | `inventory.items[].status: critical|watch|ok` |
 | Memorias (Proveedores/Demanda/Eventos/Preferencias) | memory store with category, source, case count | missing (only `history.decision_log` and `suppliers/performance`) | `GET /cases/{id}/memories -> [{id, category, text, source, n_cases, confidence, created_at}]` |
+| Alert severity/tone (Crítica/Seguimiento) | `severity` level on alerts | missing (all open alerts show "Seguimiento"; integrity "Datos") | `severity: critical|watch|info` |
 | Alert category, agent, time | `category`, `agent_id` on alerts | missing (`alert_type` numeric, no agent, mixed old cases) | `GET /alerts` with `category: operacion|datos|auto`, `agent_id`, `created_at` |
 | N1 automatic actions + Revertir | `GET /cases/{id}/autonomy/log`, revert | missing (N1 auto-execution does not exist; button hidden) | `GET /cases/{id}/autonomy/log`, `POST /cases/{id}/autonomy/{action_id}/revert` |
 | "6 agentes conectados" | `GET /agents/status` | missing (orb shows "Listo"/"Pensando…") | `GET /agents/status -> [{agent_id, name, state}]` |

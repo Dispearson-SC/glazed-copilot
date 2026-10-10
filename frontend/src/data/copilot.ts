@@ -1,8 +1,8 @@
 import { isUnavailable, type Api } from "../api";
-import { avgTicket, longDate, shiftDate, signedPct, usd, usdWhole, weekdayDay } from "../format";
+import { avgTicket, dayMonth, longDate, shiftDate, signedPct, usd, usdWhole, weekdayDay } from "../format";
 import type {
   AlertRecord, DaySummary, DeliveriesResponse, ExpiringResponse, ForecastResponse, InventoryResponse, Issue, IssueOption, Kpis, OrderLine, OrderPlan,
-  Outlook, OutlookDay, Proposal, Range3,
+  DecisionLogEntry, HistoryResponse, Outlook, OutlookDay, Proposal, Range3, SupplierPerformance,
 } from "../types";
 
 /**
@@ -495,3 +495,113 @@ export function buildScheduled(d: DeliveriesResponse | null, limit = 4): Schedul
     };
   });
 }
+
+// ---------------------------------------------------------------------------------------------
+// Memorias: decision_log (GET /history) + supplier performance + rejections learned in this session.
+// GET /cases/{id}/memories (pending) will replace all of it behind `fetchMemories`.
+// ---------------------------------------------------------------------------------------------
+const ACTION_LABELS: Record<string, string> = {
+  place_order: "Compra",
+  skip_order: "Omitir pedido",
+  adjust_order_qty: "Ajustar pedido",
+  markdown_end_of_day: "Descuento al cierre",
+  transfer: "Transferencia",
+};
+const actionLabel = (a: string): string => ACTION_LABELS[a] ?? a;
+const skuOf = (d: DecisionLogEntry): string => d.sku || d.issue_id.split("|")[2] || d.issue_id;
+
+function decisionMemory(d: DecisionLogEntry): Memory | null {
+  const date = dayMonth(d.created_at);
+  if (d.status === "rejected") {
+    return {
+      id: `dec-${d.decision_id}`, cat: "preferencias", icon: "person", tag: "Motivo de rechazo",
+      text: d.reason ? `«${d.reason}»` : "Rechazada sin motivo", src: `Rechazo · ${actionLabel(d.action_type)} · ${skuOf(d)}`, conf: date,
+    };
+  }
+  if (d.status === "approved") {
+    return {
+      id: `dec-${d.decision_id}`, cat: d.kind === "calendar_uplift" ? "eventos" : "demanda", icon: d.kind === "calendar_uplift" ? "celebration" : "bakery_dining",
+      tag: "Decisión aprobada", text: `Aprobaste: ${actionLabel(d.action_type)} de ${skuOf(d)}.`, src: `Registro de decisiones · ${d.tier ?? ""}`.trim(), conf: date,
+    };
+  }
+  return null;
+}
+
+function supplierMemory(s: SupplierPerformance): Memory {
+  return {
+    id: `sup-${s.supplier_id}`, cat: "proveedores", icon: "local_shipping", tag: "Proveedor",
+    text: `${s.supplier_name}: ${s.on_time_pct}% a tiempo, entrega real de ${s.lead_time_mean_days} días y surte el ${s.fill_pct}%.`,
+    src: `Desempeño de proveedores · ${s.window_days} días`, conf: `${s.received_pos} pedidos`,
+  };
+}
+
+export function buildMemories(input: { history: HistoryResponse | null; suppliers: SupplierPerformance[] | null; learned: Memory[] }): Memory[] {
+  const decisions = [...(input.history?.decision_log ?? [])]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .map(decisionMemory)
+    .filter((m): m is Memory => m !== null)
+    .slice(0, 30);
+  return [...input.learned, ...decisions, ...(input.suppliers ?? []).map(supplierMemory)];
+}
+
+export function filterMemories(list: Memory[], cat: string, query: string): Memory[] {
+  const q = query.trim().toLowerCase();
+  return list.filter((m) => (cat === "todas" || m.cat === cat) && (!q || `${m.tag} ${m.text} ${m.src}`.toLowerCase().includes(q)));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Advertencias: open alerts (GET /alerts) + integrity issues (GET /issues?category=integrity).
+// ---------------------------------------------------------------------------------------------
+export type WarningCategory = "operacion" | "datos" | "auto";
+
+export interface WarningItem {
+  id: string;
+  cat: WarningCategory;
+  tone: "warn" | "info";
+  toneLabel: string;
+  icon: string;
+  title: string;
+  body: string;
+  /** Agent that raised it; null until `agent_id` is served. */
+  agent: string | null;
+  time: string;
+  /** Only N1 automatic actions can be reverted, and N1 auto-execution does not exist. */
+  revertible: boolean;
+}
+
+function alertCopy(a: AlertRecord): { icon: string; title: string; body: string } {
+  const i = a.issue ?? {};
+  const sev = a.severity_usd != null ? usd(a.severity_usd) : null;
+  switch (i.kind) {
+    case "overstock_waste":
+      return { icon: "hourglass_bottom", title: `Exceso de inventario: ${i.product_name || i.sku || "producto"}`, body: sev ? `Merma estimada de ${sev}.` : "Sin datos" };
+    case "calendar_uplift":
+      return { icon: "event", title: `Efecto de calendario: ${i.event?.name ?? "evento"}`, body: sev ? `Impacto estimado de ${sev} si el plan no lo refleja.` : "Sin datos" };
+    case "compliance_deviation":
+      return { icon: "rule", title: "Acción aprobada sin ejecutar", body: "Una decisión aprobada no se ejecutó. Revisa qué pasó." };
+    default:
+      return { icon: "warning", title: i.kind ?? "Advertencia", body: sev ? `Impacto estimado de ${sev}.` : "Sin datos" };
+  }
+}
+
+const INTEGRITY_TITLES: Record<string, string> = {
+  orphan_sku: "Ventas sin producto en el catálogo",
+  sku_key_mismatch: "Claves de producto que no coinciden",
+};
+
+export function buildWarnings(input: { alerts: AlertRecord[]; integrity: Issue[] }): WarningItem[] {
+  const ops = input.alerts
+    .filter((a) => a.state === "nueva")
+    .map((a): WarningItem => ({
+      id: a.alert_id, cat: "operacion", tone: "warn", toneLabel: "Seguimiento", ...alertCopy(a),
+      agent: alertAgent(a), time: a.as_of ? dayMonth(a.as_of) : "", revertible: false,
+    }));
+  const data = input.integrity.map((i): WarningItem => ({
+    id: i.issue_id, cat: "datos", tone: "info", toneLabel: "Datos", icon: "sensors",
+    title: INTEGRITY_TITLES[i.kind] ?? i.kind, body: i.exposure_usd != null ? `Exposición de ${usd(i.exposure_usd)}.` : "Sin datos",
+    agent: null, time: i.as_of ? dayMonth(i.as_of) : "", revertible: false,
+  }));
+  return [...ops, ...data];
+}
+
+export const filterWarnings = (list: WarningItem[], cat: string): WarningItem[] => list.filter((w) => cat === "todas" || w.cat === cat);

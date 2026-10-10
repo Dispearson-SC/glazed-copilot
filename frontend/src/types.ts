@@ -215,6 +215,8 @@ export interface Issue {
   evidence?: IssueEvidence[];
   options?: IssueOption[];
   recommended_option_id?: string | null;
+  exposure_usd?: number | null;
+  event?: { name?: string; type?: string; days?: string[] } | null;
 }
 
 export interface OrderLine {
@@ -323,4 +325,33 @@ export interface OutlookDay {
 export interface Outlook {
   as_of?: string;
   days: OutlookDay[];
+}
+
+// ---- Memorias / Advertencias ----
+export interface DecisionLogEntry {
+  decision_id: string;
+  issue_id: string;
+  kind?: string;
+  sku?: string | null;
+  action_type: string;
+  tier?: string;
+  status: string;
+  rationale?: string;
+  reason?: string;
+  created_at: string;
+}
+
+export interface HistoryResponse {
+  as_of: string;
+  decision_log: DecisionLogEntry[];
+}
+
+export interface SupplierPerformance {
+  supplier_id: string;
+  supplier_name: string;
+  received_pos: number;
+  lead_time_mean_days: number;
+  on_time_pct: number;
+  fill_pct: number;
+  window_days: number;
 }
