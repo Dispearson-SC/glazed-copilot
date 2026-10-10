@@ -9,6 +9,7 @@ import type { AgentsStatusResponse } from "../../types";
 import type { useChat } from "../../useChat";
 import AgentOrb from "./AgentOrb";
 import AnalysisCard from "./AnalysisCard";
+import { ChatSkeleton } from "./Skeleton";
 import ConversationBar from "./ConversationBar";
 
 type Chat = ReturnType<typeof useChat>;
@@ -163,6 +164,7 @@ export default function AgentWindow({
           )}
 
           <div className="flex flex-col gap-2.5">
+            {chat.historyLoading && chat.messages.length === 0 && <ChatSkeleton />}
             {chat.messages.map((m, i) => (
               <div key={m.id} className="contents">
                 {renderCards(i)}

@@ -1,3 +1,4 @@
+import { MemoriesSkeleton } from "./Skeleton";
 import { useEffect, useState } from "react";
 import { filterMemories, SOON_TEXT, type Memory } from "../../data/copilot";
 import type { MemoryState } from "../../useMemoryData";
@@ -59,7 +60,7 @@ export default function MemoriesWindow({
       </label>
       <FilterChips options={MEMORY_FILTERS} value={filter} onChange={onFilter} />
       <div className="flex flex-col">
-        {shown.map((m) => (
+        {(state === "loading" ? [] : shown).map((m) => (
           <article key={m.id} className="flex flex-col gap-1.5 border-b border-partition/70 px-1 py-3.5">
             <div className="flex items-center justify-between gap-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-surface-container px-2 py-0.5 font-label-sm text-label-sm font-semibold text-secondary">
@@ -75,7 +76,8 @@ export default function MemoriesWindow({
             </div>
           </article>
         ))}
-        {shown.length === 0 && <p className="m-0 py-6 text-center text-[13px] text-on-surface-variant">{state === "loading" ? "Cargando memorias…" : state === "soon" ? SOON_TEXT : state === "error" ? "No se pudieron cargar las memorias." : memories.length === 0 ? "Aún no hay memorias. Se irán sumando con tus decisiones." : "Sin memorias que coincidan"}</p>}
+        {state === "loading" && <MemoriesSkeleton />}
+        {state !== "loading" && shown.length === 0 && <p className="m-0 py-6 text-center text-[13px] text-on-surface-variant">{state === "soon" ? SOON_TEXT : state === "error" ? "No se pudieron cargar las memorias." : memories.length === 0 ? "Aún no hay memorias. Se irán sumando con tus decisiones." : "Sin memorias que coincidan"}</p>}
       </div>
       <p className="m-0 text-[12px] leading-[18px] text-on-surface-variant">Las memorias se escriben solo después de una decisión o de un resultado medido. Con un solo caso, el copiloto lo dice y la confianza queda baja.</p>
     </main>

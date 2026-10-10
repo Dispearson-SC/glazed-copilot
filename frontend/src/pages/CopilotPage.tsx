@@ -30,7 +30,7 @@ function CopilotShell() {
   const session = useSession();
   const storeId = session.storeId || firstId;
   const active = stores.find((s) => s.store_id === storeId);
-  const { currentCase } = useCurrentCase(storeId, session.refreshKey);
+  const { currentCase, loading: caseLoading } = useCurrentCase(storeId, session.refreshKey);
   const caseId = currentCase?.case_id ?? "";
   const simToday = currentCase?.sim_today ?? "";
   const chat = useChat(caseId, { storeId });
@@ -116,6 +116,7 @@ function CopilotShell() {
         <DecisionsWindow
           items={visible}
           simToday={simToday}
+          loading={data.items.length === 0 && (data.loading || (!caseId && caseLoading))}
           loadState={data.items.length === 0 && data.error ? (isUnavailable(data.error) ? "soon" : "error") : "ok"}
           menuFor={state.menuFor}
           busyId={busyId}
@@ -146,10 +147,10 @@ function CopilotShell() {
           memories={memories}
           filter={state.memFilter}
           onFilter={(value) => dispatch({ type: "memFilter", value })}
-          state={memoryData.state}
+          state={!caseId && !caseLoading ? "ok" : memoryData.state}
         />
       )}
-      {state.tab === "alertas" && <AlertsWindow warnings={warnings} filter={state.alertFilter} onFilter={(value) => dispatch({ type: "alertFilter", value })} onAsk={ask} />}
+      {state.tab === "alertas" && <AlertsWindow loading={warningsData === null && (caseLoading || Boolean(caseId))} warnings={warnings} filter={state.alertFilter} onFilter={(value) => dispatch({ type: "alertFilter", value })} onAsk={ask} />}
       <CapsuleNav tab={state.tab} onChange={(tab) => dispatch({ type: "tab", tab })} badges={badges} />
       <Toast text={state.toast} />
       {reject && (

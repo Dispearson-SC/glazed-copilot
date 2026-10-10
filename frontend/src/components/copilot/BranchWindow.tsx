@@ -1,3 +1,4 @@
+import { BranchSkeleton } from "./Skeleton";
 import { useEffect, useState } from "react";
 import { isPlaceholder, type DayKey, type DayView, type InventoryRow, type ScheduledRow } from "../../data/copilot";
 
@@ -51,7 +52,7 @@ export default function BranchWindow({
   if (!view) {
     return (
       <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-[112px]">
-        <p className="m-0 font-body-md text-body-md text-on-surface-variant">Cargando sucursal…</p>
+        <BranchSkeleton />
       </main>
     );
   }

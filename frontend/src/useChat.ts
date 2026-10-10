@@ -56,6 +56,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
   const api = useApi();
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [local, setLocal] = useState<ChatMessage[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [status, setStatus] = useState<ChatStatus>("idle");
   const [stillRunning, setStillRunning] = useState(false);
   const [progress, setProgress] = useState<TurnProgress[]>([]);
@@ -87,6 +88,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
     setStillRunning(false);
     setProgress([]);
     setProposals([]);
+    setHistoryLoading(Boolean(enabled && caseId));
     if (!enabled || !caseId) return;
     let alive = true;
     const patch = (id: string, next: ChatMessage) => setHistory((h) => h.map((m) => (m.id === id ? next : m)));
@@ -154,7 +156,8 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
       })
       .catch(() =>
         api.getTrace(storeId, caseId).then((ev) => alive && setHistory(buildHistory(ev))).catch(() => {}),
-      );
+      )
+      .finally(() => alive && setHistoryLoading(false));
     void refreshProposals();
     return () => {
       alive = false;
@@ -259,6 +262,8 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
 
   return {
     messages: [...history, ...local],
+    /** The stored turns are still being fetched. */
+    historyLoading,
     status,
     stillRunning,
     progress,

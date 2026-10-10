@@ -52,7 +52,7 @@ describe("AnalysisCard", () => {
 
   it("says it is loading, 'Disponible pronto' on a 404 and the error otherwise, instead of empty sections", () => {
     const { rerender } = render(<AnalysisCard item={approval} analysis={{ status: "loading" }} mode="analizar" open onApprove={() => {}} onReject={() => {}} />);
-    expect(screen.getByText("Cargando análisis…")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: /Cargando análisis/ })).toBeInTheDocument();
     rerender(<AnalysisCard item={approval} analysis={{ status: "soon" }} mode="analizar" open onApprove={() => {}} onReject={() => {}} />);
     expect(screen.getByText("Disponible pronto")).toBeInTheDocument();
     rerender(<AnalysisCard item={approval} analysis={{ status: "error", message: "boom" }} mode="analizar" open onApprove={() => {}} onReject={() => {}} />);

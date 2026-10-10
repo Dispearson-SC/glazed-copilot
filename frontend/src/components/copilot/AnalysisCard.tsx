@@ -1,3 +1,4 @@
+import { AnalysisSkeleton } from "./Skeleton";
 import { analysisSections, SOON_TEXT, type AnalysisState, type DecisionItem } from "../../data/copilot";
 
 /** Espresso-header card with the analysis (approvals) or the dialogue (technical decisions) of one decision. */
@@ -50,7 +51,7 @@ export default function AnalysisCard({
         </div>
       </div>
       <div className="flex flex-col gap-3 px-4 py-3.5">
-        {analysis.status === "loading" && <p className="m-0 text-[13px] leading-[19px] text-on-surface-variant">Cargando análisis…</p>}
+        {analysis.status === "loading" && <AnalysisSkeleton />}
         {analysis.status === "soon" && <p className="m-0 text-[13px] leading-[19px] text-on-surface-variant">{SOON_TEXT}</p>}
         {analysis.status === "error" && <p className="m-0 text-[13px] leading-[19px] text-on-surface-variant">No se pudo cargar el análisis: {analysis.message}</p>}
         {sections.map((s) => (
