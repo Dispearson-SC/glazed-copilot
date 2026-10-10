@@ -1,0 +1,112 @@
+"""In-memory adapters: quick local runs and the fakes used by unit tests."""
+from __future__ import annotations
+
+import copy
+from datetime import datetime, timezone
+
+from ...domain import Alert, AlertState, BacktestRun, Case, Execution, Proposal, TraceEvent
+
+
+class InMemoryCases:
+    def __init__(self) -> None:
+        self._d: dict[str, Case] = {}
+
+    def add(self, case: Case) -> None:
+        self._d[case.case_id] = copy.deepcopy(case)
+
+    update = add
+
+    def get(self, case_id: str) -> Case | None:
+        return copy.deepcopy(self._d.get(case_id))
+
+    def get_by_issue_key(self, issue_key: str) -> Case | None:
+        return next((copy.deepcopy(c) for c in self._d.values() if c.issue_key == issue_key), None)
+
+    def get_by_conversation(self, conversation_id: str) -> Case | None:
+        return next((copy.deepcopy(c) for c in self._d.values() if c.core_conversation_id == conversation_id), None)
+
+    def list(self, store_id: str | None = None) -> list[Case]:
+        rows = [c for c in self._d.values() if store_id in (None, c.store_id)]
+        return copy.deepcopy(sorted(rows, key=lambda c: c.created_at))
+
+
+class InMemoryAlerts:
+    def __init__(self) -> None:
+        self._d: dict[str, Alert] = {}
+
+    def add(self, alert: Alert) -> None:
+        self._d[alert.alert_id] = copy.deepcopy(alert)
+
+    update = add
+
+    def get(self, alert_id: str) -> Alert | None:
+        return copy.deepcopy(self._d.get(alert_id))
+
+    def get_by_issue_key(self, issue_key: str) -> Alert | None:
+        return next((copy.deepcopy(a) for a in self._d.values() if a.issue_key == issue_key), None)
+
+    def list(self, store_id: str | None = None, state: AlertState | None = None) -> list[Alert]:
+        rows = [a for a in self._d.values()
+                if store_id in (None, a.store_id) and state in (None, a.state)]
+        return copy.deepcopy(sorted(rows, key=lambda a: -a.severity_usd))
+
+
+class InMemoryProposals:
+    def __init__(self) -> None:
+        self._d: dict[str, Proposal] = {}
+
+    def add(self, proposal: Proposal) -> None:
+        self._d[proposal.proposal_id] = copy.deepcopy(proposal)
+
+    update = add
+
+    def get(self, proposal_id: str) -> Proposal | None:
+        return copy.deepcopy(self._d.get(proposal_id))
+
+    def list(self, case_id: str | None = None, store_id: str | None = None,
+             status: str | None = None) -> list[Proposal]:
+        rows = [p for p in self._d.values() if case_id in (None, p.case_id)
+                and store_id in (None, p.store_id) and status in (None, p.status)]
+        return copy.deepcopy(sorted(rows, key=lambda p: p.created_at))
+
+
+class InMemoryExecutions:
+    def __init__(self) -> None:
+        self._rows: list[Execution] = []
+
+    def add(self, execution: Execution) -> None:
+        self._rows.append(copy.deepcopy(execution))
+
+    def list(self, case_id: str) -> list[Execution]:
+        return copy.deepcopy([e for e in self._rows if e.case_id == case_id])
+
+
+class InMemoryBacktests:
+    def __init__(self) -> None:
+        self._d: dict[str, BacktestRun] = {}
+
+    def add(self, run: BacktestRun) -> None:
+        self._d[run.run_id] = copy.deepcopy(run)
+
+    def get(self, run_id: str) -> BacktestRun | None:
+        return copy.deepcopy(self._d.get(run_id))
+
+    def list(self, case_id: str | None = None) -> list[BacktestRun]:
+        return copy.deepcopy([r for r in self._d.values() if case_id in (None, r.case_id)])
+
+
+class InMemoryTrace:
+    def __init__(self) -> None:
+        self._rows: dict[str, TraceEvent] = {}
+
+    def record(self, event: TraceEvent) -> None:
+        self._rows[event.event_id] = copy.deepcopy(event)
+
+    def list(self, case_id: str | None = None, store_id: str | None = None) -> list[TraceEvent]:
+        rows = [e for e in self._rows.values() if case_id in (None, e.case_id) and store_id in (None, e.store_id)]
+        return copy.deepcopy(sorted(rows, key=lambda e: e.ts))
+
+
+class SystemClock:
+    def now(self) -> datetime:
+        return datetime.now(timezone.utc)
