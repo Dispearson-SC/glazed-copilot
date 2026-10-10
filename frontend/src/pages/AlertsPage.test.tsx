@@ -2,7 +2,7 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api";
-import { fakeApi, renderPage } from "../test/helpers";
+import { alertA, fakeApi, renderPage } from "../test/helpers";
 import AlertsPage from "./AlertsPage";
 
 const open = (api = fakeApi()) => renderPage(api, "/alerts", "/alerts", <AlertsPage />);
@@ -94,5 +94,15 @@ describe("AlertsPage", () => {
   it("shows an empty state when there are no alerts", async () => {
     open(fakeApi({ listAlerts: vi.fn(async () => []) }));
     expect(await screen.findByText("Sin alertas")).toBeInTheDocument();
+  });
+});
+
+describe("AlertsPage issue detail (Wave 5)", () => {
+  it("renders option cards when the alert carries a full issue", async () => {
+    const { issueA } = await import("../test/fixtures");
+    const api = fakeApi({ listAlerts: async () => [{ ...alertA, issue: issueA }] });
+    open(api);
+    await userEvent.click(await screen.findByText("Ver detalle"));
+    expect(await screen.findByTestId("option-o-n3")).toBeInTheDocument();
   });
 });

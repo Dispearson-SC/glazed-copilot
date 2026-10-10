@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useApi } from "../ApiContext";
 import { ErrorBox, StoreSelect, useStores } from "../components";
-import type { Alert, Proposal } from "../types";
+import IssueDetail from "../IssueDetail";
+import { useSession } from "../SessionContext";
+import type { Alert, Issue, Proposal } from "../types";
 import { usePolling } from "../usePolling";
 
 const REFRESH_MS = 10_000;
@@ -48,7 +50,11 @@ function AlertDetail({ alert, onClose }: { alert: Alert; onClose: () => void }) 
     <aside aria-label="Detalle de alerta" className="panel">
       <button onClick={onClose} style={{ float: "right" }}>Cerrar</button>
       <h3>Alerta {alert.alert_id}</h3>
-      <pre>{JSON.stringify(alert.issue, null, 2)}</pre>
+      {Array.isArray(alert.issue.options) ? (
+        <IssueDetail issue={alert.issue as Issue} caseId={alert.case_id} />
+      ) : (
+        <pre>{JSON.stringify(alert.issue, null, 2)}</pre>
+      )}
       <h4>Propuestas pendientes</h4>
       <ErrorBox error={proposals.error} />
       {proposals.data?.length === 0 && <p className="muted">Sin propuestas pendientes</p>}
@@ -62,9 +68,11 @@ function AlertDetail({ alert, onClose }: { alert: Alert; onClose: () => void }) 
 export default function AlertsPage() {
   const api = useApi();
   const { stores, storeId, setStoreId, error: storesError } = useStores();
+  const { refreshKey } = useSession();
   const [selected, setSelected] = useState<Alert | null>(null);
   const alerts = usePolling(() => (storeId ? api.listAlerts({ store_id: storeId }) : Promise.resolve([])), REFRESH_MS, true, [
     storeId,
+    refreshKey,
   ]);
   const error = storesError ?? alerts.error;
 
