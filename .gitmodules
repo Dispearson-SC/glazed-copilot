@@ -2,3 +2,7 @@
 	path = vendor/dataset-road2tech
 	url = https://github.com/ams-innovation/dataset-hacktahton-road2tech.git
 	branch = master
+[submodule "agent-core"]
+	path = agent-core
+	url = https://github.com/Dispearson-SC/Agent-Core.git
+	branch = vertical/glazed

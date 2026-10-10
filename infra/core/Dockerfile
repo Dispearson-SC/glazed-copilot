@@ -1,4 +1,4 @@
-# Agent-Core (Glazed vertical) image. Build context: ../Agent-Core/Core (see infra/docker-compose.yml).
+# Agent-Core (Glazed vertical) image. Build context: ../agent-core/Core (git submodule) (see infra/docker-compose.yml).
 FROM python:3.12-slim
 WORKDIR /app/Core
 

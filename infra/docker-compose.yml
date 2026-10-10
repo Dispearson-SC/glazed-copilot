@@ -4,8 +4,8 @@ name: glazed-copilot
 # POSTGRES_PASSWORD and MINIMAX_API_KEY come from the git-ignored .env at the repository root.
 x-core: &core
   build:
-    context: ../../Agent-Core/Core
-    dockerfile: ../../glazed-copilot/infra/core/Dockerfile
+    context: ../agent-core/Core
+    dockerfile: ../../infra/core/Dockerfile
   environment: &core-env
     # Agent-Core creates and migrates its own app and DBOS databases through the admin URL.
     AGENT_CORE_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change-me}@db:5432/agent_core
