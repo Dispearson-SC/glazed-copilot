@@ -1,4 +1,4 @@
-import type { AdvanceResult, AgentsStatusResponse, AlertRecord, Case, CaseDecisionBody, CaseDecisionResult, InboxCounts, IssueAnalysis, MemoryRecord, MessageContext, PendingResponse, CaseMode, DaySummary, DeliveriesResponse, ExpiringResponse, HistoryResponse, InventoryResponse, Kpis, Outlook, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, SupplierPerformance, TraceEvent, Turn, TurnRecord } from "./types";
+import type { AdvanceResult, AgentsStatusResponse, AlertRecord, Case, CaseDecisionBody, CaseDecisionResult, InboxCounts, IssueAnalysis, MemoryRecord, MessageContext, PendingResponse, CaseMode, DaySummary, DeliveriesResponse, ExpiringResponse, InventoryResponse, Outlook, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, TraceEvent, Turn, TurnRecord } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -69,13 +69,10 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
       }),
     listIssues: (caseId: string, q: { limit?: string; category?: string; kind?: string } = {}) =>
       request<Issue[]>(`/cases/${caseId}/issues`, {}, q),
-    getKpis: (caseId: string) => request<Kpis>(`/cases/${caseId}/kpis`),
     getExpiring: (caseId: string, q: { days?: string } = {}) => request<ExpiringResponse>(`/cases/${caseId}/expiring`, {}, q),
     getInventory: (caseId: string, q: { sort?: string; limit?: string } = {}) => request<InventoryResponse>(`/cases/${caseId}/inventory`, {}, q),
     getDeliveries: (caseId: string, q: { days?: string } = {}) => request<DeliveriesResponse>(`/cases/${caseId}/deliveries`, {}, q),
     getOutlook: (caseId: string, q: { days?: string } = {}) => request<Outlook>(`/cases/${caseId}/outlook`, {}, q),
-    getHistory: (caseId: string) => request<HistoryResponse>(`/cases/${caseId}/history`),
-    getSupplierPerformance: (caseId: string) => request<SupplierPerformance[]>(`/cases/${caseId}/suppliers/performance`),
     getOrderPlan: (caseId: string) => request<OrderPlan>(`/cases/${caseId}/order-plan`),
     listAlerts: (q: { store_id?: string; state?: string }) => request<AlertRecord[]>("/alerts", {}, q),
     /** Step 1 of a decision: turns (issue, option) into a pending proposal. Repeating the key returns the same proposal. */

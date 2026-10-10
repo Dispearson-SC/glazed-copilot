@@ -16,7 +16,6 @@ const api = (over = {}) =>
     getForecast: vi.fn(async (_c: string, q: { metric?: keyof typeof metricForecasts } = {}) => (q.metric ? metricForecasts[q.metric] : branchForecast)),
     getOutlook: async () => outlookA,
     getDaySummary: async (_c: string, date?: string) => (date === "2026-07-18" ? ayerSummary : hoySummary),
-    getKpis: async () => branchKpis,
     getExpiring: async () => branchExpiring,
     getInventory: async () => inventoryWithStatus,
     getDeliveries: async () => branchDeliveries,
