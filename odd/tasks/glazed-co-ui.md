@@ -54,3 +54,4 @@ Strategy: ask-on-risk. Forecast ~1,500 authored lines (UI port) → exceeds the 
 - T2 commit dbfc06a
 - T3 commit acdc876
 - T4 commit e6f134c
+- T5 commit 42f0d0f
