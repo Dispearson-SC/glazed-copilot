@@ -50,6 +50,32 @@ def current_case_id(case: str | None) -> str:
     return cid
 
 
+_CODE = __import__("re").compile(r"^S\d{3}$", __import__("re").IGNORECASE)
+
+
+def resolve_store(api: Api, text: str | None) -> str | None:
+    """A store code as is, or a case-insensitive partial display-name match (all words must appear).
+
+    Several matches: list them and ask for a more specific name. Never guesses."""
+    if not text:
+        return text
+    if _CODE.match(text.strip()):
+        return text.strip().upper()
+    words = text.lower().split()
+    stores = api.get("/api/v1/stores")
+    hits = [s for s in stores if all(w in _label(s).lower() for w in words)]
+    if not hits:
+        raise CliError(f"No store matches {text!r}. Run `glazed stores` to see them.")
+    if len(hits) > 1:
+        lines = "\n".join(f"  {s['store_id']}  {_label(s)}" for s in hits)
+        raise CliError(f"{len(hits)} stores match {text!r}; be more specific (use the full name or the code):\n{lines}")
+    return hits[0]["store_id"]
+
+
+def _label(store: dict) -> str:
+    return store.get("display_name") or store.get("name") or store["store_id"]
+
+
 def _guard(fn: Callable[..., Any]) -> Callable[..., Any]:
     """Turn CliError into a one-line message and exit code 1."""
     import functools
@@ -71,14 +97,14 @@ def stores(ctx: typer.Context) -> None:
     c: Ctx = ctx.obj
     data = c.api.get("/api/v1/stores")
     c.out(data, lambda d: render.console().print(render.records_table(
-        "Stores", d, ["store_id", "name", "format", "site_id", "region"])))
+        "Stores", [{**s, "display_name": _label(s)} for s in d], ["store_id", "display_name", "format", "region"])))
 
 
 # ---- cases ----
 
 def _announce_case(c: Ctx, case: dict, verb: str) -> None:
     c.out(case, lambda d: render.console().print(
-        f"{verb} case [bold]{d['case_id']}[/bold]  store={d['store_id']} "
+        f"{verb} case [bold]{d['case_id']}[/bold]  store={d.get('store_display_name') or d['store_id']} "
         f"sim_today={d['sim_today']} mode={d['mode']}"))
 
 
@@ -91,7 +117,7 @@ def case_new(ctx: typer.Context,
              title: Optional[str] = typer.Option(None, "--title")) -> None:
     """Create an isolated case and make it current."""
     c: Ctx = ctx.obj
-    body = {"store_id": store, "sim_today": date, "mode": mode}
+    body = {"store_id": resolve_store(c.api, store), "sim_today": date, "mode": mode}
     if title:
         body["title"] = title
     case = c.api.post("/api/v1/cases", body)
@@ -104,7 +130,7 @@ def case_new(ctx: typer.Context,
 def case_list(ctx: typer.Context, store: Optional[str] = typer.Option(None, "--store")) -> None:
     """List cases (the current one is marked with *)."""
     c: Ctx = ctx.obj
-    data = c.api.get("/api/v1/cases", store_id=store)
+    data = c.api.get("/api/v1/cases", store_id=resolve_store(c.api, store))
     cur = State.load().current_case
     c.out(data, lambda d: render.console().print(render.case_table(d, cur)))
 
@@ -156,7 +182,7 @@ def ask(ctx: typer.Context, question: str,
     if new:
         if not store or not date:
             raise CliError("--new needs --store and --date, e.g. --new --store S030 --date 2026-03-10.")
-        created = c.api.post("/api/v1/cases", {"store_id": store, "sim_today": date, "mode": "live"})
+        created = c.api.post("/api/v1/cases", {"store_id": resolve_store(c.api, store), "sim_today": date, "mode": "live"})
         State(current_case=created["case_id"]).save()
         case_id = created["case_id"]
     else:
@@ -226,7 +252,7 @@ def alerts(ctx: typer.Context, store: Optional[str] = typer.Option(None, "--stor
            state: Optional[str] = typer.Option(None, "--state", help="e.g. nueva, vista, en_analisis.")) -> None:
     """List alerts."""
     c: Ctx = ctx.obj
-    data = c.api.get("/api/v1/alerts", store_id=store, state=state)
+    data = c.api.get("/api/v1/alerts", store_id=resolve_store(c.api, store), state=state)
     c.out(data, lambda d: render.console().print(render.alerts_table(d) if d else "No alerts."))
 
 
@@ -282,6 +308,7 @@ def backtest_run(ctx: typer.Context, date_from: str = typer.Option(..., "--from"
     """Run a backtest over a period and print the report."""
     c: Ctx = ctx.obj
     if store:
+        store = resolve_store(c.api, store)
         created = c.api.post("/api/v1/cases", {
             "store_id": store, "sim_today": date_to, "mode": "backtest",
             "title": f"backtest {store} {date_from}..{date_to}"})
@@ -311,9 +338,21 @@ def trace(ctx: typer.Context, case: Optional[str] = typer.Option(None, "--case")
           store: Optional[str] = typer.Option(None, "--store")) -> None:
     """Agent-communication timeline (current case, or a whole store with --store)."""
     c: Ctx = ctx.obj
+    store = resolve_store(c.api, store)
     case_id = case if (case or store) else current_case_id(None)
+    name = _trace_store_name(c.api, case_id, store)
     data = c.api.get("/api/v1/trace", store_id=store, case_id=case_id)
-    c.out(data, lambda d: render.console().print(render.trace_table(d) if d else "No trace events."))
+    c.out(data, lambda d: render.console().print(render.trace_table(d, name) if d else "No trace events."))
+
+
+def _trace_store_name(api: Api, case_id: str | None, store: str | None) -> str | None:
+    try:
+        if case_id:
+            return api.get(f"/api/v1/cases/{case_id}").get("store_display_name")
+        found = [s for s in api.get("/api/v1/stores") if s["store_id"] == store]
+        return _label(found[0]) if found else None
+    except Exception:  # noqa: BLE001 - the name is a nicety
+        return None
 
 
 def main() -> None:

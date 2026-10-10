@@ -56,13 +56,13 @@ def _is_records(v: Any) -> bool:
 
 def case_table(cases: list[dict], current: str | None) -> Table:
     return table("Cases", ["", "case_id", "store", "sim_today", "mode", "parent", "title"], (
-        ["*" if c["case_id"] == current else "", c["case_id"], c["store_id"], c["sim_today"],
+        ["*" if c["case_id"] == current else "", c["case_id"], c.get("store_display_name") or c["store_id"], c["sim_today"],
          c["mode"], c.get("parent_case_id"), c.get("title")] for c in cases))
 
 
 def alerts_table(alerts: list[dict], title: str = "Alerts") -> Table:
     return table(title, ["alert_id", "type", "store", "severity_usd", "state", "as_of", "issue_key"], (
-        [a["alert_id"], a.get("alert_type"), a.get("store_id"), a.get("severity_usd"), a.get("state"),
+        [a["alert_id"], a.get("alert_type"), a.get("store_display_name") or a.get("store_id"), a.get("severity_usd"), a.get("state"),
          a.get("as_of"), a.get("issue_key")] for a in alerts))
 
 
@@ -95,8 +95,8 @@ def short_payload(payload: Any, limit: int = 100) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-def trace_table(events: list[dict]) -> Table:
-    t = Table(title="Agent trace", title_justify="left")
+def trace_table(events: list[dict], store_name: str | None = None) -> Table:
+    t = Table(title=f"Agent trace · {store_name}" if store_name else "Agent trace", title_justify="left")
     for col in ("time", "from -> to", "kind", "payload"):
         t.add_column(col, overflow="fold")
     for e in events:
