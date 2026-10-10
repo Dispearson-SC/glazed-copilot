@@ -80,3 +80,11 @@ def test_missing_prices_do_not_break_a_kind_without_a_template():
     client, cid, _ = with_issues(iss)
     a = analysis(client, cid, "S030|weird_kind|E")
     assert a["title"] and a["problem"]
+
+
+def test_inflated_order_with_zero_optimum_says_no_order_is_needed():
+    iss = stockout_issue("F", kind="inflated_order")
+    iss["evidence"] = [{"metric": "ordered_qty", "value": 12.0}, {"metric": "optimum_qty", "value": 0.0}]
+    client, cid, _ = with_issues(iss)
+    a = analysis(client, cid, "S030|inflated_order|F")
+    assert "no hace falta pedir" in a["problem"] and "0.0" not in a["problem"]

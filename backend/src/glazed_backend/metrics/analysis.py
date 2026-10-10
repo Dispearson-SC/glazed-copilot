@@ -79,7 +79,9 @@ def problem_text(issue: dict[str, Any]) -> str:
     if kind == "expiring":
         return f"Hay {_ev(issue, 'expiring_units')} unidades de {name} por caducar; valen {sev} si no se venden."
     if kind == "inflated_order":
-        return f"El pedido de {name} ({_ev(issue, 'ordered_qty')} unidades) supera el óptimo de {_ev(issue, 'optimum_qty')}; el costo esperado es {sev}."
+        opt = _ev(issue, "optimum_qty")
+        target = "no hace falta pedir en este ciclo" if not opt else f"el óptimo es de {opt:g} unidades"
+        return f"El pedido de {name} ({_ev(issue, 'ordered_qty')} unidades) es mayor al necesario: {target}; el costo esperado es {sev}."
     if kind == "late_delivery":
         return f"Hay {_ev(issue, 'overdue_lines')} líneas vencidas de {name}, con hasta {_ev(issue, 'max_days_late')} días de retraso; exposición {sev}."
     return f"{_TITLES.get(kind, str(kind).replace('_', ' '))}: {name}. Impacto estimado {sev}."
