@@ -228,6 +228,15 @@ def day(ctx: typer.Context, date: Optional[str] = typer.Option(None, "--date", h
 
 @app.command()
 @_guard
+def briefing(ctx: typer.Context, case: Optional[str] = typer.Option(None, "--case")) -> None:
+    """Store briefing: headline facts, KPIs, top issues, order plan and suppliers (served from cache)."""
+    c: Ctx = ctx.obj
+    data = c.api.get(f"/api/v1/cases/{current_case_id(case)}/briefing")
+    c.out(data, lambda d: render.briefing_report(d, render.console()))
+
+
+@app.command()
+@_guard
 def advance(ctx: typer.Context, days: Optional[int] = typer.Option(None, "--days", min=1),
             to: Optional[str] = typer.Option(None, "--to", help="Target date YYYY-MM-DD."),
             case: Optional[str] = typer.Option(None, "--case")) -> None:

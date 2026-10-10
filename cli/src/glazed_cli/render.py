@@ -178,3 +178,33 @@ def backtest_report(run: dict, out: Console) -> None:
         out.print(f"({len(daily)} daily replays available in the run JSON: glazed --json backtest show {run['run_id']})")
     if res:
         render_object("Other results", res, out)
+
+
+def briefing_report(b: dict, out: Console) -> None:
+    """Headline facts first, then the snapshot sections as tables."""
+    s = b["snapshot"]
+    out.print(f"[bold]{s['store_display_name']}[/bold]  as_of={s['as_of']}  window={s['window']['from']}..{s['window']['to']}"
+              f"  (cache {s['cache_age_s']}s)")
+    out.print(table("Headline", ["fact", "value", "unit", "source"],
+                    ([f["text"], f["value"], f["unit"], f["source"]] for f in b["headline"])))
+    k = s["kpis"]
+    out.print(table("KPIs", ["metric", "value"], [[n, k.get(n)] for n in
+                    ("net_sales", "transactions", "waste_usd", "tx_per_staff_hour")] +
+                    [["lost_sales_usd", "{low} - {mid} - {high}".format(**k["lost_sales_usd"])] if k.get("lost_sales_usd") else ["lost_sales_usd", None]]))
+    out.print(table("Top issues", ["issue_id", "kind", "product", "severity_usd", "options"],
+                    ([i["issue_id"], i["kind"], i.get("product_name") or i.get("sku"), i.get("severity_usd"),
+                      len(i.get("options", []))] for i in s["top_issues"])))
+    out.print(table("Integrity", ["kind", "exposure_usd", "summary"],
+                    ([i["kind"], i["exposure_usd"], i["summary"]] for i in s["integrity"])))
+    plan = s["order_plan"]
+    lines = [("today", ln) for ln in plan["due_today"]] + [("tomorrow", ln) for ln in plan["due_tomorrow"]] + \
+            [("top loss", ln) for ln in plan["top_lines"]]
+    out.print(table("Order plan", ["when", "sku", "name", "supplier", "qty", "deadline", "expected_loss_usd"],
+                    ([w, ln["sku"], ln.get("name"), ln.get("supplier_name"), ln.get("qty"), ln.get("order_deadline"),
+                      ln.get("expected_loss_usd")] for w, ln in lines)))
+    out.print(table("Suppliers", ["supplier", "on_time_pct", "fill_pct", "next_delivery"],
+                    ([x.get("supplier_name") or x["supplier_id"], x.get("on_time_pct"), x.get("fill_pct"),
+                      x.get("next_delivery")] for x in s["suppliers"])))
+    out.print(proposals_table(s["pending_proposals"], "Pending proposals") if s["pending_proposals"] else "No pending proposals.")
+    if s["recent_decisions"]:
+        out.print(proposals_table(s["recent_decisions"], "Recent decisions"))
