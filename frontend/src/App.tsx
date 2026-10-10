@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import AlertsPage from "./pages/AlertsPage";
+import ChatPage from "./pages/ChatPage";
 import CasesPage from "./pages/CasesPage";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/stores/:storeId/purchases" element={<PurchasesPage />} />
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/cases" element={<CasesPage />} />
+          <Route path="/chat" element={<ChatPage />} />
           <Route path="/trace" element={<StoreRedirect to="trace" />} />
           <Route path="/stores/:storeId/trace" element={<TracePage />} />
           <Route path="/login" element={<LoginPage />} />

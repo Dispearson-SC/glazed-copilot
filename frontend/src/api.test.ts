@@ -43,6 +43,13 @@ describe("api client", () => {
     expect(JSON.parse(init.body as string)).toEqual({ approved: false, reason: "no budget" });
   });
 
+  it("sends extra headers such as Idempotency-Key on decisions and keeps defaults", async () => {
+    const api = createApi("", fetchFn as unknown as typeof fetch);
+    await api.decide("p1", { approved: true }, { idempotencyKey: "k-1" });
+    const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.headers).toMatchObject({ "Idempotency-Key": "k-1", "Content-Type": "application/json", Accept: "application/json" });
+  });
+
   it("creates, forks and messages cases", async () => {
     const api = createApi("", fetchFn as unknown as typeof fetch);
     await api.createCase({ store_id: "S030", sim_today: "2026-03-01", mode: "live" });

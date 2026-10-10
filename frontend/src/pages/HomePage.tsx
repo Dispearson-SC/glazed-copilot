@@ -1,3 +1,4 @@
+import FloatingChat from "../chat/FloatingChat";
 import { Link } from "react-router-dom";
 import { useApi } from "../ApiContext";
 import { ErrorBox, StoreSelect, useStores } from "../components";
@@ -91,6 +92,14 @@ export default function HomePage() {
       <p>
         <Link to={`/stores/${storeId}/purchases`}>Ver compras</Link> · <Link to="/alerts">Ver alertas</Link>
       </p>
+      {currentCase && (
+        <FloatingChat
+          storeId={storeId}
+          caseId={currentCase.case_id}
+          storeName={stores.find((s) => s.store_id === storeId)?.display_name}
+          simToday={currentCase.sim_today}
+        />
+      )}
     </section>
   );
 }

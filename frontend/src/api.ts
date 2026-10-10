@@ -25,6 +25,7 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
   async function request<T>(path: string, init: RequestInit = {}, query?: Query): Promise<T> {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (init.body !== undefined) headers["Content-Type"] = "application/json";
+    Object.assign(headers, init.headers as Record<string, string> | undefined);
     let res: Response;
     try {
       res = await fetchFn(`${base}/api/v1${path}${qs(query)}`, { ...init, headers });
@@ -62,8 +63,11 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
       request<Alert>(`/alerts/${alertId}`, send("PATCH", { state })),
     listProposals: (query: { case_id?: string; status?: string }) =>
       request<Proposal[]>("/proposals", {}, query),
-    decide: (proposalId: string, b: { approved: boolean; reason?: string }) =>
-      request<Execution>(`/proposals/${proposalId}/decision`, send("POST", b)),
+    decide: (proposalId: string, b: { approved: boolean; reason?: string }, opts: { idempotencyKey?: string } = {}) =>
+      request<Execution>(`/proposals/${proposalId}/decision`, {
+        ...send("POST", b),
+        ...(opts.idempotencyKey ? { headers: { "Idempotency-Key": opts.idempotencyKey } } : {}),
+      }),
     getCase: (caseId: string) => request<Case>(`/cases/${caseId}`),
     getDaySummary: (caseId: string, date?: string) =>
       request<DaySummary>(`/cases/${caseId}/day-summary`, {}, { date }),

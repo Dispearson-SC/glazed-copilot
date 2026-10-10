@@ -5,6 +5,7 @@ const ITEMS = [
   { to: "/purchases", label: "Compras", icon: "shopping_cart", end: false },
   { to: "/alerts", label: "Alertas", icon: "notifications_active", end: false },
   { to: "/cases", label: "Casos", icon: "forum", end: false },
+  { to: "/chat", label: "Chat", icon: "smart_toy", end: false },
   { to: "/trace", label: "Inspector", icon: "account_tree", end: false },
 ];
 
