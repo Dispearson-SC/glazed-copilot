@@ -105,8 +105,13 @@ def alert_view(alert: Any) -> dict[str, Any]:
     """An alert as the UI reads it: category (operacion|integridad|automatica), owning agent and ts."""
     out = jsonable_encoder(alert)
     kind = (alert.issue or {}).get("kind")
-    return {**out, "category": alert_category(kind, (alert.issue or {}).get("category")), "agent_id": alert_agent(kind),
-            "ts": out["created_at"]}
+    from glazed_backend.metrics.analysis import _TITLES
+    issue = alert.issue or {}
+    label = _TITLES.get(kind or "", (kind or "alerta").replace("_", " ").capitalize())
+    product = issue.get("product_name") or issue.get("sku") or issue.get("supplier_name") or issue.get("supplier_id")
+    return {**out, "category": alert_category(kind, issue.get("category")), "agent_id": alert_agent(kind),
+            "ts": out["created_at"], "kind_label_es": label,
+            "title_es": f"{label}: {product}" if product else label}
 
 
 def build_public_router(c: Any) -> APIRouter:
