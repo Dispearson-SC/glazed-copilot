@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from ..domain import (Alert, AlertState, BacktestRun, Case, DomainError, Execution, Experience, FutureDate, NotFound,
-                      Proposal, TraceEvent, alert_type_for_kind, new_id)
+                      Proposal, TraceEvent, alert_type_for_kind, canonical_agent_id, new_id)
 from ..ports import (AlertRepository, BacktestRepository, CaseRepository, Clock, CorePort,
                      ExecutionRepository, ExperienceMemoryPort, MetricsPort, ProposalRepository, TracePort)
 
@@ -278,19 +278,69 @@ class RunBacktest:
         return run
 
 
-_KIND_MAP = (("tool_call", "tool_call"), ("tool_result", "tool_result"), ("escalat", "escalation"),
-             ("approval", "escalation"))
+_ENTRY_KINDS = {"user_message": "message", "agent_message": "message", "reasoning": "message",
+                "compaction": "message", "knowledge_hit": "message", "peer_exchange": "message",
+                "tool_call": "tool_call", "tool_result": "tool_result", "policy_denial": "escalation",
+                "pending_request": "escalation", "human_decision": "escalation"}
+_SUMMARY_MAX = 300
 
 
-def _event_from_entry(case: Case, entry: dict[str, Any]) -> TraceEvent:
+def _clip(value: Any, limit: int = _SUMMARY_MAX) -> str:
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, default=str)
+    return text if len(text) <= limit else text[:limit] + "…"
+
+
+def _message_text(payload: dict[str, Any]) -> str:
+    """Core message payloads carry `content` (a string or a list of parts) or `text`/`summary`."""
+    content = payload.get("content", payload.get("text", payload.get("summary", "")))
+    if isinstance(content, list):
+        content = " ".join(str(p.get("text", "")) if isinstance(p, dict) else str(p) for p in content).strip()
+    return content if isinstance(content, str) else _clip(content)
+
+
+def _events_from_entry(case: Case, entry: dict[str, Any]) -> list[TraceEvent]:
+    """One Core transcript entry -> trace events with the keys the UIs read: `text` for messages,
+    `tool` (+ `args` / `result` summary) for tool activity, agents as canonical short ids."""
     raw = str(entry.get("kind", "message"))
-    kind = next((v for k, v in _KIND_MAP if k in raw), "message")
-    payload = entry.get("payload") or {}
-    user = raw.startswith("user")
-    frm = payload.get("from_agent") or ("manager" if user else payload.get("profile_id") or "agent")
-    to = payload.get("to_agent") or ("orchestrator" if user else "manager")
-    return TraceEvent(case.case_id, case.store_id, datetime.fromisoformat(str(entry["at"])), frm, to, kind,
-                      {"core_kind": raw, **payload}, event_id=str(entry.get("entry_id") or new_id()))
+    kind = _ENTRY_KINDS.get(raw, "message")
+    payload = dict(entry.get("payload") or {})
+    ts = datetime.fromisoformat(str(entry["at"]))
+    eid = str(entry.get("entry_id") or new_id())
+    mk = lambda frm, to, body, suffix="": TraceEvent(  # noqa: E731
+        case.case_id, case.store_id, ts, canonical_agent_id(frm), canonical_agent_id(to), kind,
+        {"core_kind": raw, **body}, event_id=eid + suffix)
+
+    if raw == "peer_exchange":
+        target = str(payload.get("target_agent_id") or "agent")
+        out = [mk("orchestrator", target, {"text": _clip(payload.get("question") or "", 2000),
+                                           "hop": payload.get("hop")}, ":q")]
+        if payload.get("answer"):
+            out.append(TraceEvent(case.case_id, case.store_id, ts + timedelta(milliseconds=1),
+                                  canonical_agent_id(target), "orchestrator", "message",
+                                  {"core_kind": raw, "text": _clip(payload["answer"], 2000)}, event_id=eid + ":a"))
+        return out
+    if raw in ("tool_call", "policy_denial", "tool_result"):
+        tool = str(payload.get("tool") or payload.get("tool_name") or "")
+        body: dict[str, Any] = {"tool": tool}
+        if "arguments" in payload:
+            body["args"] = payload["arguments"]
+        if "result" in payload:
+            body["result"] = _clip(payload["result"])
+        if payload.get("effect"):
+            body["effect"] = payload["effect"]
+        if raw == "tool_result":
+            return [mk("backend", "orchestrator", body)]
+        target = "backend"
+        if tool == "ask_peer":
+            target = str((payload.get("arguments") or {}).get("agent_id")
+                         or (payload.get("arguments") or {}).get("target_agent_id") or "backend")
+        return [mk("orchestrator", target, body)]
+    if raw == "user_message":
+        return [mk("manager", "orchestrator", {"text": _message_text(payload)})]
+    if kind == "escalation":  # pending_request, human_decision
+        return [mk("orchestrator", "manager", {"text": _clip(payload), **{k: v for k, v in payload.items()
+                                                                           if k in ("kind", "approved", "note")}})]
+    return [mk("orchestrator", "manager", {"text": _message_text(payload)})]
 
 
 class GetAgentTrace:
@@ -316,7 +366,8 @@ class GetAgentTrace:
         except Exception:  # Core unavailable: serve the cache
             return
         for entry in entries:
-            self.trace.record(_event_from_entry(case, entry))
+            for event in _events_from_entry(case, entry):
+                self.trace.record(event)
 
 
 class RecordEvent:
@@ -325,6 +376,7 @@ class RecordEvent:
 
     def execute(self, case_id: str, from_agent: str, to_agent: str, kind: str, payload: dict[str, Any]) -> TraceEvent:
         case = _case(self.cases, case_id)
-        event = TraceEvent(case.case_id, case.store_id, self.clock.now(), from_agent, to_agent, kind, payload)
+        event = TraceEvent(case.case_id, case.store_id, self.clock.now(), canonical_agent_id(from_agent),
+                           canonical_agent_id(to_agent), kind, payload)
         self.trace.record(event)
         return event

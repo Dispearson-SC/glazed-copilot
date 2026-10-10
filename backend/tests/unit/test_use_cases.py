@@ -183,3 +183,68 @@ def test_trace_merges_core_transcript_and_recorded_events(w):
     assert len(events) == 3
     assert len(uc.execute(case_id=c.case_id)) == 3  # refresh is idempotent
     assert len(uc.execute(store_id="S030")) == 3
+
+
+def _trace_for(w, entries):
+    c = start(w)
+    AskAgent(w.cases, w.core).execute(c.case_id, "hi")
+    w.core.transcript = entries
+    return GetAgentTrace(w.cases, w.core, w.trace).execute(case_id=c.case_id)
+
+
+def _entry(i, kind, payload, at="2026-03-10T10:00:0%d+00:00"):
+    return {"entry_id": f"e{i}", "turn_id": "t", "kind": kind, "at": at % i, "payload": payload}
+
+
+def test_trace_messages_carry_text_from_core_content(w):
+    events = _trace_for(w, [
+        _entry(1, "user_message", {"role": "user", "content": "how was the day?"}),
+        _entry(2, "agent_message", {"role": "assistant", "content": [{"type": "text", "text": "Good."}]}),
+    ])
+    assert [(e.kind, e.payload["text"]) for e in events] == [("message", "how was the day?"), ("message", "Good.")]
+    assert (events[0].from_agent, events[0].to_agent) == ("manager", "orchestrator")
+    assert (events[1].from_agent, events[1].to_agent) == ("orchestrator", "manager")
+
+
+def test_trace_tool_calls_carry_tool_args_and_result_summary(w):
+    events = _trace_for(w, [
+        _entry(1, "tool_call", {"tool": "propose_action", "caller": "x", "arguments": {"issue_id": "i1"}}),
+        _entry(2, "tool_result", {"tool_name": "propose_action", "result": "r" * 500}),
+    ])
+    call, res = events
+    assert call.kind == "tool_call" and call.payload["tool"] == "propose_action"
+    assert call.payload["args"] == {"issue_id": "i1"}
+    assert res.kind == "tool_result" and res.payload["tool"] == "propose_action"
+    assert 0 < len(res.payload["result"]) <= 301
+
+
+def test_trace_peer_exchange_becomes_question_and_answer_between_canonical_agents(w):
+    events = _trace_for(w, [
+        _entry(1, "peer_exchange", {"target_agent_id": "glazed_supply", "hop": 0, "state": "answered",
+                                    "question": "stock of SKU-1?", "answer": "3 days"})])
+    assert [(e.from_agent, e.to_agent, e.kind, e.payload["text"]) for e in events] == [
+        ("orchestrator", "supply", "message", "stock of SKU-1?"),
+        ("supply", "orchestrator", "message", "3 days")]
+
+
+def test_trace_policy_denial_and_pending_request_are_escalations(w):
+    events = _trace_for(w, [
+        _entry(1, "policy_denial", {"tool": "ask_peer", "arguments": {}, "effect": "deny"}),
+        _entry(2, "pending_request", {"kind": "approval", "tool_call_id": "tc"})])
+    assert [e.kind for e in events] == ["escalation", "escalation"]
+    assert events[0].payload["tool"] == "ask_peer"
+    assert events[1].payload["text"]
+
+
+def test_canonical_agent_ids():
+    from glazed_backend.domain import canonical_agent_id
+    for role in ("orchestrator", "present", "past", "supply", "strategist", "sentinel", "auditor", "liaison"):
+        assert canonical_agent_id(f"glazed_{role}") == role == canonical_agent_id(role)
+    assert canonical_agent_id("manager") == "manager" and canonical_agent_id("glazed_other") == "glazed_other"
+
+
+def test_record_event_canonicalizes_core_profile_ids(w):
+    c = start(w)
+    e = RecordEvent(w.cases, w.trace, w.clock).execute(c.case_id, "glazed_sentinel", "glazed_orchestrator",
+                                                         "message", {"text": "x"})
+    assert (e.from_agent, e.to_agent) == ("sentinel", "orchestrator")

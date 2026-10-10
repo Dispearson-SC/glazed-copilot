@@ -16,6 +16,15 @@ CASE_MODES = ("live", "sandbox", "backtest")
 EXECUTION_SOURCES = ("simulated", "demo_injected", "operational")
 EXECUTION_STATUSES = ("executed", "not_executed", "partial")
 TRACE_KINDS = ("message", "tool_call", "tool_result", "escalation")
+AGENT_IDS = ("orchestrator", "present", "past", "supply", "strategist", "sentinel", "auditor", "liaison")
+
+
+def canonical_agent_id(agent_id: str) -> str:
+    """Agent-Core profile ids are `glazed_<role>`; the product (trace, frontend lanes, CLI) uses `<role>`.
+    Anything else (the manager, `backend`, unknown ids) keeps its id."""
+    role = agent_id.removeprefix("glazed_")
+    return role if role in AGENT_IDS else agent_id
+
 
 _KIND_TO_ALERT_TYPE = {
     "expiring": 1, "overstock_waste": 1, "stockout_risk": 2, "staffing": 3,
