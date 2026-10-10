@@ -17,10 +17,10 @@ const option = {
 };
 const withOptions: TransferOptionsResponse = { as_of: "2026-07-19", store_id: "S001", options: [option] };
 
-const show = (getTransferOptions: unknown) =>
+const show = (getTransferOptions: unknown, props: { sku?: string; issueId?: string } = { sku: "SKU-100263" }) =>
   render(
     <ApiProvider api={fakeApi({ getTransferOptions })}>
-      <TransferOptions caseId="c1" />
+      <TransferOptions caseId="c1" {...props} />
     </ApiProvider>,
   );
 
@@ -39,6 +39,28 @@ describe("TransferOptions", () => {
     expect(card).toHaveTextContent("Vence el 2026-07-20");
     expect(card).toHaveTextContent("Trasladar 8 cuesta $15.80 y evita merma.");
     expect(screen.queryByRole("status", { name: /Cargando traslados/ })).toBeNull();
+  });
+
+  it("a card for one SKU never shows the options of another SKU", async () => {
+    const other = { ...option, option_id: "zzz", sku: "SKU-999999", to_store_name: "Otra tienda" };
+    show(async () => ({ ...withOptions, options: [option, other] }), { sku: "SKU-100263" });
+    expect(await screen.findByText("Terminal C")).toBeInTheDocument();
+    expect(screen.getAllByTestId("transfer-option")).toHaveLength(1);
+    expect(screen.queryByText("Otra tienda")).toBeNull();
+  });
+
+  it("says in Spanish that nothing applies when no option matches the card's SKU", async () => {
+    show(async () => withOptions, { sku: "SKU-OTHER" });
+    expect(await screen.findByText("No hay traslados recomendados para este producto")).toBeInTheDocument();
+    expect(screen.queryByTestId("transfer-option")).toBeNull();
+  });
+
+  it("matches the issue_id when the option carries one", async () => {
+    const mine = { ...option, option_id: "m", issue_id: "S030|transfer_opportunity|SKU-100263" };
+    const other = { ...option, option_id: "o", to_store_name: "Otra tienda", issue_id: "S030|transfer_opportunity|SKU-100263-X" };
+    show(async () => ({ ...withOptions, options: [mine, other] }), { sku: "SKU-100263", issueId: "S030|transfer_opportunity|SKU-100263" });
+    expect(await screen.findByText("Terminal C")).toBeInTheDocument();
+    expect(screen.queryByText("Otra tienda")).toBeNull();
   });
 
   it("empty options say why in Spanish, never the code", async () => {
@@ -66,8 +88,8 @@ describe("TransferOptions", () => {
 describe("transfer_opportunity decisions", () => {
   const transfer = {
     ...pendingA.approvals[0],
-    issue_id: "S030|transfer_opportunity|SKU-100263", kind: "transfer_opportunity", kinds: ["transfer_opportunity"], tier: "N3",
-    recommendation: { option_id: "a899c3d5698f", label: "Trasladar 8 unidades a Terminal C", action_type: "transfer_stock", params: {} },
+    issue_id: "S030|transfer_opportunity|SKU-100263", sku: "SKU-100263", kind: "transfer_opportunity", kinds: ["transfer_opportunity"], tier: "N3",
+    recommendation: { option_id: "a899c3d5698f", label: "Trasladar 8 unidades a Terminal C", action_type: "transfer_stock", params: { sku: "SKU-100263" } },
   };
   const pending = { ...pendingA, approvals: [transfer], technical: [] };
 

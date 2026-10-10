@@ -72,7 +72,7 @@ function AnalysisLoader({ caseId, item, mode, open, busy, onApprove, onReject }:
       alive = false;
     };
   }, [api, caseId, item.issueId]);
-  return <AnalysisCard item={item} analysis={analysis} mode={mode} open={open} busy={busy} onApprove={onApprove} onReject={onReject} extra={item.isTransfer ? <TransferOptions caseId={caseId} /> : undefined} />;
+  return <AnalysisCard item={item} analysis={analysis} mode={mode} open={open} busy={busy} onApprove={onApprove} onReject={onReject} extra={item.isTransfer ? <TransferOptions caseId={caseId} sku={item.sku} issueId={item.issueId} /> : undefined} />;
 }
 
 /** Agente window: the existing chat (useChat) in the copilot look, with the pinned context and the analysis cards. */

@@ -20,7 +20,7 @@ const netText = (r: Range3): string => {
 };
 
 /** Stock-transfer options of the case (GET /transfers/options), shown inside the analysis of a "Oportunidad de traslado". */
-export default function TransferOptions({ caseId }: { caseId: string }) {
+export default function TransferOptions({ caseId, sku, issueId }: { caseId: string; sku?: string; issueId?: string }) {
   const api = useApi();
   const res = usePolling<TransferOptionsResponse>(() => api.getTransferOptions(caseId), 60_000, false, [caseId]);
 
@@ -40,8 +40,13 @@ export default function TransferOptions({ caseId }: { caseId: string }) {
   }
   const data = res.data;
   if (!data) return null;
-  if (data.options.length === 0) {
-    const why = data.reason_es || (data.reason ? REASONS_ES[data.reason] : undefined) || "No hay traslados recomendados por ahora";
+  // The endpoint lists every option of the case: a card shows only those of its own issue/product.
+  const options = data.options.filter((o) => (o.issue_id && issueId ? o.issue_id === issueId : Boolean(sku) && o.sku === sku));
+  if (options.length === 0) {
+    const why =
+      data.options.length > 0
+        ? "No hay traslados recomendados para este producto"
+        : data.reason_es || (data.reason ? REASONS_ES[data.reason] : undefined) || "No hay traslados recomendados por ahora";
     return <p className="m-0 text-[13px] leading-[19px] text-on-surface-variant">{why}</p>;
   }
   return (
@@ -50,7 +55,7 @@ export default function TransferOptions({ caseId }: { caseId: string }) {
         <span aria-hidden="true" className="material-symbols-outlined text-[16px]">swap_horiz</span>
         Opciones de traslado
       </span>
-      {data.options.map((o) => (
+      {options.map((o) => (
         <div key={o.option_id} data-testid="transfer-option" className="flex flex-col gap-1 rounded-2xl bg-surface-container p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="min-w-0 truncate font-body-md text-body-md font-semibold text-primary">{o.to_store_name}</span>

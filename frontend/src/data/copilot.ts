@@ -100,6 +100,8 @@ export interface DecisionItem {
   kinds?: string[];
   /** A stock transfer between stores (kind transfer_opportunity / action transfer_stock). */
   isTransfer?: boolean;
+  /** Product of the card (approvals): sku, else the recommendation's params.sku. */
+  sku?: string;
 }
 
 const TIER_NAMES: Record<string, string> = { N1: "Automática", N2: "Propuesta", N3: "Diálogo" };
@@ -149,6 +151,7 @@ export function buildPendingItems(pending: PendingResponse | null, simToday: str
     supplier: "", arrive: "", cost: "", why: a.problem, chips: [], warn: "",
     kinds: (a.kinds ?? []).map((k) => kindLabelEs(k)),
     isTransfer: a.kind === "transfer_opportunity" || a.recommendation.action_type === "transfer_stock",
+    sku: a.sku ?? (typeof a.recommendation.params?.sku === "string" ? a.recommendation.params.sku : undefined),
   }));
   const techs = pending.technical.map((t): DecisionItem => {
     const decidable = Boolean(t.issue_id && t.option_id);
