@@ -38,7 +38,7 @@ function AssistantBubble({ m }: { m: ChatMessage }) {
 }
 
 /** Fetches the backend analysis of the issue once and hands it to the card. */
-function AnalysisLoader({ caseId, item, mode, open, onApprove, onReject }: { caseId: string; item: DecisionItem; mode: AnalysisRef["mode"]; open: boolean; onApprove: (i: DecisionItem) => void; onReject: (i: DecisionItem) => void }) {
+function AnalysisLoader({ caseId, item, mode, open, busy, onApprove, onReject }: { caseId: string; item: DecisionItem; mode: AnalysisRef["mode"]; open: boolean; busy: boolean; onApprove: (i: DecisionItem) => void; onReject: (i: DecisionItem) => void }) {
   const api = useApi();
   const [analysis, setAnalysis] = useState<AnalysisState>({ status: "loading" });
   useEffect(() => {
@@ -52,7 +52,7 @@ function AnalysisLoader({ caseId, item, mode, open, onApprove, onReject }: { cas
       alive = false;
     };
   }, [api, caseId, item.issueId]);
-  return <AnalysisCard item={item} analysis={analysis} mode={mode} open={open} onApprove={onApprove} onReject={onReject} />;
+  return <AnalysisCard item={item} analysis={analysis} mode={mode} open={open} busy={busy} onApprove={onApprove} onReject={onReject} />;
 }
 
 /** Agente window: the existing chat (useChat) in the copilot look, with the pinned context and the analysis cards. */
@@ -61,6 +61,7 @@ export default function AgentWindow({
   chat,
   items,
   openIds,
+  busyId = null,
   pendingLine,
   onApprove,
   onReject,
@@ -71,6 +72,8 @@ export default function AgentWindow({
   items: DecisionItem[];
   /** Ids still pending (default: all). */
   openIds?: string[];
+  /** Card with a decision request in flight. */
+  busyId?: string | null;
   pendingLine: string;
   onApprove: (item: DecisionItem) => void;
   onReject: (item: DecisionItem) => void;
@@ -105,7 +108,7 @@ export default function AgentWindow({
     cardsAt(at).map((a) => {
       const item = items.find((i) => i.id === a.itemId);
       if (!item) return null;
-      return <AnalysisLoader key={a.id} caseId={caseId} item={item} mode={a.mode} open={pendingIds.has(item.id)} onApprove={onApprove} onReject={onReject} />;
+      return <AnalysisLoader key={a.id} caseId={caseId} item={item} mode={a.mode} open={pendingIds.has(item.id)} busy={busyId === item.id} onApprove={onApprove} onReject={onReject} />;
     });
 
   return (

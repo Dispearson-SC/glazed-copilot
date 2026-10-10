@@ -20,7 +20,7 @@ const isDefinitive = (e: unknown): boolean => e instanceof ApiError && e.status 
 export function useDecide(caseId: string, refresh: () => Promise<void> | void) {
   const api = useApi();
   const { dispatch, showToast } = useCopilot();
-  const [, setBusy] = useState<string | null>(null);
+  const [busyId, setBusy] = useState<string | null>(null);
   // One Idempotency-Key per user intent (card x action): created when the action starts, reused on retries and double taps,
   // dropped only after a definitive outcome (success or a 4xx answer from the backend).
   const keys = useRef(new Map<string, string>());
@@ -87,7 +87,7 @@ export function useDecide(caseId: string, refresh: () => Promise<void> | void) {
     [caseId, run],
   );
 
-  return { decide };
+  return { decide, busyId };
 }
 
 export type Decide = ReturnType<typeof useDecide>["decide"];

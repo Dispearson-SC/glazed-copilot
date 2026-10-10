@@ -24,6 +24,19 @@ function setup(over: Record<string, unknown> = {}) {
 }
 const keyOf = (api: ReturnType<typeof fakeApi>, call: number) => (vi.mocked(api.recordDecision).mock.calls[call] as unknown as [string, unknown, { idempotencyKey: string }])[2].idempotencyKey;
 
+describe("useDecide busy state", () => {
+  it("exposes the id of the card with a request in flight and clears it afterwards", async () => {
+    let release: (v: unknown) => void = () => {};
+    const { hook } = setup({ recordDecision: vi.fn(() => new Promise((r) => { release = r; })) });
+    expect(hook.result.current.busyId).toBeNull();
+    let p!: Promise<boolean>;
+    act(() => { p = hook.result.current.decide(tech, true); });
+    await waitFor(() => expect(hook.result.current.busyId).toBe(tech.id));
+    await act(async () => { release({ decision_id: "d", proposal_id: "d", status: "approved" }); await p; });
+    expect(hook.result.current.busyId).toBeNull();
+  });
+});
+
 describe("useDecide idempotency", () => {
   it("reuses ONE Idempotency-Key when the same decision is retried after a transient failure", async () => {
     const recordDecision = vi.fn().mockRejectedValueOnce(new ApiError(503, "down")).mockResolvedValue({ decision_id: "d", proposal_id: "d", status: "approved" });

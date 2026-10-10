@@ -59,6 +59,12 @@ describe("AnalysisCard", () => {
     expect(screen.getByText("No se pudo cargar el análisis: boom")).toBeInTheDocument();
   });
 
+  it("disables Aprobar and Rechazar while a request for the card is in flight", () => {
+    render(<AnalysisCard item={approval} analysis={ok} mode="analizar" open busy onApprove={() => {}} onReject={() => {}} />);
+    expect(screen.getByRole("button", { name: /Aprobar/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Rechazar/ })).toBeDisabled();
+  });
+
   it("disables decisions on a read-only item and says 'Disponible pronto'", () => {
     render(<AnalysisCard item={{ ...tech, readOnly: true }} analysis={ok} mode="dialogo" open onApprove={() => {}} onReject={() => {}} />);
     expect(screen.getByRole("button", { name: /Aceptar/ })).toBeDisabled();

@@ -6,6 +6,7 @@ export default function AnalysisCard({
   analysis,
   mode,
   open,
+  busy = false,
   onApprove,
   onReject,
 }: {
@@ -15,6 +16,8 @@ export default function AnalysisCard({
   mode: "analizar" | "dialogo";
   /** True while the decision is still pending. */
   open: boolean;
+  /** A request for this decision is in flight. */
+  busy?: boolean;
   onApprove: (item: DecisionItem) => void;
   onReject: (item: DecisionItem) => void;
 }) {
@@ -66,7 +69,7 @@ export default function AnalysisCard({
         <div className="flex gap-2 px-4 pb-4">
           <button
             type="button"
-            disabled={item.readOnly}
+            disabled={item.readOnly || busy}
             onClick={() => onApprove(item)}
             className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full bg-secondary font-body-md text-body-md font-semibold text-white shadow-[0_4px_6px_-1px_rgba(122,86,73,.2)] disabled:opacity-40"
           >
@@ -75,7 +78,7 @@ export default function AnalysisCard({
           </button>
           <button
             type="button"
-            disabled={item.readOnly}
+            disabled={item.readOnly || busy}
             onClick={() => onReject(item)}
             className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full bg-surface-container-high font-body-md text-body-md font-medium text-primary disabled:opacity-40"
           >

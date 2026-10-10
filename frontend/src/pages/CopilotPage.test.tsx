@@ -73,6 +73,42 @@ describe("Decisiones window", () => {
     expect(screen.getByText(/Sin decisiones resueltas hoy/)).toBeInTheDocument();
   });
 
+  it("disables the card buttons while the decision is in flight and enables them again after", async () => {
+    let release: (v: unknown) => void = () => {};
+    const api = await openDecisiones(apiWith({ recordDecision: vi.fn(() => new Promise((r) => { release = r; })) }));
+    const card = (await screen.findByRole("heading", { name: /Pedir 10 unidades/ })).closest("article")!;
+    await userEvent.click(within(card).getByRole("button", { name: /Aceptar/ }));
+    await waitFor(() => expect(within(card).getByRole("button", { name: /Aceptar/ })).toBeDisabled());
+    expect(within(card).getByRole("button", { name: /Rechazar/ })).toBeDisabled();
+    release({ decision_id: "d", proposal_id: "d", status: "approved" });
+    await waitFor(() => expect(screen.queryByRole("heading", { name: /Pedir 10 unidades/ })).toBeNull());
+    expect(api.recordDecision).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables the reject sheet submit and the analysis card buttons while a request is in flight", async () => {
+    let release: (v: unknown) => void = () => {};
+    await openDecisiones(apiWith({ recordDecision: vi.fn(() => new Promise((r) => { release = r; })) }));
+    await userEvent.click(await screen.findByRole("button", { name: "Analizar con el copiloto" }));
+    const analysis = (await screen.findByText("Análisis")).closest("article")!;
+    await userEvent.click(within(analysis).getByRole("button", { name: /Aprobar/ }));
+    await waitFor(() => expect(within(analysis).getByRole("button", { name: /Aprobar/ })).toBeDisabled());
+    expect(within(analysis).getByRole("button", { name: /Rechazar/ })).toBeDisabled();
+    release({ decision_id: "d", proposal_id: "d", status: "approved" });
+    await screen.findByText("Decisión registrada");
+  });
+
+  it("keeps the reject sheet submit disabled while its request is in flight", async () => {
+    let release: (v: unknown) => void = () => {};
+    await openDecisiones(apiWith({ recordDecision: vi.fn(() => new Promise((r) => { release = r; })) }));
+    const card = (await screen.findByRole("heading", { name: /Pedir 10 unidades/ })).closest("article")!;
+    await userEvent.click(within(card).getByRole("button", { name: /Rechazar/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Mal momento" }));
+    await userEvent.click(screen.getByRole("button", { name: "Enviar motivo y rechazar" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Enviar motivo y rechazar" })).toBeDisabled());
+    release({ decision_id: "d", proposal_id: "d", status: "approved" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
   it("keeps the card and shows the error when the backend refuses", async () => {
     await openDecisiones(apiWith({ recordDecision: async () => { throw new ApiError(400, "unknown option"); } }));
     await userEvent.click(await screen.findByRole("button", { name: /Aceptar/ }));

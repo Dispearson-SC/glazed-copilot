@@ -36,7 +36,7 @@ function CopilotShell() {
   const branch_ = useBranchData(caseId, simToday, state.tab === "sucursal", session.refreshKey);
   const warningsData = useWarningsData(storeId, caseId, session.refreshKey);
   const memoryData = useMemoryData(caseId, state.tab === "memorias", session.refreshKey);
-  const { decide } = useDecide(caseId, data.refresh);
+  const { decide, busyId } = useDecide(caseId, data.refresh);
   const [site, branch] = splitStoreName(active ? storeLabel(active) : "Sucursal");
 
   // Every decision seen this session stays available to the chat cards even after it is decided.
@@ -79,6 +79,7 @@ function CopilotShell() {
           chat={chat}
           items={[...known.current.values()]}
           openIds={visible.map((i) => i.id)}
+          busyId={busyId}
           pendingLine={data.items.length || !data.loading ? pendingLine : ""}
           onApprove={(i) => void decide(i, true)}
           onReject={(i) => dispatch({ type: "openReject", id: i.id })}
@@ -90,7 +91,7 @@ function CopilotShell() {
           simToday={simToday}
           loadState={data.items.length === 0 && data.error ? (isUnavailable(data.error) ? "soon" : "error") : "ok"}
           menuFor={state.menuFor}
-          busyId={null}
+          busyId={busyId}
           accepted={state.accepted}
           onAnalyze={(i) => openCard(i, "analizar")}
           onAccept={(i) => void decide(i, true)}
@@ -126,7 +127,7 @@ function CopilotShell() {
       {reject && (
         <RejectSheet
           title={reject.title}
-          busy={false}
+          busy={busyId === reject.id}
           onCancel={() => dispatch({ type: "closeReject" })}
           onSubmit={async (r) => {
             if (await decide(reject, false, r)) dispatch({ type: "closeReject" });
