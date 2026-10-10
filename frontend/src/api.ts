@@ -98,8 +98,8 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
     createCase: (b: { store_id: string; sim_today: string; mode?: CaseMode; title?: string }) =>
       request<Case>("/cases", send("POST", b)),
     advanceCase: (caseId: string, b: { days: number }) => request<AdvanceResult>(`/cases/${caseId}/advance`, send("POST", b)),
-    sendMessage: (caseId: string, text: string, context?: MessageContext) =>
-      request<{ turn_id: string }>(`/cases/${caseId}/messages`, send("POST", context ? { text, context } : { text })),
+    sendMessage: (caseId: string, text: string, context?: MessageContext, opts?: { voice?: boolean }) =>
+      request<{ turn_id: string }>(`/cases/${caseId}/messages`, send("POST", { text, ...(context ? { context } : {}), ...(opts?.voice ? { voice: true } : {}) })),
     listTurns: (caseId: string) => request<TurnRecord[]>(`/cases/${caseId}/turns`),
     getTurn: (caseId: string, turnId: string) => request<Turn>(`/cases/${caseId}/turns/${turnId}`),
     listProposals: (query: { case_id?: string; status?: string }) =>
