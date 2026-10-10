@@ -261,3 +261,36 @@ def test_internal_data_reads_are_traced_as_agent_tool_calls(env):
     # no agent header (e.g. a script) -> nothing recorded
     client.get("/internal/v1/order-plan", headers={"X-Glazed-Case": case["case_id"]})
     assert len(client.get("/api/v1/trace", params={"case_id": case["case_id"]}).json()) == 1
+
+
+NAME = "Bayfront Municipal Airport · Gate Area West"
+
+
+def test_stores_listing_has_display_name(env):
+    client, _ = env
+    s = client.get("/api/v1/stores").json()[0]
+    assert s["display_name"] == NAME and s["site_name"] and s["site_type"] and s["region"]
+
+
+def test_public_payloads_carry_store_display_name(env):
+    client, _ = env
+    c = mkcase(client)
+    assert c["store_display_name"] == NAME
+    assert client.get(f"/api/v1/cases/{c['case_id']}").json()["store_display_name"] == NAME
+    assert client.get("/api/v1/cases").json()[0]["store_display_name"] == NAME
+    assert client.get(f"/api/v1/cases/{c['case_id']}/day-summary").json()["store_display_name"] == NAME
+    adv = client.post(f"/api/v1/cases/{c['case_id']}/advance", json={"days": 1}).json()
+    assert adv["new_alerts"][0]["store_display_name"] == NAME
+    assert client.get("/api/v1/alerts").json()[0]["store_display_name"] == NAME
+
+
+def test_internal_payloads_carry_store_display_name(env):
+    client, _ = env
+    c = mkcase(client)
+    h = {"X-Glazed-Case": c["case_id"]}
+    assert client.get("/internal/v1/kpis", headers=h).json()["store_display_name"] == NAME
+    assert client.get("/internal/v1/day-summary", headers=h).json()["store_display_name"] == NAME
+    assert client.get("/internal/v1/order-plan", headers=h).json()["store_display_name"] == NAME
+    client.post(f"/api/v1/cases/{c['case_id']}/advance", json={"days": 1})
+    issues = client.get("/internal/v1/issues", headers=h).json()
+    assert issues and issues[0]["store_display_name"] == NAME

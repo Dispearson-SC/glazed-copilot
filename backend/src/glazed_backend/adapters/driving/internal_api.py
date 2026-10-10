@@ -11,6 +11,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
+from .store_names import StoreNames
 from ...domain import Case, DomainError, canonical_agent_id, case_id_from_session
 
 
@@ -48,6 +49,7 @@ def build_internal_router(c: Any) -> APIRouter:
             {"tool": tool, "text": f"{tool}?{query}" if query else tool})
 
     r = APIRouter(prefix="/internal/v1")
+    names = StoreNames(c.metrics)
 
     def case_ctx(request: Request, x_glazed_case: Annotated[str | None, Header()] = None,
                  x_glazed_agent: Annotated[str | None, Header()] = None) -> Case:
@@ -65,7 +67,7 @@ def build_internal_router(c: Any) -> APIRouter:
     @r.get("/kpis")
     def kpis(case: Ctx, date_from: date | None = None, date_to: date | None = None):
         end = date_to or case.sim_today
-        return c.metrics.kpis(case.store_id, case.sim_today, date_from or end - timedelta(days=6), end)
+        return names.tag(c.metrics.kpis(case.store_id, case.sim_today, date_from or end - timedelta(days=6), end), case.store_id)
 
     @r.get("/metrics/explain")
     def explain(case: Ctx, metric: str):
@@ -73,11 +75,11 @@ def build_internal_router(c: Any) -> APIRouter:
 
     @r.get("/day-summary")
     def day_summary(case: Ctx, date: date | None = None):
-        return uc.GetDaySummary(c.cases, c.metrics).execute(case.case_id, date)
+        return names.tag(uc.GetDaySummary(c.cases, c.metrics).execute(case.case_id, date), case.store_id)
 
     @r.get("/issues")
     def issues(case: Ctx, limit: int = 5):
-        return c.metrics.issues(case.store_id, case.sim_today, max(1, min(limit, 20)))
+        return names.tag(c.metrics.issues(case.store_id, case.sim_today, max(1, min(limit, 20))), case.store_id)
 
     @r.get("/inventory/projection")
     def projection(case: Ctx, sku: str, horizon: int = 7):
@@ -85,7 +87,7 @@ def build_internal_router(c: Any) -> APIRouter:
 
     @r.get("/order-plan")
     def order_plan(case: Ctx):
-        return c.metrics.order_plan(case.store_id, case.sim_today)
+        return names.tag(c.metrics.order_plan(case.store_id, case.sim_today), case.store_id)
 
     @r.get("/suppliers/performance")
     def suppliers(case: Ctx):

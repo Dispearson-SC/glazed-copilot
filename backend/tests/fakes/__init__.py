@@ -31,7 +31,8 @@ class FakeMetrics:
 
     def stores(self):
         return [{"store_id": "S030", "name": "Gate Area West", "format": "Shop-in-Shop", "site_id": "ST12",
-                 "region": "Northeast"}]
+                 "region": "Northeast", "site_name": "Bayfront Municipal Airport", "site_type": "Airport",
+                 "display_name": "Bayfront Municipal Airport · Gate Area West"}]
 
     def kpis(self, store_id, as_of, date_from, date_to):
         self._guard(as_of, date_to)

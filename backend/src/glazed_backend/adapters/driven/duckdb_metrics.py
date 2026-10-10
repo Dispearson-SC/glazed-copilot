@@ -59,7 +59,9 @@ class DuckDBMetrics:
         return [d - timedelta(days=7 * k) for k in range(0 if include_d else 1, n + 1)]
 
     def stores(self) -> list[dict[str, Any]]:
-        return self._rows("SELECT s.store_id, s.store_name AS name, s.format, s.site_id, si.region"
+        return self._rows("SELECT s.store_id, s.store_name AS name, s.format, s.site_id, si.region,"
+                          " si.site_name, si.site_type,"
+                          " coalesce(si.site_name || ' · ', '') || s.store_name AS display_name"
                           " FROM stores s LEFT JOIN sites si ON si.site_id=s.site_id ORDER BY s.store_id")
 
     # -- KPIs --------------------------------------------------------------------

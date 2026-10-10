@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from ... import application as uc
 from ...domain import AlertState, DomainError, NotFound
+from .store_names import StoreNames
 
 
 class NewCase(BaseModel):
@@ -52,6 +53,7 @@ class TransitionBody(BaseModel):
 
 def build_public_router(c: Any) -> APIRouter:
     r = APIRouter(prefix="/api/v1")
+    names = StoreNames(c.metrics)
 
     @r.get("/health")
     def health() -> dict[str, Any]:
@@ -63,19 +65,19 @@ def build_public_router(c: Any) -> APIRouter:
 
     @r.post("/cases", status_code=201)
     def create_case(b: NewCase):
-        return jsonable_encoder(uc.StartCase(c.cases).execute(b.store_id, b.sim_today, b.mode, b.title))
+        return names.tag(jsonable_encoder(uc.StartCase(c.cases).execute(b.store_id, b.sim_today, b.mode, b.title)))
 
     @r.get("/cases")
     def list_cases(store_id: str | None = None):
-        return jsonable_encoder(uc.ListCases(c.cases).execute(store_id))
+        return names.tag(jsonable_encoder(uc.ListCases(c.cases).execute(store_id)))
 
     @r.get("/cases/{case_id}")
     def get_case(case_id: str):
-        return jsonable_encoder(uc.ResumeCase(c.cases).execute(case_id))
+        return names.tag(jsonable_encoder(uc.ResumeCase(c.cases).execute(case_id)))
 
     @r.post("/cases/{case_id}/fork", status_code=201)
     def fork(case_id: str, b: ForkBody | None = None):
-        return jsonable_encoder(uc.ForkCase(c.cases, c.proposals, c.executions).execute(case_id, (b.title if b else "")))
+        return names.tag(jsonable_encoder(uc.ForkCase(c.cases, c.proposals, c.executions).execute(case_id, (b.title if b else ""))))
 
     @r.post("/cases/{case_id}/messages", status_code=202)
     def ask(case_id: str, b: AskBody):
@@ -87,13 +89,13 @@ def build_public_router(c: Any) -> APIRouter:
 
     @r.get("/cases/{case_id}/day-summary")
     def day_summary(case_id: str, date: date | None = None):
-        return uc.GetDaySummary(c.cases, c.metrics).execute(case_id, date)
+        return names.tag(uc.GetDaySummary(c.cases, c.metrics).execute(case_id, date))
 
     @r.post("/cases/{case_id}/advance")
     def advance(case_id: str, b: AdvanceBody | None = None):
         b = b or AdvanceBody()
         res = uc.AdvanceSimClock(c.cases, c.alerts, c.metrics).execute(case_id, b.days, b.to)
-        return jsonable_encoder({"sim_today": res["sim_today"], "new_alerts": res["alerts"]})
+        return {"sim_today": res["sim_today"], "new_alerts": names.tag(jsonable_encoder(res["alerts"]))}
 
     @r.get("/alerts")
     def alerts(store_id: str | None = None, state: str | None = None):
@@ -101,7 +103,7 @@ def build_public_router(c: Any) -> APIRouter:
             st = AlertState(state) if state else None
         except ValueError:
             raise DomainError(f"unknown alert state {state!r}") from None
-        return jsonable_encoder(uc.ListAlerts(c.alerts).execute(store_id, st))
+        return names.tag(jsonable_encoder(uc.ListAlerts(c.alerts).execute(store_id, st)))
 
     @r.patch("/alerts/{alert_id}")
     def transition(alert_id: str, b: TransitionBody):
@@ -114,7 +116,7 @@ def build_public_router(c: Any) -> APIRouter:
             raise DomainError(f"unknown alert state {b.state!r}") from None
         alert.advance(target)
         c.alerts.update(alert)
-        return jsonable_encoder(alert)
+        return names.tag(jsonable_encoder(alert))
 
     @r.get("/proposals")
     def proposals(case_id: str | None = None, store_id: str | None = None, status: str | None = None):

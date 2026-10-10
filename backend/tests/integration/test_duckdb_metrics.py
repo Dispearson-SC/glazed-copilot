@@ -91,3 +91,11 @@ def test_stores_listing(m):
     rows = m.stores()
     s030 = next(r for r in rows if r["store_id"] == "S030")
     assert s030.keys() >= {"store_id", "name", "format", "site_id", "region"} and s030["region"]
+
+
+def test_stores_expose_display_name_with_site(m):
+    s030 = next(r for r in m.stores() if r["store_id"] == "S030")
+    assert s030["display_name"] == f"{s030['site_name']} · {s030['name']}"
+    assert s030["site_name"] and s030["site_type"]
+    names = [r["display_name"] for r in m.stores()]
+    assert len(set(names)) == len(names)  # unique, unlike store_name alone
