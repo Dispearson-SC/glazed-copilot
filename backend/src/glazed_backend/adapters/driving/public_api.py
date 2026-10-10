@@ -101,7 +101,9 @@ def build_public_router(c: Any) -> APIRouter:
 
     @r.post("/cases", status_code=201)
     def create_case(b: NewCase):
-        return names.tag(jsonable_encoder(uc.StartCase(c.cases).execute(b.store_id, b.sim_today, b.mode, b.title)))
+        case = uc.StartCase(c.cases).execute(b.store_id, b.sim_today, b.mode, b.title)
+        c.briefings.refresh_async(case)
+        return names.tag(jsonable_encoder(case))
 
     @r.get("/cases")
     def list_cases(store_id: str | None = None):
@@ -113,7 +115,9 @@ def build_public_router(c: Any) -> APIRouter:
 
     @r.post("/cases/{case_id}/fork", status_code=201)
     def fork(case_id: str, b: ForkBody | None = None):
-        return names.tag(jsonable_encoder(uc.ForkCase(c.cases, c.proposals, c.executions).execute(case_id, (b.title if b else ""))))
+        child = uc.ForkCase(c.cases, c.proposals, c.executions).execute(case_id, (b.title if b else ""))
+        c.briefings.refresh_async(child)
+        return names.tag(jsonable_encoder(child))
 
     @r.post("/cases/{case_id}/messages", status_code=202)
     def ask(case_id: str, b: AskBody):
@@ -131,7 +135,12 @@ def build_public_router(c: Any) -> APIRouter:
     def advance(case_id: str, b: AdvanceBody | None = None):
         b = b or AdvanceBody()
         res = uc.AdvanceSimClock(c.cases, c.alerts, c.metrics, compliance=checker()).execute(case_id, b.days, b.to)
+        c.briefings.refresh_async(uc.ResumeCase(c.cases).execute(case_id))
         return {"sim_today": res["sim_today"], "new_alerts": names.tag(jsonable_encoder(res["alerts"]))}
+
+    @r.get("/cases/{case_id}/briefing")
+    def briefing(case_id: str):
+        return jsonable_encoder(c.briefings.briefing(uc.ResumeCase(c.cases).execute(case_id)))
 
     @r.post("/promos/audit")
     def promo_audit(b: PromoAuditBody):

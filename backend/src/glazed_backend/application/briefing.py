@@ -5,12 +5,16 @@ recent decisions change within a day and are always read live.
 """
 from __future__ import annotations
 
+import logging
 import threading
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Callable
 
 from ..domain import Case
+
+log = logging.getLogger(__name__)
 
 WINDOW_DAYS = 7
 MAX_ISSUES, MAX_INTEGRITY, MAX_LINES, MAX_EVIDENCE, MAX_DECISIONS, MAX_PENDING = 5, 3, 5, 3, 5, 10
@@ -109,17 +113,105 @@ class SnapshotBuilder:
                 "recent_decisions": [_trim_proposal(p, s) for p, s in decided[:MAX_DECISIONS]]}
 
 
+def _money(x: float) -> str:
+    return f"${x:,.0f}"
+
+
+def headline(core: dict[str, Any]) -> list[dict[str, Any]]:
+    """At most five facts, computed from the snapshot by code so that no model has to derive them."""
+    kp, out = core["kpis"], []
+    if kp.get("waste_usd") is not None:
+        out.append({"key": "waste_7d", "text": f"Merma 7 días {_money(kp['waste_usd'])}", "value": kp["waste_usd"],
+                    "unit": "USD", "source": "kpis"})
+    ls = kp.get("lost_sales_usd") or {}
+    if ls:
+        out.append({"key": "lost_sales", "text": f"Venta perdida estimada {_money(ls['low'])}–{_money(ls['high'])}",
+                    "value": ls["mid"], "unit": "USD", "source": "kpis.lost_sales_usd", "low": ls["low"], "high": ls["high"]})
+    due = len(core["order_plan"]["due_today"])
+    out.append({"key": "orders_due_today", "text": f"{due} pedidos vencen hoy", "value": due, "unit": "pedidos",
+                "source": "order_plan"})
+    sups = [s for s in core["suppliers"] if s.get("on_time_pct") is not None]
+    if sups:
+        w = min(sups, key=lambda s: s["on_time_pct"])
+        out.append({"key": "worst_supplier",
+                    "text": f"Proveedor con menor puntualidad: {w.get('supplier_name') or w['supplier_id']} "
+                            f"({w['on_time_pct']:.1f}%)", "value": w["on_time_pct"], "unit": "%",
+                    "source": "suppliers.performance"})
+    if core["top_issues"]:
+        t = core["top_issues"][0]
+        label = " ".join(x for x in (t.get("product_name") or t.get("sku"), t.get("kind")) if x)
+        out.append({"key": "top_issue", "text": f"Mayor problema: {label} ({_money(float(t.get('severity_usd') or 0))})",
+                    "value": t.get("severity_usd"), "unit": "USD", "source": "issues", "issue_id": t["issue_id"]})
+    return out[:5]
+
+
+def suggested_focus(core: dict[str, Any]) -> list[str]:
+    ids = [i["issue_id"] for i in core["top_issues"][:3]]
+    return ids + [i["issue_id"] for i in core["integrity"][:1]]
+
+
 @dataclass
 class _Entry:
     core: dict[str, Any]
     generated_at: datetime
+    headline: list[dict[str, Any]]
+    focus: list[str]
 
 
 class BriefingService:
-    def __init__(self, builder: SnapshotBuilder, clock: Any) -> None:
-        self.builder, self.clock = builder, clock
+    def __init__(self, builder: SnapshotBuilder, clock: Any, cases: Any = None, warmers: tuple = ()) -> None:
+        self.builder, self.clock, self.cases, self.warmers = builder, clock, cases, warmers
         self._cache: dict[tuple[str, date], _Entry] = {}
         self._lock = threading.Lock()
+        self._pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="briefing")
+        self._pending: list[Future] = []
+
+    def clear(self) -> None:
+        self._cache.clear()
+
+    def wait_idle(self, timeout: float = 30.0) -> None:
+        wait(list(self._pending), timeout=timeout)
+        self._pending = [f for f in self._pending if not f.done()]
+
+    def briefing(self, case: Case) -> dict[str, Any]:
+        entry = self._entry(case)
+        return {"snapshot": self.snapshot(case), "headline": entry.headline, "suggested_focus": entry.focus}
+
+    def refresh(self, case: Case) -> None:
+        """Recompute now, replacing the entry for the case's simulated day and dropping its earlier days."""
+        core = self.builder.core(case)
+        with self._lock:
+            for k in [k for k in self._cache if k[0] == case.case_id and k[1] != case.sim_today]:
+                del self._cache[k]
+            self._cache[(case.case_id, case.sim_today)] = _Entry(core, self.clock.now(), headline(core), suggested_focus(core))
+
+    def refresh_async(self, case: Case) -> None:
+        """Background refresh (create, fork, advance). A failure only means the next read computes it itself."""
+        def run() -> None:
+            try:
+                self.refresh(case)
+            except Exception:  # noqa: BLE001 - never break the caller over a warm-up
+                log.warning("briefing refresh failed for %s", case.case_id, exc_info=True)
+        self._pending.append(self._pool.submit(run))
+
+    def warm_recent(self, limit: int = 3) -> None:
+        """Precompute the most recently created cases and initialise slow clients; never raises."""
+        def run() -> None:
+            for w in self.warmers:
+                try:
+                    w()
+                except Exception:  # noqa: BLE001
+                    log.warning("warmer failed", exc_info=True)
+            try:
+                recent = sorted(self.cases.list(), key=lambda c: c.created_at, reverse=True)[:limit] if self.cases else []
+                for case in recent:
+                    try:
+                        self.refresh(case)
+                    except Exception:  # noqa: BLE001
+                        log.warning("warm-up failed for %s", case.case_id, exc_info=True)
+            except Exception:  # noqa: BLE001
+                log.warning("warm-up could not list cases", exc_info=True)
+        self._pending.append(self._pool.submit(run))
 
     def keys(self) -> list[tuple[str, date]]:
         return list(self._cache)
@@ -138,6 +230,7 @@ class BriefingService:
         with self._lock:
             hit = self._cache.get(key)
             if hit is None:
-                hit = _Entry(self.builder.core(case), self.clock.now())
+                core = self.builder.core(case)
+                hit = _Entry(core, self.clock.now(), headline(core), suggested_focus(core))
                 self._cache[key] = hit
             return hit

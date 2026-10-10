@@ -87,6 +87,11 @@ def build_internal_router(c: Any) -> APIRouter:
         """Everything a specialist usually needs in one call (KPIs, top issues, order plan, suppliers, decisions)."""
         return jsonable_encoder(c.briefings.snapshot(case))
 
+    @r.get("/briefing")
+    def briefing(case: Ctx):
+        """Precomputed snapshot plus code-computed headline facts: answers simple questions without a specialist."""
+        return jsonable_encoder(c.briefings.briefing(case))
+
     @r.get("/metrics/explain")
     def explain(case: Ctx, metric: str):
         return uc.ExplainMetric(c.cases, c.metrics).execute(case.case_id, metric)

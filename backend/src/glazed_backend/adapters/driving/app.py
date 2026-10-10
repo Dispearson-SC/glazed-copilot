@@ -35,6 +35,7 @@ class Container:
     turn_tracker: Any = field(default_factory=TurnTracker)
     classifier: Any = None  # TextClassifierPort (Jev via Backboard, LLM fallback); None -> escape labels
     served: dict = field(default_factory=dict)  # (case_id, issue_id) -> issue as served, for option lookup
+    warm_on_startup: bool = False  # production only: precompute recent briefings and init clients in the background
     briefings: Any = None  # BriefingService; built from the other ports when not given
 
 
@@ -58,7 +59,8 @@ def create_app(c: Container) -> FastAPI:
     if c.briefings is None:
         from ...application.briefing import BriefingService, SnapshotBuilder
         from .store_names import StoreNames
-        c.briefings = BriefingService(SnapshotBuilder(c.metrics, c.proposals, StoreNames(c.metrics).of, c.served), c.clock)
+        c.briefings = BriefingService(SnapshotBuilder(c.metrics, c.proposals, StoreNames(c.metrics).of, c.served), c.clock, c.cases,
+                                   (c.memory.warm,) if hasattr(c.memory, "warm") else ())
     app = FastAPI(title="glazed-backend")
     app.add_middleware(CORSMiddleware, allow_origins=c.cors_origins or DEFAULT_CORS_ORIGINS,
                        allow_methods=["GET", "POST", "PATCH", "OPTIONS"], allow_headers=["*"])
@@ -75,6 +77,10 @@ def create_app(c: Container) -> FastAPI:
     app.add_exception_handler(DomainError, err(400))
     app.include_router(build_public_router(c))
     app.include_router(build_internal_router(c))
+    if c.warm_on_startup:
+        @app.on_event("startup")
+        def warm() -> None:  # a background thread: startup never waits for it, and it never raises
+            c.briefings.warm_recent()
     return app
 
 
@@ -106,13 +112,13 @@ def build_container(env: dict[str, str] | None = None) -> Container:
                          store.backtests, store.trace, SystemClock(),
                          BackboardMemory(key, store.assistants, display_name=StoreNames(metrics).of), "postgres",
                          "configured" if core_url else "missing", cors,
-                         float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier)
+                         float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier, warm_on_startup=True)
     classifier = build_classifier(env, None)
     return Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
                      InMemoryBacktests(), InMemoryTrace(), SystemClock(),
                      BackboardMemory(key, InMemoryAssistants(), display_name=StoreNames(metrics).of), "memory",
                      "configured" if core_url else "missing", cors,
-                         float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier)
+                         float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier, warm_on_startup=True)
 
 
 def build_classifier(env: dict[str, str], assistants: Any = None) -> Any:

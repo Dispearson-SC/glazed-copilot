@@ -29,6 +29,11 @@ class BackboardMemory:
         from backboard import BackboardClient
         return BackboardClient(api_key=self.api_key)
 
+    def warm(self) -> None:
+        """Pay the SDK import and client construction at startup instead of on the first agent call. No network."""
+        if self.api_key:
+            self._factory()
+
     async def _assistant_id(self, client: Any, store_id: str) -> str:
         known = self.assistants.get(store_id)
         if known:
