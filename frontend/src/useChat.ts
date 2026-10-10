@@ -50,10 +50,13 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
     setProposals([]);
     if (!enabled || !caseId) return;
     let alive = true;
-    // Stored turns carry the full replies; the trace parser is the fallback while the route is missing.
+    // Stored turns carry the full replies; the trace parser is the fallback while the route is missing or empty.
     api
       .listTurns(caseId)
-      .then((turns) => alive && setHistory(buildTurnHistory(turns)))
+      .then((turns) => {
+        if (turns.length === 0) throw new Error("no stored turns");
+        if (alive) setHistory(buildTurnHistory(turns));
+      })
       .catch(() =>
         api.getTrace(storeId, caseId).then((ev) => alive && setHistory(buildHistory(ev))).catch(() => {}),
       );

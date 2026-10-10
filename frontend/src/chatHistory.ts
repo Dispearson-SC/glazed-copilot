@@ -65,16 +65,26 @@ export function buildHistory(events: TraceEvent[]): ChatMessage[] {
   return out;
 }
 
-/** Rebuilds the conversation from the stored turns (full replies, ordered by ts). Turns still in flight show only the question. */
+export const WORKING_TEXT = "El copiloto sigue trabajando…";
+
+/** Rebuilds the conversation from the stored turns (full replies, ordered by ts). Back-filled rows may carry serialized envelopes. */
 export function buildTurnHistory(turns: TurnRecord[]): ChatMessage[] {
   const out: ChatMessage[] = [];
   for (const t of [...turns].sort((a, b) => a.ts.localeCompare(b.ts))) {
-    out.push({ id: `s-${t.turn_id}-u`, role: "user", text: t.user_text });
+    const user = parseTraceMessage(t.user_text ?? "");
+    out.push({ id: `s-${t.turn_id}-u`, role: "user", text: user.text, ...(user.truncated ? { truncated: true } : {}) });
     if (t.status === "failed") {
-      out.push({ id: `s-${t.turn_id}-e`, role: "error", text: t.error || "El copiloto no pudo responder.", retryText: t.user_text });
-    } else if (t.reply) {
-      out.push({ id: `s-${t.turn_id}-a`, role: "assistant", text: sanitizeReply(t.reply), turnId: t.turn_id, meta: t.reply_meta });
+      out.push({ id: `s-${t.turn_id}-e`, role: "error", text: t.error || "El copiloto no pudo responder.", retryText: user.text });
+      continue;
     }
+    const raw = t.reply?.trim();
+    const hasReply = t.status !== "pending" && !!raw && raw !== "None";
+    if (!hasReply) {
+      if (t.status === "pending") out.push({ id: `s-${t.turn_id}-a`, role: "assistant", text: WORKING_TEXT, turnId: t.turn_id });
+      continue;
+    }
+    const reply = parseTraceMessage(raw!);
+    out.push({ id: `s-${t.turn_id}-a`, role: "assistant", text: reply.text, turnId: t.turn_id, meta: t.reply_meta, ...(reply.truncated ? { truncated: true } : {}) });
   }
   return out;
 }

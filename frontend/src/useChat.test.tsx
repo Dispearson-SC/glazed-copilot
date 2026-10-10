@@ -37,6 +37,15 @@ describe("useChat", () => {
     expect(api.getTrace).not.toHaveBeenCalled();
   });
 
+  it("falls back to the trace when the turns route answers an empty list", async () => {
+    const api = fakeApi({
+      listTurns: vi.fn(async () => []),
+      getTrace: vi.fn(async () => [ev("2026-03-01T10:00:00Z", "manager", "orchestrator", "message", { text: "hola" })]),
+    });
+    const { result } = setup(api);
+    await waitFor(() => expect(result.current.messages).toHaveLength(1));
+  });
+
   it("falls back to the trace parser when the turns route answers 404", async () => {
     const api = fakeApi({
       listTurns: vi.fn(async () => { throw new ApiError(404, "nf"); }),
