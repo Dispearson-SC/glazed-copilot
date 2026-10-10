@@ -81,7 +81,37 @@ services:
       core:
         condition: service_healthy   # the core serve process creates and migrates the databases first
 
-  # frontend:   # run with `npm run dev` in frontend/ for now (http://localhost:5173)
+  # Public web (PWA build + /api proxy) behind the Coolify Traefik proxy, with HTTPS and basic auth.
+  # Dev alternative: `npm run dev` in frontend/ (http://localhost:5173).
+  web:
+    build:
+      context: ..
+      dockerfile: infra/web/Dockerfile
+    container_name: glazed-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - default
+      - coolify
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.routers.glazed-web-http.rule=Host(`${GLAZED_PUBLIC_HOST:-glazed.farone.cloud}`)
+      - traefik.http.routers.glazed-web-http.entrypoints=http
+      - traefik.http.routers.glazed-web-http.middlewares=glazed-web-https-redirect
+      - traefik.http.middlewares.glazed-web-https-redirect.redirectscheme.scheme=https
+      - traefik.http.routers.glazed-web.rule=Host(`${GLAZED_PUBLIC_HOST:-glazed.farone.cloud}`)
+      - traefik.http.routers.glazed-web.entrypoints=https
+      - traefik.http.routers.glazed-web.tls=true
+      - traefik.http.routers.glazed-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.glazed-web.middlewares=glazed-web-auth
+      - traefik.http.middlewares.glazed-web-auth.basicauth.users=${GLAZED_WEB_BASICAUTH:?set GLAZED_WEB_BASICAUTH in .env}
+      - traefik.http.services.glazed-web.loadbalancer.server.port=80
 
 volumes:
   glazed_pgdata:
+
+networks:
+  coolify:
+    external: true
