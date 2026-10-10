@@ -145,3 +145,43 @@ def test_defaults_and_errors():
     assert client.get(base, params={"sku": "A", "from": "2026-03-10", "to": "2026-03-01"}).status_code == 400
     assert client.get(base, params={"sku": "ZZZ"}).status_code == 404
     assert client.get("/api/v1/cases/nope/forecast", params={"sku": "A"}).status_code == 404
+
+
+# --- GET /cases/{id}/forecast/accuracy -------------------------------------------------------------------------
+
+def accuracy(client, cid, **params):
+    r = client.get(f"/api/v1/cases/{cid}/forecast/accuracy", params=params)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def acc_env(leak=False):
+    series = [make_series("A", 2.0, START, AS_OF, lambda d: 10 if d <= AS_OF else 9000, shelf_life=1),
+              make_series("B", 5.0, START, AS_OF, lambda d: 12, shelf_life=3),
+              make_series("C", 1.0, START, AS_OF, lambda d: 20, shelf_life=None)]
+    return build(series=series, leak=leak, forecasters=[StubForecast(AS_OF)])
+
+
+def test_accuracy_by_shelf_life_segments_the_skus_and_only_scores_dates_up_to_as_of():
+    client, cid = acc_env(leak=True)
+    out = accuracy(client, cid, by="shelf_life", **{"from": "2026-03-01", "to": "2026-03-20"})
+    assert out["by"] == "shelf_life" and out["as_of"] == "2026-03-10" and set(out["groups"]) == {"1", "2-3", "non_perishable"}
+    one = out["groups"]["1"]
+    assert one["n_days"] == 10 and one["wape"] == pytest.approx(2 / 10, abs=1e-3)  # forecast 12 vs actual 10, Mar 1..10
+    assert out["groups"]["2-3"]["wape"] == 0.0 and out["groups"]["non_perishable"]["bias"] == pytest.approx(-8 / 20, abs=1e-3)
+    assert out["overall"]["n_days"] == 30 and out["window"] == {"from": "2026-03-01", "to": "2026-03-10"}
+
+
+def test_accuracy_by_sku_and_by_format():
+    client, cid = acc_env()
+    by_sku = accuracy(client, cid, by="sku")
+    assert set(by_sku["groups"]) == {"A", "B", "C"}
+    fmt = accuracy(client, cid, by="format")
+    assert set(fmt["groups"]) == {"Shop-in-Shop"} and fmt["groups"]["Shop-in-Shop"]["n_days"] == by_sku["overall"]["n_days"]
+
+
+def test_accuracy_rejects_an_unknown_grouping_and_unknown_cases():
+    client, cid = acc_env()
+    assert client.get(f"/api/v1/cases/{cid}/forecast/accuracy", params={"by": "color"}).status_code == 400
+    assert client.get(f"/api/v1/cases/{cid}/forecast/accuracy").status_code == 400
+    assert client.get("/api/v1/cases/nope/forecast/accuracy", params={"by": "sku"}).status_code == 404

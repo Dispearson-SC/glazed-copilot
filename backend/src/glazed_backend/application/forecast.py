@@ -126,3 +126,51 @@ class GetForecast:
                 scored.append(ScoredPoint(actual, fc, lv["p10"], lv["p90"], censored, baseline,
                                           tuple((q, lv[k]) for k, q in (("p20", 0.2), ("p80", 0.8)) if k in lv)))
         return points, scored
+
+
+class ForecastAccuracy:
+    """Accuracy over SKU-days with an actual, dates <= as_of only, grouped by shelf-life class, store format or SKU.
+    Scored in units. Store scoped: the format grouping has one group, the format of the case's store."""
+
+    BY = ("shelf_life", "format", "sku")
+    DEFAULT_DAYS = 28
+
+    def __init__(self, cases, metrics, forecasters: list[Any]) -> None:
+        self.cases, self.metrics, self.loader = cases, metrics, ForecastLoader(metrics, forecasters)
+
+    def execute(self, case_id: str, by: str | None, date_from: date | None = None, date_to: date | None = None) -> dict[str, Any]:
+        from . import _case
+        from ..metrics.accuracy import segment, shelf_life_class
+        case = _case(self.cases, case_id)
+        if by not in self.BY:
+            raise DomainError(f"by must be one of {', '.join(self.BY)}")
+        as_of = case.sim_today
+        date_to = min(date_to or as_of, as_of)  # nothing after as_of can be scored
+        date_from = date_from or date_to - timedelta(days=self.DEFAULT_DAYS - 1)
+        if date_from > date_to:
+            raise DomainError("from must not be after to")
+        loaded = self.loader.load(case.store_id, as_of, None, date_from, date_to)
+        fmt = next((s.get("format") for s in self.metrics.stores() if s["store_id"] == case.store_id), None) or "unknown"
+        life = {s.sku: s.shelf_life_days for s in loaded.history}
+        key = {"sku": lambda k: k, "shelf_life": lambda k: shelf_life_class(life.get(k)), "format": lambda k: fmt}[by]
+        items = [(key(sku), p) for sku, p in self._sku_days(loaded, date_from, date_to)]
+        return {"store_id": case.store_id, "by": by, "as_of": as_of.isoformat(), "window": {"from": date_from.isoformat(),
+                "to": date_to.isoformat()}, "unit": "units", "model": loaded.result.model,
+                "model_version": loaded.result.model_version, "forecast_origin": loaded.result.origin.isoformat(),
+                "groups": segment(items), "overall": summarize([p for _, p in items])}
+
+    @staticmethod
+    def _sku_days(loaded: Loaded, date_from: date, date_to: date) -> list[tuple[str, ScoredPoint]]:
+        rows_by = {s.sku: {r.date: r for r in s.rows} for s in loaded.history}
+        units_by = {k: {d: float(r.sold) for d, r in v.items()} for k, v in rows_by.items()}
+        out = []
+        for fr in loaded.result.rows:
+            actual_row = rows_by.get(fr.sku, {}).get(fr.date)
+            if actual_row is None or not date_from <= fr.date <= min(date_to, loaded.as_of):  # NO LOOK-AHEAD
+                continue
+            s = weekday_samples(units_by[fr.sku], fr.date, loaded.as_of)
+            lv = fr.levels()
+            out.append((fr.sku, ScoredPoint(float(actual_row.sold), fr.forecast, fr.quantiles["p10"], fr.quantiles["p90"],
+                                            actual_row.stockout_hours > 0, sum(s) / len(s) if s else None,
+                                            tuple((q, lv[q]) for q in (0.2, 0.8) if q in lv))))
+        return out
