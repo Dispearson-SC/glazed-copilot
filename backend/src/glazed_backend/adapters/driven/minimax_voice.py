@@ -9,7 +9,7 @@ import httpx
 from ...ports.voice import VoiceError, VoiceUnavailable
 
 BASE = "https://api.minimax.io/v1"
-DEFAULT_VOICE = "Spanish_ConfidentWoman"
+DEFAULT_VOICE = "Spanish_RationalMan"
 DEFAULT_TTS_MODEL = "speech-2.8-turbo"
 DEFAULT_STT_MODEL = "asr-1.0"
 # Formats the provider documents: wav, aiff, flac, m4a (alac), mp3, aac, opus, ogg. Browsers send webm/opus or mp4/aac.

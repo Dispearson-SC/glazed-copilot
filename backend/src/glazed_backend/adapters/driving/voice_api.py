@@ -39,7 +39,7 @@ def build_voice_router(c: Any, guard: AuthGuard) -> APIRouter:
                                                  "max_seconds": 60}
 
     @r.post("/transcribe")
-    async def transcribe(request: Request) -> dict[str, str]:
+    async def transcribe(request: Request) -> dict[str, Any]:
         v = desk()
         form = await request.form(max_part_size=MAX_AUDIO_BYTES + 1024)
         up = form.get("audio")
@@ -52,8 +52,8 @@ def build_voice_router(c: Any, guard: AuthGuard) -> APIRouter:
             raise HTTPException(400, f"audio is too big (max {MAX_AUDIO_BYTES // 1024} KB)")
         lang = str(form.get("language") or "es")
         from starlette.concurrency import run_in_threadpool
-        text = await run_in_threadpool(provider, lambda: v.transcribe(audio, up.content_type or "", lang))
-        return {"text": text}
+        text, suspect = await run_in_threadpool(provider, lambda: v.transcribe_checked(audio, up.content_type or "", lang))
+        return {"text": text, "language_suspect": suspect}
 
     @r.post("/speak")
     def speak(b: SpeakBody) -> Response:

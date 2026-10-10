@@ -156,7 +156,7 @@ def test_config_when_enabled():
 def test_transcribe_returns_text_and_validates_input():
     c, cl = client()
     r = cl.post("/api/v1/voice/transcribe", files=audio(500))
-    assert r.status_code == 200 and r.json() == {"text": "cuanto pido hoy"}
+    assert r.status_code == 200 and r.json() == {"text": "cuanto pido hoy", "language_suspect": False}
     assert c.voice.service.heard == [(500, "audio/webm;codecs=opus", "es")]
     assert cl.post("/api/v1/voice/transcribe", files=audio(0)).status_code == 400
     assert cl.post("/api/v1/voice/transcribe", files=audio(MAX_AUDIO_BYTES + 1)).status_code == 400
@@ -184,3 +184,105 @@ def test_auth_guard_applies_to_voice_routes():
     assert cl.post("/api/v1/voice/transcribe", files=audio()).status_code == 401
     assert cl.post("/api/v1/auth/login", json={"email": "a@glazed.demo", "password": "correct horse battery"}).status_code == 200
     assert cl.get("/api/v1/voice/config").status_code == 200
+
+
+# --- long text: chunking, parallel synthesis, concatenation --------------------------------------------------------------
+
+def _long(n):
+    return " ".join(f"Frase numero {i} de la respuesta." for i in range(n))
+
+
+def test_long_text_is_chunked_and_concatenated_in_order():
+    class Echo(FakeVoice):
+        def speak(self, text):  # audio = the text itself, so the output order is observable
+            import time; time.sleep(0.02 if text.startswith("Frase numero 0 ") else 0)
+            self.speaks.append(text)
+            return text.encode()
+    fv = Echo()
+    text = _long(100)  # ~3400 chars
+    out = VoiceDesk(fv, "v", "m").speak(text)
+    assert len(fv.speaks) > 3 and all(len(c) <= 900 for c in fv.speaks)
+    assert " ".join(sorted(fv.speaks, key=text.index)) == speakable_text(text, 10 ** 9)
+    assert out == "".join(sorted(fv.speaks, key=text.index)).encode()
+
+
+def test_id3_tags_are_stripped_from_later_chunks():
+    class V(FakeVoice):
+        def speak(self, text):
+            return b"ID3\x04\x00\x00\x00\x00\x00\x02XX" + text[:5].encode()
+    out = VoiceDesk(V(), "v", "m").speak(_long(60))
+    assert out.count(b"ID3") == 1 and out.startswith(b"ID3")
+
+
+def test_long_text_hits_cache_and_key_includes_voice():
+    fv = FakeVoice()
+    d = VoiceDesk(fv, "v1", "m")
+    d.speak(_long(60)); n = len(fv.speaks)
+    d.speak(_long(60))
+    assert len(fv.speaks) == n
+    VoiceDesk(fv, "v2", "m").speak(_long(60))
+    assert len(fv.speaks) == 2 * n
+    assert ("v1", "m", speakable_text(_long(60), 10 ** 9)) in d._cache
+
+
+def test_over_six_thousand_chars_gets_closing_sentence():
+    fv = FakeVoice()
+    VoiceDesk(fv, "v", "m").speak(_long(400))
+    joined = " ".join(fv.speaks)
+    assert joined.endswith("El resto está en la pantalla.") and len(joined) <= 6000
+    assert all(len(c) <= 900 for c in fv.speaks)
+
+
+def test_short_text_is_a_single_call_without_closing():
+    fv = FakeVoice()
+    VoiceDesk(fv, "v", "m").speak("Hola mundo.")
+    assert fv.speaks == ["Hola mundo."]
+
+
+def test_any_chunk_failure_fails_the_request():
+    class V(FakeVoice):
+        def speak(self, text):
+            if "numero 30 " in text:
+                raise VoiceError("down")
+            return b"x"
+    _, cl = client(voice=VoiceDesk(V(), "v", "m"))
+    assert cl.post("/api/v1/voice/speak", json={"text": _long(100)}).status_code == 502
+
+
+# --- ASR language guard -----------------------------------------------------------------------------------------
+
+class SeqVoice(FakeVoice):
+    def __init__(self, *texts):
+        super().__init__()
+        self.texts, self.calls = list(texts), 0
+
+    def transcribe(self, audio, mime, language="es"):
+        self.calls += 1
+        return self.texts[min(self.calls, len(self.texts)) - 1]
+
+
+PT = "O que acontece com os bagels aí?"
+
+
+def test_portuguese_result_is_retried_until_spanish():
+    v = SeqVoice(PT, "¿Qué pasa con los bagels hoy?")
+    assert VoiceDesk(v, "v", "m").transcribe_checked(b"a", "audio/webm") == ("¿Qué pasa con los bagels hoy?", False)
+    assert v.calls == 2
+
+
+def test_all_portuguese_sets_the_suspect_flag_after_three_attempts():
+    v = SeqVoice(PT, "Você não sabe", "Amanhã devo pedir")
+    text, suspect = VoiceDesk(v, "v", "m").transcribe_checked(b"a", "audio/webm")
+    assert v.calls == 3 and text == "Amanhã devo pedir" and suspect is True
+
+
+def test_normal_spanish_is_not_retried():
+    v = SeqVoice("¿Cuánto vendí ayer?")
+    assert VoiceDesk(v, "v", "m").transcribe_checked(b"a", "audio/webm") == ("¿Cuánto vendí ayer?", False)
+    assert v.calls == 1
+
+
+def test_non_spanish_language_is_never_checked():
+    v = SeqVoice(PT)
+    assert VoiceDesk(v, "v", "m").transcribe_checked(b"a", "audio/webm", "pt") == (PT, False)
+    assert v.calls == 1
