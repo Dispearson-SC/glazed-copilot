@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useApi } from "../ApiContext";
 import { DEFAULT_SIM_TODAY } from "../config";
 import { useSession } from "../SessionContext";
+import { useCurrentCase } from "../useCurrentCase";
 import { storeLabel, type Store } from "../types";
 
 /** True when the store is closed (or not yet open) on the simulated date. Absent dates mean selectable. */
@@ -19,6 +20,11 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
   // The stores request resolves later: it must judge the store chosen by then, not the one at first render.
   const storeIdRef = useRef(storeId);
   storeIdRef.current = storeId;
+  // Stores open and close on the simulated date of the active case.
+  const { currentCase } = useCurrentCase(storeId || stores[0]?.store_id || "", session.refreshKey);
+  const simToday = currentCase?.sim_today ?? DEFAULT_SIM_TODAY;
+  const simTodayRef = useRef(simToday);
+  simTodayRef.current = simToday;
 
   useEffect(() => {
     let alive = true;
@@ -31,7 +37,8 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
         const cur = storeIdRef.current;
         if (cur && s.length > 0) {
           const found = s.find((x) => x.store_id === cur);
-          if (!found || storeClosedReason(found)) setStoreId(s.find((x) => !storeClosedReason(x))?.store_id ?? "");
+          const today = simTodayRef.current;
+          if (!found || storeClosedReason(found, today)) setStoreId(s.find((x) => !storeClosedReason(x, today))?.store_id ?? "");
         }
       })
       .catch(() => {});
@@ -97,7 +104,7 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
             <ul className="m-0 flex-1 list-none space-y-1 overflow-y-auto p-0">
               {shown.length === 0 && <li className="px-2 py-3 font-body-md text-body-md text-on-surface-variant">Sin resultados</li>}
               {shown.map((s) => {
-                const closed = storeClosedReason(s);
+                const closed = storeClosedReason(s, simToday);
                 const isCurrent = s.store_id === current;
                 const label = storeLabel(s);
                 return (
