@@ -66,31 +66,6 @@ class FakeAudio {
   constructor() { FakeAudio.instances.push(this); }
 }
 
-class FakeRecognition {
-  static instances: FakeRecognition[] = [];
-  lang = "";
-  continuous = false;
-  interimResults = false;
-  onresult: ((e: unknown) => void) | null = null;
-  onerror: ((e: { error: string }) => void) | null = null;
-  onend: (() => void) | null = null;
-  start = vi.fn();
-  abort = vi.fn();
-  stop = vi.fn(() => this.onend?.());
-  constructor() { FakeRecognition.instances.push(this); }
-  results: Array<{ isFinal: boolean; 0: { transcript: string } }> = [];
-  say(text: string) { this.results.push({ isFinal: true, 0: { transcript: text } }); this.emit(); }
-  /** Replaces the trailing interim result. */
-  interim(text: string) {
-    if (this.results.length && !this.results[this.results.length - 1].isFinal) this.results.pop();
-    this.results.push({ isFinal: false, 0: { transcript: text } });
-    this.emit();
-  }
-  private emit() { this.onresult?.({ results: this.results }); }
-  /** Browser-initiated end (long pause); onend fires without stop(). */
-  drop() { this.results = []; this.onend?.(); }
-}
-
 let now = 1_000_000;
 const trackStop = vi.fn();
 const getUserMedia = vi.fn();
@@ -113,7 +88,6 @@ beforeEach(() => {
   vi.spyOn(Date, "now").mockImplementation(() => now);
   FakeRecorder.instances = [];
   FakeAudio.instances = [];
-  FakeRecognition.instances = [];
   trackStop.mockClear();
   getUserMedia.mockReset().mockImplementation(async () => ({ getTracks: () => [{ stop: trackStop }] }));
   vi.stubGlobal("MediaRecorder", FakeRecorder);
@@ -125,7 +99,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-  delete (window as unknown as Record<string, unknown>).SpeechRecognition;
   delete (window as unknown as Record<string, unknown>).speechSynthesis;
 });
 
@@ -136,38 +109,110 @@ async function ready(api: ReturnType<typeof fakeApi>, chat = chatOf()) {
   await act(async () => {});
   return utils;
 }
-/** Hold the mic for `ms` and release. */
-async function hold(ms = 1500) {
-  const m = mic()!;
-  fireEvent.pointerDown(m, { button: 0 });
-  await waitFor(() => expect(FakeRecorder.instances.length + FakeRecognition.instances.length).toBeGreaterThan(0));
+const sendBtn = () => screen.getByRole("button", { name: /^Enviar mensaje/ });
+/** Taps the mic and waits until the recorder runs. */
+async function tapMic() {
+  fireEvent.click(mic()!);
+  await waitFor(() => expect(FakeRecorder.instances.length).toBeGreaterThan(0));
+  return FakeRecorder.instances[FakeRecorder.instances.length - 1];
+}
+/** Records for `ms` and taps the send button. */
+async function record(ms = 1500) {
+  const before = FakeRecorder.instances.length;
+  fireEvent.click(mic()!);
+  await waitFor(() => expect(FakeRecorder.instances.length).toBe(before + 1));
   now += ms;
-  fireEvent.pointerUp(m);
+  fireEvent.click(sendBtn());
 }
 
-describe("push-to-talk (MiniMax fallback, no Web Speech)", () => {
-  it("hold then release transcribes and sends the text as a normal message", async () => {
+describe("tap-to-talk (MiniMax STT)", () => {
+  it("one tap starts recording: Escuchando with timer, cancel X, mic pressed, send enabled", async () => {
+    await ready(fakeApi());
+    expect(sendBtn()).toBeDisabled();
+    await tapMic();
+    expect(await screen.findByText(/Escuchando… 0:00/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancelar grabación" })).toBeInTheDocument();
+    expect(mic()).toHaveAttribute("aria-pressed", "true");
+    const send = screen.getByRole("button", { name: "Enviar mensaje de voz" });
+    expect(send).toBeEnabled();
+    expect(FakeRecorder.instances[0].mimeType).toBe("audio/webm;codecs=opus");
+    now += 3000;
+    expect(await screen.findByText(/Escuchando… 0:03/)).toBeInTheDocument();
+  });
+
+  it("requests the mic and primes the shared audio element synchronously inside the mic tap", async () => {
+    await ready(fakeApi());
+    fireEvent.click(mic()!);
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(FakeAudio.instances).toHaveLength(1);
+    expect(FakeAudio.instances[0].play).toHaveBeenCalledTimes(1);
+    expect(FakeAudio.instances[0].src).toMatch(/^data:audio\/wav/);
+  });
+
+  it("send transcribes and sends the text as a voice message; the mic tracks are already stopped", async () => {
     const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "¿Qué pido hoy?" })) });
     const chat = chatOf();
     await ready(api, chat);
-    fireEvent.pointerDown(mic()!, { button: 0 });
-    expect(await screen.findByText(/Escuchando… 0:00/)).toBeInTheDocument();
-    await waitFor(() => expect(FakeRecorder.instances).toHaveLength(1));
-    expect(FakeRecorder.instances[0].mimeType).toBe("audio/webm;codecs=opus");
-    now += 2000;
-    fireEvent.pointerUp(mic()!);
+    await record(2000);
+    expect(screen.queryByRole("button", { name: "Cancelar grabación" })).toBeNull();
     await waitFor(() => expect(chat.send).toHaveBeenCalledWith("¿Qué pido hoy?", { voice: true }));
     const [blob, name] = (api.transcribe as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(blob).toBeInstanceOf(Blob);
     expect(name).toBe("voice.webm");
     expect(trackStop).toHaveBeenCalled();
+    expect(trackStop.mock.invocationCallOrder[0]).toBeLessThan((api.transcribe as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]);
+  });
+
+  it("shows Transcribiendo… with send disabled while the request is in flight", async () => {
+    let release!: (v: { text: string }) => void;
+    const api = fakeApi({ transcribe: vi.fn(() => new Promise<{ text: string }>((r) => { release = r; })) });
+    await ready(api);
+    await record();
+    expect(await screen.findByText("Transcribiendo…")).toBeInTheDocument();
+    expect(sendBtn()).toBeDisabled();
+    await act(async () => release({ text: "hola" }));
+    await waitFor(() => expect(screen.queryByText("Transcribiendo…")).toBeNull());
+  });
+
+  it("tapping the mic again discards the recording and sends nothing", async () => {
+    const api = fakeApi();
+    const chat = chatOf();
+    await ready(api, chat);
+    await tapMic();
+    fireEvent.click(mic()!);
+    expect(screen.queryByText(/Escuchando/)).toBeNull();
+    expect(mic()).toHaveAttribute("aria-pressed", "false");
+    expect(trackStop).toHaveBeenCalled();
+    expect(api.transcribe).not.toHaveBeenCalled();
+    expect(chat.send).not.toHaveBeenCalled();
+  });
+
+  it("the cancel X discards the recording and sends nothing", async () => {
+    const api = fakeApi();
+    const chat = chatOf();
+    await ready(api, chat);
+    await tapMic();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar grabación" }));
+    expect(screen.queryByText(/Escuchando/)).toBeNull();
+    expect(trackStop).toHaveBeenCalled();
+    expect(api.transcribe).not.toHaveBeenCalled();
+    expect(chat.send).not.toHaveBeenCalled();
+  });
+
+  it("auto-stops at max_seconds and sends as if send were tapped", async () => {
+    const api = fakeApi({ getVoiceConfig: vi.fn(async () => cfg({ max_seconds: 0.1 })), transcribe: vi.fn(async () => ({ text: "largo" })) });
+    const chat = chatOf();
+    await ready(api, chat);
+    await tapMic();
+    now += 5000;
+    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("largo", { voice: true }));
   });
 
   it("language_suspect puts the text in the composer, does not send, and a later send is a voice turn", async () => {
     const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "hola buenos dias", language_suspect: true })) });
     const chat = chatOf();
     await ready(api, chat);
-    await hold();
+    await record();
     const box = screen.getByLabelText("Mensaje para el copiloto") as HTMLInputElement;
     await waitFor(() => expect(box.value).toBe("hola buenos dias"));
     expect(chat.send).not.toHaveBeenCalled();
@@ -181,7 +226,7 @@ describe("push-to-talk (MiniMax fallback, no Web Speech)", () => {
     const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "hola", language_suspect: true })) });
     const chat = chatOf();
     await ready(api, chat);
-    await hold();
+    await record();
     const box = screen.getByLabelText("Mensaje para el copiloto") as HTMLInputElement;
     await waitFor(() => expect(box.value).toBe("hola"));
     fireEvent.change(box, { target: { value: "" } });
@@ -190,281 +235,82 @@ describe("push-to-talk (MiniMax fallback, no Web Speech)", () => {
     expect(chat.send).toHaveBeenCalledWith("otro mensaje", undefined);
   });
 
-  it("prefers audio/mp4 over webm (the provider rejects webm)", async () => {
-    FakeRecorder.isTypeSupported.mockImplementation((m) => m === "audio/mp4" || m === "audio/webm;codecs=opus");
-    const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "hola" })) });
-    await ready(api);
-    await hold();
-    await waitFor(() => expect(api.transcribe).toHaveBeenCalled());
-    expect((api.transcribe as ReturnType<typeof vi.fn>).mock.calls[0][1]).toBe("voice.m4a");
-    FakeRecorder.reset();
-  });
-
-  it("prefers audio/ogg;codecs=opus when supported and names the file .ogg", async () => {
-    FakeRecorder.isTypeSupported.mockImplementation(() => true);
-    const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "hola" })) });
-    await ready(api);
-    await hold();
-    await waitFor(() => expect(api.transcribe).toHaveBeenCalled());
-    expect(FakeRecorder.instances[0].mimeType).toBe("audio/ogg;codecs=opus");
-    expect((api.transcribe as ReturnType<typeof vi.fn>).mock.calls[0][1]).toBe("voice.ogg");
-    FakeRecorder.reset();
-  });
-
-  it("a 400 from transcribe shows a toast and keeps using the backend", async () => {
-    const api = fakeApi({ transcribe: vi.fn(async () => { throw new ApiError(400, "audio vacío"); }) });
-    await ready(api);
-    await hold();
-    expect(await screen.findByText(/No se pudo procesar el audio/)).toBeInTheDocument();
-    await hold();
-    await waitFor(() => expect(FakeRecorder.instances).toHaveLength(2));
-  });
-
-  it("cancels a hold shorter than 0.5 s without calling the backend", async () => {
-    const api = fakeApi();
+  it("an empty transcript is not sent and shows a toast", async () => {
+    const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "  " })) });
     const chat = chatOf();
     await ready(api, chat);
-    await hold(100);
-    expect(await screen.findByText("Mantén presionado el micrófono para hablar")).toBeInTheDocument();
-    expect(api.transcribe).not.toHaveBeenCalled();
+    await record();
+    expect(await screen.findByText("No te escuché, intenta de nuevo")).toBeInTheDocument();
     expect(chat.send).not.toHaveBeenCalled();
-    expect(trackStop).toHaveBeenCalled();
   });
 
-  it("cancels when the pointer leaves the button", async () => {
-    const api = fakeApi();
+  it("a 400 shows the audio message; 502 and network errors show the retry message", async () => {
+    const transcribe = vi.fn()
+      .mockRejectedValueOnce(new ApiError(400, "audio vacío"))
+      .mockRejectedValueOnce(new ApiError(502, "down"))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    await ready(fakeApi({ transcribe }));
+    await record();
+    expect(await screen.findByText(/No se pudo procesar el audio/)).toBeInTheDocument();
+    await record();
+    expect(await screen.findByText("No se pudo transcribir, intenta de nuevo")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("Transcribiendo…")).toBeNull());
+    await record();
+    await waitFor(() => expect(transcribe).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(mic()).toHaveAttribute("aria-pressed", "false"));
+  });
+
+  it.each([
+    ["audio/mp4", "voice.m4a"],
+    ["audio/ogg;codecs=opus", "voice.ogg"],
+  ])("prefers %s over webm", async (mime, file) => {
+    FakeRecorder.isTypeSupported.mockImplementation((m) => m === mime || m === "audio/webm;codecs=opus");
+    const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "hola" })) });
     await ready(api);
-    fireEvent.pointerDown(mic()!, { button: 0 });
-    await waitFor(() => expect(FakeRecorder.instances).toHaveLength(1));
-    fireEvent.pointerLeave(mic()!);
-    expect(screen.queryByText(/Escuchando/)).toBeNull();
-    now += 2000;
-    fireEvent.pointerUp(mic()!);
-    expect(api.transcribe).not.toHaveBeenCalled();
-  });
-
-  it("cancels when the pointer slides far away (touch keeps the pointer captured)", async () => {
-    const api = fakeApi();
-    await ready(api);
-    fireEvent.pointerDown(mic()!, { button: 0 });
-    await waitFor(() => expect(FakeRecorder.instances).toHaveLength(1));
-    fireEvent.pointerMove(mic()!, { clientX: 400, clientY: 400 });
-    expect(screen.queryByText(/Escuchando/)).toBeNull();
-    expect(api.transcribe).not.toHaveBeenCalled();
-  });
-
-  it("auto-stops at max_seconds", async () => {
-    const api = fakeApi({ getVoiceConfig: vi.fn(async () => cfg({ max_seconds: 0.1 })), transcribe: vi.fn(async () => ({ text: "largo" })) });
-    const chat = chatOf();
-    await ready(api, chat);
-    fireEvent.pointerDown(mic()!, { button: 0 });
-    await waitFor(() => expect(FakeRecorder.instances).toHaveLength(1));
-    now += 5000;
-    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("largo", { voice: true }));
+    await record();
+    await waitFor(() => expect(api.transcribe).toHaveBeenCalled());
+    expect(FakeRecorder.instances[0].mimeType).toBe(mime);
+    expect((api.transcribe as ReturnType<typeof vi.fn>).mock.calls[0][1]).toBe(file);
+    FakeRecorder.reset();
   });
 
   it("shows a clear message when the microphone permission is denied", async () => {
     getUserMedia.mockRejectedValue(Object.assign(new Error("denied"), { name: "NotAllowedError" }));
     await ready(fakeApi());
-    fireEvent.pointerDown(mic()!, { button: 0 });
+    fireEvent.click(mic()!);
     expect(await screen.findByText("Permite el micrófono para hablar con el copiloto")).toBeInTheDocument();
     expect(screen.queryByText(/Escuchando/)).toBeNull();
   });
 
-  it("does not send an empty transcript", async () => {
-    const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "  " })) });
-    const chat = chatOf();
-    await ready(api, chat);
-    await hold();
-    expect(await screen.findByText("No te escuché, intenta de nuevo")).toBeInTheDocument();
-    expect(chat.send).not.toHaveBeenCalled();
-  });
-
-  it("stops the stream when unmounted mid-hold", async () => {
+  it("stops the stream when unmounted mid-recording", async () => {
     const { unmount } = await ready(fakeApi());
-    fireEvent.pointerDown(mic()!, { button: 0 });
-    await waitFor(() => expect(FakeRecorder.instances).toHaveLength(1));
+    await tapMic();
     unmount();
     expect(trackStop).toHaveBeenCalled();
   });
 });
 
-describe("Web Speech and availability", () => {
-  it("uses Web Speech when the config is disabled", async () => {
-    vi.stubGlobal("SpeechRecognition", FakeRecognition);
-    const api = fakeApi({ getVoiceConfig: vi.fn(async () => cfg({ enabled: false, stt: false, tts: false })) });
-    const chat = chatOf();
-    await ready(api, chat);
-    fireEvent.pointerDown(mic()!, { button: 0 });
-    await waitFor(() => expect(FakeRecognition.instances).toHaveLength(1));
-    FakeRecognition.instances[0].say("desde el navegador");
-    now += 1500;
-    fireEvent.pointerUp(mic()!);
-    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("desde el navegador", { voice: true }));
-    expect(FakeRecorder.instances).toHaveLength(0);
+describe("mic availability", () => {
+  it("is shown while the config loads and when stt is on", async () => {
+    await ready(fakeApi());
+    expect(mic()).not.toBeNull();
   });
 
-  it("uses Web Speech when the config request fails", async () => {
-    vi.stubGlobal("SpeechRecognition", FakeRecognition);
-    const api = fakeApi({ getVoiceConfig: vi.fn(async () => { throw new ApiError(404, "nf"); }) });
-    await ready(api);
-    fireEvent.pointerDown(mic()!, { button: 0 });
-    await waitFor(() => expect(FakeRecognition.instances).toHaveLength(1));
-  });
-
-  it("hides the mic when stt is off and the browser has no Web Speech", async () => {
-    const api = fakeApi({ getVoiceConfig: vi.fn(async () => cfg({ stt: false })) });
-    await ready(api);
+  it("is hidden when stt is off", async () => {
+    await ready(fakeApi({ getVoiceConfig: vi.fn(async () => cfg({ stt: false })) }));
     await waitFor(() => expect(mic()).toBeNull());
   });
-});
 
-describe("push-to-talk (Web Speech primary)", () => {
-  const press = async () => {
-    fireEvent.pointerDown(mic()!, { button: 0 });
-    await waitFor(() => expect(FakeRecognition.instances.length).toBeGreaterThan(0));
-    return FakeRecognition.instances[FakeRecognition.instances.length - 1];
-  };
-  beforeEach(() => { vi.stubGlobal("SpeechRecognition", FakeRecognition); });
-
-  it("starts synchronously on pointerdown, shows interim text, and sends the final text as a voice turn without calling the backend", async () => {
-    const api = fakeApi();
-    const chat = chatOf();
-    await ready(api, chat);
-    fireEvent.pointerDown(mic()!, { button: 0 });
-    expect(FakeRecognition.instances).toHaveLength(1); // no await between pointerdown and start()
-    const rec = FakeRecognition.instances[0];
-    expect(rec.start).toHaveBeenCalled();
-    expect([rec.lang, rec.continuous, rec.interimResults]).toEqual(["es-MX", true, true]);
-    expect(getUserMedia).not.toHaveBeenCalled();
-    act(() => rec.interim("qué pi"));
-    expect(screen.getByTestId("voice-preview")).toHaveTextContent("qué pi");
-    act(() => rec.say("qué pido"));
-    act(() => rec.say("hoy"));
-    expect(screen.getByTestId("voice-preview")).toHaveTextContent("qué pido hoy");
-    now += 2000;
-    fireEvent.pointerUp(mic()!);
-    expect(rec.stop).toHaveBeenCalled();
-    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("qué pido hoy", { voice: true }));
-    expect(api.transcribe).not.toHaveBeenCalled();
-    expect(FakeRecorder.instances).toHaveLength(0);
+  it("is hidden without MediaRecorder", async () => {
+    vi.stubGlobal("MediaRecorder", undefined);
+    await ready(fakeApi());
+    expect(mic()).toBeNull();
   });
 
-  it("falls back to the last interim text when no final arrived", async () => {
-    const chat = chatOf();
-    await ready(fakeApi(), chat);
-    const rec = await press();
-    act(() => rec.interim("solo interino"));
-    now += 1500;
-    fireEvent.pointerUp(mic()!);
-    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("solo interino", { voice: true }));
-  });
-
-  it("restarts recognition when the browser ends it mid-hold and keeps the accumulated text", async () => {
-    const chat = chatOf();
-    await ready(fakeApi(), chat);
-    const rec = await press();
-    act(() => rec.say("primera parte"));
-    act(() => rec.drop());
-    expect(rec.start).toHaveBeenCalledTimes(2);
-    expect(screen.getByText(/Escuchando/)).toBeInTheDocument();
-    act(() => rec.say("segunda parte"));
-    now += 1500;
-    fireEvent.pointerUp(mic()!);
-    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("primera parte segunda parte", { voice: true }));
-  });
-
-  it("an empty transcript is not sent and shows a toast", async () => {
-    const chat = chatOf();
-    await ready(fakeApi(), chat);
-    await press();
-    now += 1500;
-    fireEvent.pointerUp(mic()!);
-    expect(await screen.findByText("No te escuché, intenta de nuevo")).toBeInTheDocument();
-    expect(chat.send).not.toHaveBeenCalled();
-  });
-
-  it("aborts a hold shorter than 0.5 s and sends nothing", async () => {
-    const api = fakeApi();
-    const chat = chatOf();
-    await ready(api, chat);
-    const rec = await press();
-    act(() => rec.say("hola"));
-    now += 100;
-    fireEvent.pointerUp(mic()!);
-    expect(rec.abort).toHaveBeenCalled();
-    expect(chat.send).not.toHaveBeenCalled();
-    expect(screen.queryByText(/Escuchando/)).toBeNull();
-  });
-
-  it("aborts when the pointer slides away", async () => {
-    const chat = chatOf();
-    await ready(fakeApi(), chat);
-    const rec = await press();
-    act(() => rec.say("hola"));
-    fireEvent.pointerLeave(mic()!);
-    expect(rec.abort).toHaveBeenCalled();
-    now += 2000;
-    fireEvent.pointerUp(mic()!);
-    expect(chat.send).not.toHaveBeenCalled();
-  });
-
-  it("not-allowed shows the microphone permission message", async () => {
-    const chat = chatOf();
-    await ready(fakeApi(), chat);
-    const rec = await press();
-    act(() => rec.onerror?.({ error: "not-allowed" }));
-    expect(await screen.findByText("Permite el micrófono para hablar con el copiloto")).toBeInTheDocument();
-    expect(screen.queryByText(/Escuchando/)).toBeNull();
-    expect(chat.send).not.toHaveBeenCalled();
-  });
-
-  it("no-speech is treated as empty", async () => {
-    const chat = chatOf();
-    await ready(fakeApi(), chat);
-    const rec = await press();
-    now += 1500;
-    fireEvent.pointerUp(mic()!);
-    act(() => rec.onerror?.({ error: "no-speech" }));
-    expect(await screen.findByText("No te escuché, intenta de nuevo")).toBeInTheDocument();
-    expect(chat.send).not.toHaveBeenCalled();
-  });
-
-  it.each(["network", "service-not-allowed"])("error '%s' asks to hold again and later holds use MiniMax", async (error) => {
-    const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "desde minimax" })) });
-    const chat = chatOf();
-    await ready(api, chat);
-    const rec = await press();
-    act(() => rec.onerror?.({ error }));
-    expect(await screen.findByText(/mantén presionado de nuevo/)).toBeInTheDocument();
-    expect(chat.send).not.toHaveBeenCalled();
-    await hold();
-    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("desde minimax", { voice: true }));
-    expect(FakeRecognition.instances).toHaveLength(1);
-    expect(FakeRecorder.instances).toHaveLength(1);
-    expect(api.transcribe).toHaveBeenCalledTimes(1);
-  });
-
-  it("language_suspect still reviews before sending on the MiniMax fallback", async () => {
-    const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "hola buenos dias", language_suspect: true })) });
-    const chat = chatOf();
-    await ready(api, chat);
-    const rec = await press();
-    act(() => rec.onerror?.({ error: "network" }));
-    await hold();
-    const box = screen.getByLabelText("Mensaje para el copiloto") as HTMLInputElement;
-    await waitFor(() => expect(box.value).toBe("hola buenos dias"));
-    expect(chat.send).not.toHaveBeenCalled();
-  });
-
-  it("stays on Web Speech after a 'network' error when there is no backend to fall back to", async () => {
-    const api = fakeApi({ getVoiceConfig: vi.fn(async () => cfg({ stt: false })) });
-    await ready(api);
-    const rec = await press();
-    act(() => rec.onerror?.({ error: "network" }));
-    await screen.findByText(/dictado del navegador/);
-    await press();
-    expect(FakeRecognition.instances).toHaveLength(2);
+  it("is hidden without getUserMedia", async () => {
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: {} });
+    await ready(fakeApi());
+    expect(mic()).toBeNull();
   });
 });
 
@@ -478,7 +324,7 @@ describe("spoken replies", () => {
     const chat = chatOf();
     const utils = await ready(api, chat);
     if (voice) {
-      await hold();
+      await record();
       await waitFor(() => expect(chat.send).toHaveBeenCalled());
     } else {
       fireEvent.change(screen.getByLabelText("Mensaje para el copiloto"), { target: { value: "hola" } });
@@ -503,6 +349,37 @@ describe("spoken replies", () => {
     act(() => a.onended?.());
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:voice");
     expect(screen.queryByRole("button", { name: "Detener lectura" })).toBeNull();
+  });
+
+  it("primes the shared element on the mic tap and the send tap, then reuses it for playback after the mic is released", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const api = fakeApi();
+    await converse(api, true);
+    await waitFor(() => expect(FakeAudio.instances[0].src).toBe("blob:voice"));
+    const a = FakeAudio.instances[0];
+    expect(FakeAudio.instances).toHaveLength(1);
+    // mic tap and send tap prime with the silent clip; the last play call is the reply
+    await waitFor(() => expect(a.play.mock.calls.length).toBeGreaterThanOrEqual(3));
+    const [firstPrime, secondPrime] = a.play.mock.invocationCallOrder;
+    expect(secondPrime).toBeGreaterThan(firstPrime);
+    // tracks stopped before any reply playback
+    expect(trackStop.mock.invocationCallOrder[0]).toBeLessThan(a.play.mock.invocationCallOrder.at(-1)!);
+    await waitFor(() => expect(info).toHaveBeenCalledWith("[voice] tts path:", "minimax", "ok"));
+    expect(info.mock.calls.filter((c) => c[0] === "[voice] tts path:")).toHaveLength(1);
+  });
+
+  it("a typed send and the speaker button prime the shared element too", async () => {
+    const chat = chatOf({ messages: [user, reply] });
+    await ready(fakeApi(), chat);
+    fireEvent.change(screen.getByLabelText("Mensaje para el copiloto"), { target: { value: "hola" } });
+    fireEvent.submit(screen.getByLabelText("Mensaje para el copiloto").closest("form")!);
+    expect(FakeAudio.instances).toHaveLength(1);
+    expect(FakeAudio.instances[0].play).toHaveBeenCalledTimes(1);
+    expect(FakeAudio.instances[0].src).toMatch(/^data:audio\/wav/);
+    fireEvent.click(screen.getByRole("button", { name: "Escuchar respuesta" }));
+    expect(FakeAudio.instances[0].play).toHaveBeenCalledTimes(2); // synchronous, before the speak request resolves
+    await waitFor(() => expect(FakeAudio.instances[0].src).toBe("blob:voice"));
+    expect(FakeAudio.instances).toHaveLength(1);
   });
 
   it("shows 'Preparando voz…' while the speak request is in flight", async () => {
@@ -577,6 +454,89 @@ describe("spoken replies", () => {
   });
 });
 
+describe("speechSynthesis fallback voice", () => {
+  const reply: ChatMessage = { id: "a1", role: "assistant", text: "Pide 40 donas", ts: "2026-07-19T14:05:09Z" };
+  const user: ChatMessage = { id: "u1", role: "user", text: "hola" };
+  const setup = (synth: Record<string, unknown>) => {
+    vi.stubGlobal("SpeechSynthesisUtterance", class { lang = ""; rate = 1; voice: unknown = null; onend: (() => void) | null = null; onerror: (() => void) | null = null; constructor(public text: string) {} });
+    Object.defineProperty(window, "speechSynthesis", { configurable: true, value: { speak: vi.fn(), cancel: vi.fn(), ...synth } });
+    return window.speechSynthesis.speak as ReturnType<typeof vi.fn>;
+  };
+  async function play(api = fakeApi({ getVoiceConfig: vi.fn(async () => cfg({ tts: false })) })) {
+    await ready(api, chatOf({ messages: [user, reply] }));
+    fireEvent.click(screen.getByRole("button", { name: "Escuchar respuesta" }));
+  }
+
+  it.each([
+    ["es-MX", [{ lang: "en-US" }, { lang: "es-ES" }, { lang: "es-US" }, { lang: "es-MX" }], "es-MX"],
+    ["es-US", [{ lang: "en-US" }, { lang: "es-ES" }, { lang: "es_US" }], "es_US"],
+    ["es-*", [{ lang: "en-US" }, { lang: "es-ES" }], "es-ES"],
+  ])("prefers %s", async (_n, voices, expected) => {
+    const speak = setup({ getVoices: () => voices });
+    await play();
+    await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
+    const u = speak.mock.calls[0][0];
+    expect(u.lang).toBe("es-MX");
+    expect(u.voice.lang).toBe(expected);
+  });
+
+  it("never uses a non-Spanish voice: with none available it still sets lang es-MX", async () => {
+    const speak = setup({ getVoices: () => [{ lang: "en-US" }] });
+    await play();
+    await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
+    expect(speak.mock.calls[0][0].lang).toBe("es-MX");
+    expect(speak.mock.calls[0][0].voice).toBeNull();
+  });
+
+  it("waits once for voiceschanged when the list is empty", async () => {
+    let voices: Array<{ lang: string }> = [];
+    let changed: (() => void) | undefined;
+    const speak = setup({
+      getVoices: () => voices,
+      addEventListener: (_e: string, fn: () => void) => { changed = fn; },
+      removeEventListener: vi.fn(),
+    });
+    await play();
+    await waitFor(() => expect(changed).toBeDefined());
+    expect(speak).not.toHaveBeenCalled();
+    voices = [{ lang: "es-US" }];
+    act(() => changed!());
+    expect(speak).toHaveBeenCalledTimes(1);
+    expect(speak.mock.calls[0][0].voice).toEqual({ lang: "es-US" });
+  });
+
+  it("speaks anyway when voiceschanged never fires", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const speak = setup({ getVoices: () => [], addEventListener: vi.fn(), removeEventListener: vi.fn() });
+      await play();
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(speak).toHaveBeenCalledTimes(1);
+      expect(speak.mock.calls[0][0].lang).toBe("es-MX");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    ["tts off", () => fakeApi({ getVoiceConfig: vi.fn(async () => cfg({ tts: false })) }), "tts-off"],
+    ["speak error", () => fakeApi({ speak: vi.fn(async () => { throw new ApiError(502, "x"); }) }), "speak-error"],
+    ["play rejected", () => {
+      vi.stubGlobal("Audio", class extends FakeAudio {
+        constructor() { super(); this.play = vi.fn(async () => { if (this.src.startsWith("blob:")) throw new Error("NotAllowedError"); }); }
+      });
+      return fakeApi();
+    }, "play-rejected"],
+  ])("logs one speechSynthesis path line (%s) without text", async (_n, mk, reason) => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const speak = setup({ getVoices: () => [{ lang: "es-MX" }] });
+    await play(mk());
+    await waitFor(() => expect(speak).toHaveBeenCalledTimes(1));
+    const lines = info.mock.calls.filter((c) => c[0] === "[voice] tts path:");
+    expect(lines).toEqual([["[voice] tts path:", "speechSynthesis", reason]]);
+  });
+});
+
 describe("player bar", () => {
   const reply: ChatMessage = { id: "a1", role: "assistant", text: "**Pide** 40 donas", ts: "2026-07-19T14:05:09Z" };
   const user: ChatMessage = { id: "u1", role: "user", text: "hola" };
@@ -620,7 +580,7 @@ describe("player bar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Pausar" }));
     expect(a.pause).toHaveBeenCalled();
     fireEvent.click(await screen.findByRole("button", { name: "Reanudar" }));
-    expect(a.play).toHaveBeenCalledTimes(2);
+    expect(a.play).toHaveBeenCalledTimes(3); // prime, playback, resume
     expect(bar()).not.toBeNull();
   });
 
