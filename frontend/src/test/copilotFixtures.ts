@@ -188,3 +188,31 @@ export const agentsA = [
   { agent_id: "present", display_name_es: "Analista del presente", status: "up" as const },
   { agent_id: "sentinel", display_name_es: "Centinela", status: "up" as const },
 ];
+
+// ---- Sucursal, Wave 14 (real shapes, S030, as_of 2026-07-19): GET /forecast?metric=... and GET /outlook?days=2 ----
+const mp = (date: string, forecast: number, p10: number, p90: number, actual: number | null) => ({ date, forecast, p10, p90, baseline: forecast, actual, censored: false, projected: actual === null });
+const metricOf = (metric: string, unit: string, points: ReturnType<typeof mp>[], conversion_valid: boolean | null = null): ForecastResponse =>
+  ({ ...branchForecast, metric, unit, model: "flow-weekday-8w", conversion_valid, points } as unknown as ForecastResponse);
+export const metricForecasts = {
+  footfall: metricOf("footfall", "visitors", [mp("2026-07-18", 767, 662.6, 835.3, 734), mp("2026-07-19", 971, 754.2, 1098.1, 965), mp("2026-07-20", 836, 708.3, 944.7, null)]),
+  transactions: metricOf("transactions", "transactions", [mp("2026-07-18", 71.5, 63.1, 79.1, 105), mp("2026-07-19", 84.5, 71.1, 111.3, 116), mp("2026-07-20", 86, 63.1, 103.1, null)]),
+  avg_ticket: metricOf("avg_ticket", "usd", [mp("2026-07-18", 9.09, 8.27, 11.01, 8.0876), mp("2026-07-19", 9.56, 8.62, 10.35, 9.786), mp("2026-07-20", 9.24, 8.79, 10.17, null)]),
+  conversion: metricOf("conversion", "ratio", [mp("2026-07-18", 0.0932, 0.0755, 0.1194, 0.1431), mp("2026-07-19", 0.087, 0.0647, 0.1476, 0.1202), mp("2026-07-20", 0.1029, 0.0668, 0.1456, null)], true),
+};
+export const outlookA = {
+  as_of: "2026-07-19",
+  days: [
+    { date: "2026-07-20", projected: true, net_sales: { low: 681.7231, mid: 833.3911, high: 1060.493 }, transactions: { low: 63.1, mid: 86, high: 103.1 }, avg_ticket: { low: 8.79, mid: 9.24, high: 10.17 },
+      expected_waste_usd: { low: 0, mid: 0, high: 0 }, expected_lost_sales_usd: { low: 0, mid: 26.05, high: 105.35 }, weather: null, weather_note: "Sin pronóstico" },
+    { date: "2026-07-21", projected: true, net_sales: { low: 649.0835, mid: 853.1252, high: 1167.8801 }, transactions: { low: 67.9, mid: 95.5, high: 104.6 }, avg_ticket: { low: 8.3, mid: 9.26, high: 10.33 },
+      expected_waste_usd: { low: 0, mid: 0, high: 0 }, expected_lost_sales_usd: { low: 0, mid: 20, high: 90 }, weather: null, weather_note: "Sin pronóstico" },
+  ],
+};
+export const inventoryWithStatus: InventoryResponse = {
+  as_of: "2026-07-19", outflow_days: 3,
+  items: [
+    { sku: "SKU-100040", product_name: "Better For You Breakfast Sandwich", on_hand: 0, avg_daily_demand: 19.76, days_of_cover: 0, projected_stockout_date: "2026-07-23", forecast_outflow_units: 51.31, scheduled_in_units: 40, next_delivery_date: "2026-07-20", status: "critical", status_reason: "Crítico: la cobertura (0.0 d) se agota antes de la próxima entrega (2026-07-20, en 1 d)." },
+    { sku: "SKU-100263", product_name: "Md Choc Stout C.B. Wsweet Cold Foam", on_hand: 40, avg_daily_demand: 3.2, days_of_cover: 12.5, forecast_outflow_units: 9.6, scheduled_in_units: 0, next_delivery_date: null, status: "ok", status_reason: "En orden: la cobertura alcanza hasta la próxima entrega." },
+    { sku: "SKU-100014", product_name: "Bagel Twist", on_hand: 5, avg_daily_demand: 2, days_of_cover: 2.5, forecast_outflow_units: 6, scheduled_in_units: 12, next_delivery_date: "2026-07-22", status: "watch", status_reason: "Seguimiento: la cobertura supera la entrega por menos de 1 día." },
+  ],
+};

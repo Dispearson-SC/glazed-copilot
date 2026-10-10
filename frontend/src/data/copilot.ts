@@ -53,10 +53,6 @@ export type Source<T> = { status: "ok"; data: T } | { status: "soon" };
 const SOON = { status: "soon" } as const;
 export const SOON_TEXT = "Disponible pronto";
 
-/** /forecast?metric=traffic|weather (pending). */
-export const fetchForecastMetric = async (_api: Api, _caseId: string, _metric: string): Promise<Source<never>> => SOON;
-/** /inventory status fields: critical / follow-up / ok (pending). */
-export const fetchInventoryStatus = async (_api: Api, _caseId: string): Promise<Source<never>> => SOON;
 /** GET /cases/{id}/autonomy/log (pending). */
 export const fetchAutonomyLog = async (_api: Api, _caseId: string): Promise<Source<never>> => SOON;
 /** POST /cases/{id}/autonomy/{action_id}/revert (pending). */
@@ -250,10 +246,31 @@ export interface DayViewInput {
   hoy: DaySummary | null;
   kpis: Kpis | null;
   expiring: ExpiringResponse | null;
+  /** GET /outlook: null/undefined = route unavailable ("Disponible pronto"); an object without the day = "Sin datos". */
   outlook?: Outlook | null;
+  /** GET /forecast?metric=...: same convention as `outlook`. */
+  metrics?: MetricForecasts | null;
+}
+
+export const METRICS = ["footfall", "transactions", "avg_ticket", "conversion"] as const;
+export type Metric = (typeof METRICS)[number];
+export type MetricForecasts = Partial<Record<Metric, ForecastResponse | null>>;
+
+/** GET /cases/{id}/forecast?metric=... for each metric (store level). 404/501 on every metric means "not deployed". */
+export async function fetchMetricForecasts(api: Api, caseId: string, asOf: string): Promise<Source<MetricForecasts>> {
+  const results = await Promise.allSettled(METRICS.map((metric) => api.getForecast(caseId, { metric, from: shiftDate(asOf, -1), to: shiftDate(asOf, 1), level: "store" })));
+  const out: MetricForecasts = {};
+  let served = 0;
+  results.forEach((r, i) => {
+    out[METRICS[i]] = r.status === "fulfilled" ? r.value : null;
+    if (r.status === "fulfilled") served++;
+    else if (!isUnavailable(r.reason)) served++; // a failure other than "not deployed" is still a deployed route
+  });
+  return served === 0 ? SOON : { status: "ok", data: out };
 }
 
 const NO_FORECAST = "Sin pronóstico";
+const NO_DATA = "Sin datos";
 const cap = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
 const weekdayLong = (iso: string): string => cap(new Intl.DateTimeFormat("es-MX", { weekday: "long", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`)));
 const rangeText = (lo?: number | null, hi?: number | null): string | null => (lo == null || hi == null ? null : `${usdWhole(lo)} – ${usdWhole(hi)}`);
@@ -267,7 +284,7 @@ function contextText(date: string, s: DaySummary | null): string {
 export const isPlaceholder = (v: string): boolean => ["Sin datos", SOON_TEXT, NO_FORECAST, "Pendiente"].includes(v);
 
 export function buildDayView(day: DayKey, input: DayViewInput): DayView {
-  const { asOf, forecast, ayer, hoy, kpis, expiring, outlook } = input;
+  const { asOf, forecast, ayer, hoy, kpis, expiring, outlook, metrics } = input;
   const date = day === "ayer" ? shiftDate(asOf, -1) : day === "hoy" ? asOf : shiftDate(asOf, 1);
   const point = forecast?.points.find((p) => p.date === date);
   const od: OutlookDay | undefined = day === "ayer" ? undefined : outlook?.days.find((d) => d.date === date);
@@ -289,12 +306,12 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
     realNote: day === "hoy" ? "Se registra al cierre" : "Día futuro",
     realKnown: false,
     weather: { icon: "partly_cloudy_day", tag: "pronóstico", temp: NO_FORECAST, text: NO_FORECAST, effect: null },
-    traffic: { value: SOON_TEXT, caption: "visitas esperadas" },
+    traffic: { value: metrics ? NO_DATA : SOON_TEXT, caption: "visitas esperadas" },
     context: contextText(date, day === "manana" ? null : day === "hoy" ? hoy : ayer),
-    orders: { label: "Pedidos esperados", value: SOON_TEXT },
-    ticket: { value: SOON_TEXT },
-    conversion: { value: SOON_TEXT },
-    waste: { label: "Merma esperada", value: SOON_TEXT, sub: "a costo" },
+    orders: { label: "Pedidos esperados", value: metrics || outlook ? NO_DATA : SOON_TEXT },
+    ticket: { value: metrics || outlook ? NO_DATA : SOON_TEXT },
+    conversion: { value: metrics ? NO_DATA : SOON_TEXT },
+    waste: { label: "Merma esperada", value: outlook ? NO_DATA : SOON_TEXT, sub: "a costo" },
     lost: {
       label: "Venta perdida (7 días)",
       value: lostKpi?.mid == null ? "Sin datos" : usd(lostKpi.mid),
@@ -328,16 +345,26 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
     return view;
   }
 
+  const metricPoint = (m: Metric) => metrics?.[m]?.points.find((p) => p.date === date);
+  const visits = metricPoint("footfall");
+  if (visits) view.traffic.value = String(Math.round(visits.forecast));
+  const txPoint = metricPoint("transactions");
+  if (txPoint) view.orders.value = String(Math.round(txPoint.forecast));
+  const ticketPoint = metricPoint("avg_ticket");
+  if (ticketPoint) view.ticket.value = usd(ticketPoint.forecast);
+  const convPoint = metrics?.conversion?.conversion_valid === false ? undefined : metricPoint("conversion");
+  if (convPoint) view.conversion.value = `${(convPoint.forecast * 100).toFixed(1)}%`;
   if (od) {
     if (od.transactions?.mid != null) view.orders.value = String(Math.round(od.transactions.mid));
     if (od.avg_ticket?.mid != null) view.ticket.value = usd(od.avg_ticket.mid);
     const waste: Range3 | null | undefined = od.expected_waste_usd;
     if (waste?.mid != null) view.waste = { label: "Merma esperada", value: usd(waste.mid), sub: `a costo · ${rangeText(waste.low, waste.high) ?? "Sin datos"}` };
     const lost = od.expected_lost_sales_usd;
+    if (od.weather_note) view.weather = { ...view.weather, temp: od.weather_note, text: od.weather_note };
     if (lost?.mid != null) view.lost = { label: "Venta perdida esperada", value: usd(lost.mid), sub: `${rangeText(lost.low, lost.high) ?? "Sin datos"} · por falta de producto` };
   }
   const exp = expiring?.by_day?.find((d) => d.date === date)?.waste_usd;
-  if (view.waste.value === SOON_TEXT && exp?.mid != null) view.waste = { label: "Merma esperada", value: usd(exp.mid), sub: `a costo · ${rangeText(exp.low, exp.high) ?? "Sin datos"}` };
+  if ((view.waste.value === SOON_TEXT || view.waste.value === NO_DATA) && exp?.mid != null) view.waste = { label: "Merma esperada", value: usd(exp.mid), sub: `a costo · ${rangeText(exp.low, exp.high) ?? "Sin datos"}` };
   return view;
 }
 
@@ -350,22 +377,40 @@ export interface InventoryRow {
   cover: string;
   /** 0..100, current stock against the daily outflow. */
   fill: number;
+  /** Backend status; null when the inventory does not serve it. */
+  status: "critical" | "watch" | "ok" | null;
+  statusLabel: string;
+  /** Backend explanation of the status. */
+  reason: string;
 }
 
 const num = (n: number): string => String(Math.round(n * 100) / 100);
+const STATUS_LABELS = { critical: "Crítico", watch: "Seguimiento", ok: "En orden" } as const;
 
 export function buildInventoryRows(inv: InventoryResponse | null, plan: OrderPlan | null, limit = 6): InventoryRow[] {
   return (inv?.items ?? []).slice(0, limit).map((it) => {
     const line = plan?.lines.find((l) => l.sku === it.sku);
     const denom = Math.max(it.avg_daily_demand, it.on_hand);
+    const out = it.forecast_outflow_units != null ? `${num(it.forecast_outflow_units)} en ${inv?.outflow_days ?? 3} días` : `${num(it.avg_daily_demand)} /día`;
+    const buy =
+      it.scheduled_in_units != null
+        ? it.scheduled_in_units > 0
+          ? `+${num(it.scheduled_in_units)}${it.next_delivery_date ? ` · llega ${weekdayDay(it.next_delivery_date)}` : ""}`
+          : "—"
+        : line?.qty
+          ? `+${line.qty}${line.expected_delivery ? ` · llega ${weekdayDay(line.expected_delivery)}` : ""}`
+          : "—";
     return {
       sku: it.sku,
       name: it.product_name,
       now: num(it.on_hand),
-      out: `${num(it.avg_daily_demand)} /día`,
-      buy: line?.qty ? `+${line.qty}${line.expected_delivery ? ` · llega ${weekdayDay(line.expected_delivery)}` : ""}` : "—",
+      out,
+      buy,
       cover: it.days_of_cover == null ? "Sin datos" : `${num(it.days_of_cover)} días de cobertura`,
       fill: denom > 0 ? Math.min(100, Math.round((it.on_hand / denom) * 100)) : 0,
+      status: it.status ?? null,
+      statusLabel: it.status ? STATUS_LABELS[it.status] : "",
+      reason: it.status_reason ?? "",
     };
   });
 }

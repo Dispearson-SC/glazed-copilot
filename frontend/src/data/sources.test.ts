@@ -9,8 +9,6 @@ describe("data sources the backend does not serve yet", () => {
     const spy = vi.fn();
     const probe = new Proxy({}, { get: () => spy }) as unknown as Api;
     const calls = await Promise.all([
-      src.fetchForecastMetric(probe, "c1", "traffic"),
-      src.fetchInventoryStatus(probe, "c1"),
       src.fetchAutonomyLog(probe, "c1"),
       src.revertAutonomy(probe, "c1", "x"),
     ]);

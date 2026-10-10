@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, branchKpis, hoySummary, orderPlanA } from "../test/copilotFixtures";
+import { ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, branchKpis, hoySummary, inventoryWithStatus, metricForecasts, orderPlanA, outlookA } from "../test/copilotFixtures";
 import { buildDayView, isPlaceholder, buildInventoryRows, buildScheduled } from "./copilot";
 
 const input = { asOf: "2026-07-19", forecast: branchForecast, ayer: ayerSummary, hoy: hoySummary, kpis: branchKpis, expiring: branchExpiring };
@@ -67,8 +67,50 @@ describe("buildDayView with /outlook", () => {
     expect(v.lost).toEqual({ label: "Venta perdida esperada", value: "$20.00", sub: "$10 – $30 · por falta de producto" });
     expect(v.weather.text).toBe("Sin pronóstico");
   });
-  it("keeps 'Disponible pronto' for a day the outlook does not cover", () => {
-    expect(buildDayView("manana", { ...input, outlook }).orders.value).toBe("Disponible pronto");
+  it("says 'Sin datos' for a day the outlook does not cover (the route is deployed)", () => {
+    expect(buildDayView("manana", { ...input, outlook }).orders.value).toBe("Sin datos");
+  });
+});
+
+describe("buildDayView with the metric forecasts (/forecast?metric=...) and the live /outlook", () => {
+  const withMetrics = { ...input, metrics: metricForecasts };
+  it("Hoy: visits, orders, ticket and conversion come from the metric forecasts", () => {
+    const v = buildDayView("hoy", { ...withMetrics, outlook: outlookA });
+    expect(v.traffic).toEqual({ value: "971", caption: "visitas esperadas" });
+    expect(v.orders).toEqual({ label: "Pedidos esperados", value: "85" });
+    expect(v.ticket.value).toBe("$9.56");
+    expect(v.conversion.value).toBe("8.7%");
+    expect(JSON.stringify(v)).not.toContain("965"); // today's actual visits are never shown
+  });
+
+  it("Mañana: the outlook feeds orders and ticket; metrics feed visits and conversion; waste and lost sales are ranges as served", () => {
+    const v = buildDayView("manana", { ...withMetrics, outlook: outlookA });
+    expect(v.traffic.value).toBe("836");
+    expect(v.orders.value).toBe("86");
+    expect(v.ticket.value).toBe("$9.24");
+    expect(v.conversion.value).toBe("10.3%");
+    expect(v.waste).toEqual({ label: "Merma esperada", value: "$0.00", sub: "a costo · $0 – $0" });
+    expect(v.lost).toEqual({ label: "Venta perdida esperada", value: "$26.05", sub: "$0 – $105 · por falta de producto" });
+    expect(v.weather.text).toBe("Sin pronóstico");
+  });
+
+  it("says 'Sin datos' (not 'Disponible pronto') when the routes answer but have no point for the day", () => {
+    const v = buildDayView("hoy", { ...input, asOf: "2026-08-01", metrics: metricForecasts, outlook: outlookA });
+    expect(v.traffic.value).toBe("Sin datos");
+    expect(v.orders.value).toBe("Sin datos");
+    expect(v.conversion.value).toBe("Sin datos");
+    expect(v.waste.value).toBe("Sin datos");
+  });
+
+  it("keeps 'Disponible pronto' when the routes are unavailable (404)", () => {
+    const v = buildDayView("manana", { ...input, metrics: null, outlook: null });
+    expect(v.traffic.value).toBe("Disponible pronto");
+    expect(v.conversion.value).toBe("Disponible pronto");
+  });
+
+  it("does not show a conversion the backend marks as not valid", () => {
+    const bad = { ...metricForecasts, conversion: { ...metricForecasts.conversion, conversion_valid: false } as never };
+    expect(buildDayView("manana", { ...input, metrics: bad }).conversion.value).toBe("Sin datos");
   });
 });
 
@@ -92,6 +134,23 @@ describe("buildInventoryRows", () => {
     const rows = buildInventoryRows(branchInventory, orderPlanA);
     expect(rows[0]).toMatchObject({ name: "Md Choc Stout C.B. Wsweet Cold Foam", now: "5", out: "3.23 /día", buy: "+10 · llega mar 21", cover: "1.5 días de cobertura", fill: 100 });
     expect(rows[1]).toMatchObject({ now: "0", buy: "—", fill: 0, cover: "0 días de cobertura" });
+  });
+});
+
+describe("buildInventoryRows with the backend status", () => {
+  const rows = buildInventoryRows(inventoryWithStatus, null);
+  it("maps critical, watch and ok to the design's pills with the backend reason", () => {
+    expect(rows.map((r) => [r.status, r.statusLabel])).toEqual([["critical", "Crítico"], ["ok", "En orden"], ["watch", "Seguimiento"]]);
+    expect(rows[0].reason).toContain("se agota antes de la próxima entrega");
+  });
+  it("shows the forecast outflow and the scheduled delivery from the inventory itself", () => {
+    expect(rows[0]).toMatchObject({ now: "0", out: "51.31 en 3 días", buy: "+40 · llega lun 20" });
+    expect(rows[1]).toMatchObject({ out: "9.6 en 3 días", buy: "—" });
+    expect(rows[2].buy).toBe("+12 · llega mié 22");
+  });
+  it("falls back to the daily average and the order plan when the status fields are missing", () => {
+    const old = buildInventoryRows(branchInventory, orderPlanA);
+    expect(old[0]).toMatchObject({ status: null, out: "3.23 /día", buy: "+10 · llega mar 21" });
   });
 });
 

@@ -176,6 +176,8 @@ export interface ForecastResponse {
   projected?: boolean;
   /** Present on `?metric=` reads. */
   metric?: string;
+  /** `conversion` reads: false when the footfall counter was unreliable. */
+  conversion_valid?: boolean | null;
   unit_label?: string;
 }
 
@@ -322,6 +324,8 @@ export interface InventoryItem {
 
 export interface InventoryResponse {
   as_of: string;
+  /** Days covered by `forecast_outflow_units`. */
+  outflow_days?: number;
   items: InventoryItem[];
 }
 

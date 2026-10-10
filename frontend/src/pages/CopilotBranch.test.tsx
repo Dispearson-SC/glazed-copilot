@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
-  ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, branchKpis, hoySummary, orderPlanA, pendingA,
+  ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, branchKpis, hoySummary, inventoryWithStatus, metricForecasts, orderPlanA, outlookA, pendingA,
 } from "../test/copilotFixtures";
 import { caseA, fakeApi, renderPage } from "../test/helpers";
 import CopilotPage from "./CopilotPage";
@@ -14,7 +14,8 @@ const api = (over = {}) =>
     listProposals: async () => [],
     getPending: async () => pendingA,
     getOrderPlan: async () => orderPlanA,
-    getForecast: vi.fn(async () => branchForecast),
+    getForecast: vi.fn(async (_c: string, q: { metric?: keyof typeof metricForecasts } = {}) => (q.metric ? metricForecasts[q.metric] : branchForecast)),
+    getOutlook: vi.fn(async () => outlookA),
     getDaySummary: vi.fn(async (_c: string, date?: string) => (date === "2026-07-18" ? ayerSummary : hoySummary)),
     getKpis: async () => branchKpis,
     getExpiring: async () => branchExpiring,
@@ -65,16 +66,39 @@ describe("Sucursal window", () => {
     expect(screen.getAllByText("Sin pronóstico").length).toBeGreaterThan(0);
   });
 
-  it("says 'Disponible pronto' for expected visits and orders while /outlook answers 404", async () => {
-    await openSucursal();
+  it("fills expected visits, orders, ticket and conversion for Hoy from the metric forecasts", async () => {
+    const a = await openSucursal();
+    await screen.findByText("$868.54");
+    expect(screen.getByText("971")).toBeInTheDocument();
+    expect(screen.getByText("85")).toBeInTheDocument();
+    expect(screen.getByText("$9.56")).toBeInTheDocument();
+    expect(screen.getByText("8.7%")).toBeInTheDocument();
+    expect(a.getForecast).toHaveBeenCalledWith("c1", { metric: "footfall", from: "2026-07-18", to: "2026-07-20", level: "store" });
+    expect(a.getOutlook).toHaveBeenCalledWith("c1", { days: "2" });
+  });
+
+  it("says 'Disponible pronto' for those figures while the routes answer 404", async () => {
+    const { ApiError } = await import("../api");
+    const nf = async () => { throw new ApiError(404, "Not Found"); };
+    await openSucursal(api({ getOutlook: nf, getForecast: vi.fn(async (_c: string, q: { metric?: string } = {}) => { if (q.metric) throw new ApiError(404, "Not Found"); return branchForecast; }) }));
     await screen.findByText("$868.54");
     expect(screen.getAllByText("Disponible pronto").length).toBeGreaterThanOrEqual(3);
   });
 
   it("renders empty values small and muted, never as a headline figure", async () => {
-    await openSucursal();
+    const { ApiError } = await import("../api");
+    await openSucursal(api({ getOutlook: async () => { throw new ApiError(404, "Not Found"); }, getForecast: vi.fn(async (_c: string, q: { metric?: string } = {}) => { if (q.metric) throw new ApiError(404, "Not Found"); return branchForecast; }) }));
     await screen.findByText("$868.54");
     for (const el of screen.getAllByText("Disponible pronto")) expect(el.className).toMatch(/text-\[13px\]/);
+  });
+
+  it("shows the backend status pill, reason, forecast outflow and scheduled delivery per inventory row", async () => {
+    await openSucursal(api({ getInventory: async () => inventoryWithStatus }));
+    const row = (await screen.findByText("Better For You Breakfast Sandwich")).closest("div[data-row]") as HTMLElement;
+    expect(within(row).getByText("Crítico")).toBeInTheDocument();
+    expect(within(row).getByText(/se agota antes de la próxima entrega/)).toBeInTheDocument();
+    expect(within(row).getByText("51.31 en 3 días")).toBeInTheDocument();
+    expect(within(row).getByText("+40 · llega lun 20")).toBeInTheDocument();
   });
 
   it("lists inventory with stock, daily outflow and the order-plan purchase", async () => {

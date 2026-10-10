@@ -137,7 +137,7 @@ export default function BranchWindow({
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 className="m-0 font-headline-sm text-headline-sm text-primary">Inventario y salida</h2>
-            <p className="m-0 font-label-sm text-label-sm font-normal text-on-surface-variant">Actual · salida diaria promedio · compra del plan</p>
+            <p className="m-0 font-label-sm text-label-sm font-normal text-on-surface-variant">Actual · salida prevista · entrega programada</p>
           </div>
         </div>
         {inventoryFailed && <p className="m-0 text-[13px] text-on-surface-variant">Sin datos de inventario</p>}
@@ -145,11 +145,12 @@ export default function BranchWindow({
           <div key={r.sku} data-row className="flex flex-col gap-1.5 border-b border-partition/70 pb-3">
             <div className="flex items-center justify-between gap-2">
               <span className="font-body-md text-body-md font-semibold text-primary">{r.name}</span>
-              <span className="flex-shrink-0 rounded-full bg-surface-container-high px-2 py-0.5 font-label-sm text-label-sm font-semibold text-on-surface-variant">{r.cover}</span>
+              <span title={r.reason || undefined} className={`flex-shrink-0 rounded-full px-2 py-0.5 font-label-sm text-label-sm font-semibold ${r.status === "critical" ? "bg-error-container text-on-error-container" : r.status === "watch" ? "bg-[rgba(185,133,86,.18)] text-on-tertiary-fixed-variant" : "bg-surface-container-high text-on-surface-variant"}`}>{r.statusLabel || r.cover}</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-surface-container">
               <div className="h-full rounded-full bg-on-tertiary-container" style={{ width: `${r.fill}%` }} />
             </div>
+            {r.reason && <p className="m-0 font-label-sm text-label-sm font-normal text-on-surface-variant">{r.reason}</p>}
             <div className="grid grid-cols-3 gap-2 font-label-sm text-label-sm font-normal text-on-surface-variant">
               <span>Actual <b className="text-on-surface">{r.now}</b></span>
               <span>Salida <b className="text-on-surface">{r.out}</b></span>

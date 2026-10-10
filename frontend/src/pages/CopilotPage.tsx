@@ -66,7 +66,7 @@ function CopilotShell() {
   );
 
   const b = branch_.data;
-  const dayView = b ? buildDayView(state.day, { asOf: simToday, forecast: b.forecast, ayer: b.ayer, hoy: b.hoy, kpis: b.kpis, expiring: b.expiring, outlook: b.outlook }) : null;
+  const dayView = b ? buildDayView(state.day, { asOf: simToday, forecast: b.forecast, ayer: b.ayer, hoy: b.hoy, kpis: b.kpis, expiring: b.expiring, outlook: b.outlook, metrics: b.metrics }) : null;
 
   const ask = (w: WarningItem) => {
     const userText = `Explícame: ${w.title}`;
