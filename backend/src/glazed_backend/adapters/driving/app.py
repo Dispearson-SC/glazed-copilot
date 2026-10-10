@@ -33,6 +33,7 @@ class Container:
     cors_origins: list[str] | None = None  # None -> DEFAULT_CORS_ORIGINS
     turn_timeout_s: float = 120.0  # a Core turn with no answer after this long is reported as failed
     turn_tracker: Any = field(default_factory=TurnTracker)
+    classifier: Any = None  # TextClassifierPort (Jev via Backboard, LLM fallback); None -> escape labels
     served: dict = field(default_factory=dict)  # (case_id, issue_id) -> issue as served, for option lookup
 
 
@@ -89,6 +90,7 @@ def build_container(env: dict[str, str] | None = None) -> Container:
         core = _NoCore()
     cors = cors_origins_from_env(env)
     key = env.get("BACKBOARD_API_KEY", "")
+    classifier = build_classifier(env)
     from ..driven.backboard_memory import BackboardMemory
     from .store_names import StoreNames
     if env.get("GLAZED_STORAGE", "memory") == "postgres":
@@ -99,12 +101,25 @@ def build_container(env: dict[str, str] | None = None) -> Container:
                          store.backtests, store.trace, SystemClock(),
                          BackboardMemory(key, store.assistants, display_name=StoreNames(metrics).of), "postgres",
                          "configured" if core_url else "missing", cors,
-                         float(env.get("GLAZED_TURN_TIMEOUT_S", "120")))
+                         float(env.get("GLAZED_TURN_TIMEOUT_S", "120")), classifier=classifier)
     return Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
                      InMemoryBacktests(), InMemoryTrace(), SystemClock(),
                      BackboardMemory(key, InMemoryAssistants(), display_name=StoreNames(metrics).of), "memory",
                      "configured" if core_url else "missing", cors,
-                         float(env.get("GLAZED_TURN_TIMEOUT_S", "120")))
+                         float(env.get("GLAZED_TURN_TIMEOUT_S", "120")), classifier=classifier)
+
+
+def build_classifier(env: dict[str, str]) -> Any:
+    """Jev through Backboard first (account access is unverified), then the MiniMax fallback. A missing key only
+    removes its adapter; with none configured every answer is the escape label."""
+    from ..driven.classifiers import BackboardSystemOne, ChainClassifier, LLMFallback
+    adapters: list[Any] = []
+    if env.get("BACKBOARD_API_KEY"):
+        adapters.append(BackboardSystemOne(env["BACKBOARD_API_KEY"]))
+    if env.get("MINIMAX_API_KEY"):
+        adapters.append(LLMFallback(env["MINIMAX_API_KEY"], env.get("MINIMAX_API_BASE", "https://api.minimax.io/v1"),
+                                    env.get("MINIMAX_CLASSIFIER_MODEL", "MiniMax-M3.1-flash-preview")))
+    return ChainClassifier(adapters)
 
 
 def create_app_from_env() -> FastAPI:

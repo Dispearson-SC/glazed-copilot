@@ -32,6 +32,11 @@ class PromoAuditBody(BaseModel):
     discount_pct: float
 
 
+class ClassifyBody(BaseModel):
+    kind: str  # rejection_reason | deviation_cause
+    text: str
+
+
 class EventBody(BaseModel):
     """Either a trace event (from/to/kind/payload) or the Core `record_event` tool shape
     (type/date_from/date_to/note), attributed to the calling agent."""
@@ -117,6 +122,20 @@ def build_internal_router(c: Any) -> APIRouter:
     @r.post("/promos/audit")
     def promo_audit(case: Ctx, b: PromoAuditBody):
         return c.metrics.promo_audit(case.store_id, case.sim_today, b.department, b.discount_pct)
+
+    @r.post("/classify")
+    def classify(b: ClassifyBody):
+        """Free text -> closed label (Jev). No case needed: nothing here reads store data."""
+        from ..driven.classifiers import ChainClassifier
+        from ...ports.classifier import ClassifierError, labels_for
+        try:
+            labels_for(b.kind)
+        except ClassifierError as exc:
+            raise DomainError(str(exc)) from exc
+        if not b.text.strip():
+            raise DomainError("text is required")
+        clf = getattr(c, "classifier", None) or ChainClassifier([])
+        return clf.classify(b.kind, b.text).as_dict()
 
     @r.get("/compliance")
     def compliance(case: Ctx, decision_id: str | None = None):

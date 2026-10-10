@@ -278,15 +278,22 @@ class ProposeOption:
 
 class DecideProposal:
     def __init__(self, cases: CaseRepository, proposals: ProposalRepository, executions: ExecutionRepository,
-                 alerts: AlertRepository, memory: ExperienceMemoryPort | None = None) -> None:
+                 alerts: AlertRepository, memory: ExperienceMemoryPort | None = None,
+                 classifier: Any = None) -> None:
         self.cases, self.proposals, self.executions, self.alerts = cases, proposals, executions, alerts
-        self.memory = memory
+        self.memory, self.classifier = memory, classifier
 
     def execute(self, proposal_id: str, approved: bool, reason: str = "") -> Execution:
         proposal = self.proposals.get(proposal_id)
         if proposal is None:
             raise NotFound(f"proposal {proposal_id!r} not found")
         proposal.decide(approved, reason)
+        if not approved and self.classifier is not None and reason.strip():
+            try:  # Jev turns the free-text reason into a label; it never blocks the decision
+                res = self.classifier.classify("rejection_reason", reason)
+                proposal.reason_category, proposal.reason_confidence = res.label, res.confidence
+            except Exception:  # noqa: BLE001
+                pass
         self.proposals.update(proposal)
         runs = approved and proposal.action_type != "do_nothing"
         execution = Execution.new(proposal.proposal_id, proposal.case_id, "simulated",
@@ -311,7 +318,9 @@ class DecideProposal:
         kind, key = (parts[1], parts[2]) if len(parts) >= 3 else ("issue", p.issue_id)
         when = case.sim_today.isoformat() if case else ""
         verdict = "APPROVED" if p.status == "approved" else "REJECTED"
-        text = (f"[{p.store_id} · {kind} · {key} · {when}] {p.action_type} {verdict}. {p.reason or 'no reason given'}. "
+        cat = (f"Reason category: {p.reason_category} (confidence {p.reason_confidence:.2f}). "
+               if p.reason_category else "")
+        text = (f"[{p.store_id} · {kind} · {key} · {when}] {p.action_type} {verdict}. {p.reason or 'no reason given'}. {cat}"
                 f"Simulated option: {json.dumps(p.params, sort_keys=True)}. tier={p.tier}. decision_id={p.proposal_id}")
         try:
             self.memory.remember(p.store_id, Experience(text, "decision", p.store_id, p.proposal_id))

@@ -117,18 +117,20 @@ class _Alerts(_Repo):
 
 class _Proposals(_Repo):
     def add(self, p: Proposal) -> None:
-        self.s.q("INSERT INTO glazed.proposals VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+        self.s.q("INSERT INTO glazed.proposals VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
                  " ON CONFLICT (proposal_id) DO UPDATE SET status=EXCLUDED.status, reason=EXCLUDED.reason,"
-                 " params=EXCLUDED.params", [p.proposal_id, p.case_id, p.store_id, p.issue_id, p.action_type,
-                                             Jsonb(p.params), p.tier, p.rationale, p.status, p.reason, p.agent_id,
-                                             p.created_at])
+                 " params=EXCLUDED.params, reason_category=EXCLUDED.reason_category,"
+                 " reason_confidence=EXCLUDED.reason_confidence",
+                 [p.proposal_id, p.case_id, p.store_id, p.issue_id, p.action_type, Jsonb(p.params), p.tier, p.rationale,
+                  p.status, p.reason, p.agent_id, p.created_at, p.reason_category, p.reason_confidence])
 
     update = add
 
     @staticmethod
     def _row(r: dict | None) -> Proposal | None:
         return Proposal(r["proposal_id"], r["case_id"], r["store_id"], r["issue_id"], r["action_type"], r["params"],
-                        r["tier"], r["rationale"], r["status"], r["reason"], r["agent_id"], r["created_at"]) if r else None
+                        r["tier"], r["rationale"], r["status"], r["reason"], r["agent_id"], r["created_at"],
+                        r["reason_category"], r["reason_confidence"]) if r else None
 
     def get(self, proposal_id: str) -> Proposal | None:
         return self._row(self._one("SELECT * FROM glazed.proposals WHERE proposal_id=%s", (proposal_id,)))

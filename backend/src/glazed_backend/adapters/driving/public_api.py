@@ -193,7 +193,7 @@ def build_public_router(c: Any) -> APIRouter:
 
     @r.post("/proposals/{proposal_id}/decision")
     def decide(proposal_id: str, b: DecisionBody):
-        return jsonable_encoder(uc.DecideProposal(c.cases, c.proposals, c.executions, c.alerts, c.memory)
+        return jsonable_encoder(uc.DecideProposal(c.cases, c.proposals, c.executions, c.alerts, c.memory, c.classifier)
                                 .execute(proposal_id, b.approved, b.reason))
 
     @r.post("/proposals/{proposal_id}/outcome", status_code=201)
