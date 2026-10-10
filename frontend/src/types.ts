@@ -289,6 +289,9 @@ export interface AlertRecord {
   category?: string;
   agent_id?: string;
   ts?: string;
+  /** Spanish kind label and title from the backend ("Riesgo de desabasto", "Riesgo de desabasto: Angus SteakSandwich"). */
+  kind_label_es?: string;
+  title_es?: string;
   issue?: (Partial<Issue> & { options?: IssueOption[] }) | null;
 }
 
@@ -408,6 +411,8 @@ export interface PendingApproval {
   recommendation: { option_id: string; label: string; action_type: string; params: Record<string, unknown> };
   requires_approval: boolean;
   kind?: string;
+  kinds?: string[];
+  merged_issue_ids?: string[];
   sku?: string | null;
   product_name?: string | null;
 }

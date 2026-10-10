@@ -82,3 +82,27 @@ describe("useDecide idempotency", () => {
     expect(keyOf(api, 2)).not.toBe(keyOf(api, 1));
   });
 });
+
+describe("useDecide reject hardening", () => {
+  it("never sends a rejection without a reason", async () => {
+    const { api, hook } = setup();
+    await act(async () => { expect(await hook.result.current.decide(tech, false)).toBe(false); });
+    await act(async () => { expect(await hook.result.current.decide(tech, false, { label: "", text: "" })).toBe(false); });
+    expect(api.recordDecision).not.toHaveBeenCalled();
+  });
+
+  it("keeps approve and reject intents separate: a reject never joins an approve in flight", async () => {
+    const releases: Array<(v: unknown) => void> = [];
+    const recordDecision = vi.fn(() => new Promise((r) => { releases.push(r); }));
+    const { hook } = setup({ recordDecision });
+    let a!: Promise<boolean>;
+    let r!: Promise<boolean>;
+    act(() => { a = hook.result.current.decide(tech, true); });
+    act(() => { r = hook.result.current.decide(tech, false, { label: "Otro", text: "" }); });
+    expect(recordDecision).toHaveBeenCalledTimes(2);
+    const bodies = recordDecision.mock.calls.map((c) => (c as unknown as [string, { approved: boolean }])[1].approved);
+    expect(bodies).toEqual([true, false]);
+    releases.forEach((rel) => rel({ decision_id: "d", proposal_id: "d", status: "x" }));
+    await act(async () => { await Promise.all([a, r]); });
+  });
+});

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import AgentWindow from "../components/copilot/AgentWindow";
 import AlertsWindow from "../components/copilot/AlertsWindow";
@@ -76,7 +76,13 @@ function CopilotShell() {
     void chat.send(userText);
   };
 
-  const reject = state.rejectFor ? known.current.get(state.rejectFor) : undefined;
+  // The item the reject sheet was opened for; used when known.current no longer has it, so the sheet always renders.
+  const [rejectItem, setRejectItem] = useState<DecisionItem | null>(null);
+  const openReject = (i: DecisionItem) => {
+    setRejectItem(i);
+    dispatch({ type: "openReject", id: i.id });
+  };
+  const reject = state.rejectFor ? (known.current.get(state.rejectFor) ?? (rejectItem?.id === state.rejectFor ? rejectItem : undefined)) : undefined;
 
   return (
     <div className="min-h-screen bg-surface font-body-md text-body-md text-on-surface">
@@ -91,7 +97,7 @@ function CopilotShell() {
           agents={inbox.agents}
           pendingLine={data.items.length || !data.loading ? pendingLine : ""}
           onApprove={(i) => void decide(i, true)}
-          onReject={(i) => dispatch({ type: "openReject", id: i.id })}
+          onReject={openReject}
         />
       )}
       {state.tab === "decisiones" && (
@@ -104,7 +110,7 @@ function CopilotShell() {
           accepted={state.accepted}
           onAnalyze={(i) => openCard(i, "analizar")}
           onAccept={(i) => void decide(i, true)}
-          onReject={(i) => dispatch({ type: "openReject", id: i.id })}
+          onReject={openReject}
           onToggleMenu={(i) => dispatch({ type: "toggleMenu", id: i.id })}
           onDialog={(i) => openCard(i, "dialogo")}
         />
