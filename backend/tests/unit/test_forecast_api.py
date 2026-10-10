@@ -136,7 +136,7 @@ def test_extra_quantiles_are_exposed_per_point_when_the_model_has_them():
 def test_defaults_and_errors():
     client, cid = build()
     out = get(client, cid, sku="A")
-    assert out["points"][0]["date"] == "2026-02-11" and out["points"][-1]["date"] == "2026-03-23"
+    assert out["points"][0]["date"] == "2026-03-03" and out["points"][-1]["date"] == "2026-03-17"
     assert get(client, cid)["level"] == "store"
     base = f"/api/v1/cases/{cid}/forecast"
     assert client.get(base, params={"level": "sku"}).status_code == 400

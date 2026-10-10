@@ -364,8 +364,8 @@ def build_public_router(c: Any) -> APIRouter:
             case_of(case_id), category, q)
 
     @r.get("/cases/{case_id}/outlook")
-    def outlook(case_id: str, days: int | None = None):
-        return uc_manager.OutlookView(c.metrics, names, c.forecasters, c.flow_forecaster).execute(case_of(case_id), days)
+    def outlook(case_id: str, days: int | None = None, past_days: int | None = None):
+        return uc_manager.OutlookView(c.metrics, names, c.forecasters, c.flow_forecaster).execute(case_of(case_id), days, past_days)
 
     @r.get("/cases/{case_id}/executions")
     def executions(case_id: str):

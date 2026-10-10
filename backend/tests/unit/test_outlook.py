@@ -32,7 +32,9 @@ def configure(on_hand=3, pos=(), extra_flow=()):
 def outlook(client, cid, **params):
     r = client.get(f"/api/v1/cases/{cid}/outlook", params=params)
     assert r.status_code == 200, r.text
-    return r.json()
+    out = r.json()
+    out["days"] = [d for d in out["days"] if d["projected"]]  # today / past days are covered by their own test
+    return out
 
 
 def test_shape_envelope_and_days_start_tomorrow():
@@ -93,4 +95,17 @@ def test_days_validation_and_no_look_ahead():
 def test_internal_twin_matches_public():
     client, cid, _ = build(configure())
     r = client.get("/internal/v1/outlook", headers={"X-Glazed-Case": cid}, params={"days": 2})
-    assert r.status_code == 200 and r.json() == outlook(client, cid, days=2)
+    pub = client.get(f"/api/v1/cases/{cid}/outlook", params={"days": 2}).json()
+    assert r.status_code == 200 and r.json() == pub
+
+
+def test_today_and_yesterday_are_backtests_with_actual():
+    client, cid, _ = build(configure())
+    r = client.get(f"/api/v1/cases/{cid}/outlook")
+    assert r.status_code == 200
+    days = r.json()["days"]
+    assert [d["date"] for d in days][:3] == ["2026-07-18", "2026-07-19", D1.isoformat()]
+    today = days[1]
+    assert today["is_today"] is True and today["forecast_kind"] == "backtest" and today["projected"] is False
+    assert "net_sales" in today["actual"] and "vs_forecast_pct" in today
+    assert days[2]["forecast_kind"] == "forward"

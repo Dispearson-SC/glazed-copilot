@@ -11,10 +11,11 @@ from ..metrics.deliveries import LATE_LOOKBACK_DAYS, build_delivery_days
 from ..metrics.expiry import MAX_SHELF_LIFE_DAYS, expiring_items, summarize_expiry
 from ..metrics.staffing import WINDOW_DAYS, productivity_p50, recommended_hours
 from ..metrics.promos_view import STATUSES, in_window, promo_status, sort_promos
-from ..metrics.inventory_view import SORTS, inventory_item, sort_items
+from ..metrics.inventory_view import SORTS, display_status_es, inventory_item, sort_items
 from ..metrics.stockflow import STATUS_RULE, arrivals_by_sku, next_delivery, project_lost_sales, stock_status
 
 DEFAULT_LIMIT, MAX_LIMIT = 50, 500
+ALL_SKUS_LIMIT = 200  # inventory lists every SKU with stock or movement by default
 PROJECTION_HORIZON = 14
 SELLING_DAYS = 28
 FALLBACK_OUTFLOW_DAYS = 3
@@ -67,13 +68,17 @@ class InventoryView(_View):
             if it is not None:
                 items.append(it)
         selling = self.metrics.selling_skus(store, as_of, as_of - timedelta(days=SELLING_DAYS - 1))
-        shown = sort_items(items, sort)[:clamp_limit(limit)]
+        shown = sort_items(items, sort)  # every SKU with inventory: the limit applies after the status is known
         for it in shown:  # the projection is only worth asking for a SKU that could run out within the horizon
             stock = None
             if it["days_of_cover"] is not None and it["days_of_cover"] <= PROJECTION_HORIZON:
                 stock = self.metrics.inventory_projection(store, as_of, it["sku"], PROJECTION_HORIZON).get("projected_stockout_date")
             it["projected_stockout_date"], it["projected"] = stock, stock is not None
         self._flow(case, shown, days)
+        if sort == "days_of_cover":  # critical first, then watch, then ok; emptiest cover first inside each
+            rank = {"critical": 0, "watch": 1, "ok": 2}
+            shown.sort(key=lambda i: (rank.get(i["status"], 3), i["days_of_cover"] is None, i["days_of_cover"] or 0.0, i["sku"]))
+        shown = shown[:clamp_limit(limit, ALL_SKUS_LIMIT)]
         return self.envelope(case, coverage={"skus_with_inventory": len(items), "skus_selling": len(selling)},
                              sort=sort, projection_horizon_days=PROJECTION_HORIZON, outflow_days=days,
                              status_rule=STATUS_RULE, items=shown)
@@ -106,6 +111,9 @@ class InventoryView(_View):
             it["next_delivery_date"], it["next_delivery_source"] = (nxt.isoformat() if nxt else None), src
             it["status"], it["status_reason"] = stock_status(it["days_of_cover"], nxt, as_of, days)
             it["projected"] = bool(it.get("projected") or nxt)
+            it["on_order_qty"] = round(sum(arr.values()), 2)
+            it["opening_qty_next"] = round(arr[nxt], 2) if nxt and nxt in arr else None
+            it["display_status_es"] = display_status_es(it, as_of)
 
 
 class ExpiringView(_View):
@@ -265,24 +273,53 @@ class OutlookView(_View):
         super().__init__(metrics, names)
         self.forecasters, self.flow_forecaster = forecasters, flow_forecaster
 
-    def execute(self, case: Case, days: int | None = None) -> dict[str, Any]:
+    def execute(self, case: Case, days: int | None = None, past_days: int | None = None) -> dict[str, Any]:
+        """Tomorrow onwards plus today (as_of) and `past_days` (default 1) before it. Past days and today carry a
+        backtest forecast issued with data up to the day before them (`forecast_kind: backtest`), the `actual` and
+        `vs_forecast_pct`; today is flagged `is_today`."""
         from ..domain import Unprocessable  # noqa: F401
         from .forecast import FlowForecast, ForecastLoader, StoreMetricForecast
         days = 2 if days is None else days
+        past_days = 1 if past_days is None else past_days
         if not 1 <= days <= self.MAX_DAYS:
             raise DomainError(f"days must be between 1 and {self.MAX_DAYS}")
+        if not 0 <= past_days <= 7:
+            raise DomainError("past_days must be between 0 and 7")
         as_of = case.sim_today
+        past = [as_of - timedelta(days=i) for i in range(past_days, -1, -1)]  # ..., yesterday, today
         dates = [as_of + timedelta(days=i) for i in range(1, days + 1)]
         sales = {}
         try:
             got = StoreMetricForecast(None, self.metrics, self.forecasters, self.flow_forecaster, self.names)
-            sales = {p["date"]: p for p in got.execute_case(case, "net_sales", dates[0], dates[-1])["points"]}
+            sales = {p["date"]: p for p in got.execute_case(case, "net_sales", past[0], dates[-1])["points"]}
         except NotFound:
             pass
         flow = FlowForecast(self.metrics, self.flow_forecaster)
+        actual_flow = {r["date"]: r for r in self.metrics.flow_history(case.store_id, as_of, past[0]) if r["date"] <= as_of}
         waste = {d["date"]: d["waste_usd"] for d in ExpiringView(self.metrics, self.names).execute(case, days)["by_day"]}
         lost = self._lost_sales(case, dates, ForecastLoader(self.metrics, self.forecasters))
         out = []
+        for d in past:
+            iso = d.isoformat()
+            try:
+                f = flow.execute(case, d, backtest=True)
+            except NotFound:
+                f = {"transactions": None, "avg_ticket": None}
+            s = sales.get(iso)
+            row = actual_flow.get(d) or {}
+            tx_act = row.get("transactions")
+            actual = {"net_sales": s.get("actual") if s and s.get("actual") is not None else row.get("net_sales"),
+                      "transactions": tx_act,
+                      "avg_ticket": round(row["net_sales"] / tx_act, 2) if tx_act and row.get("net_sales") is not None else None}
+            mid = s["forecast"] if s else None
+            out.append({"date": iso, "projected": False, "is_today": d == as_of, "forecast_kind": "backtest",
+                        "net_sales": {"low": s["p10"], "mid": s["forecast"], "high": s["p90"]} if s else None,
+                        "transactions": _range(f["transactions"]), "avg_ticket": _range(f["avg_ticket"]),
+                        "actual": actual,
+                        "vs_forecast_pct": round((actual["net_sales"] - mid) / mid * 100, 1)
+                        if mid and actual["net_sales"] is not None else None,
+                        "expected_waste_usd": None, "expected_lost_sales_usd": None,
+                        "weather": None, "weather_note": self.WEATHER_NOTE})
         for i, d in enumerate(dates):
             iso = d.isoformat()
             try:
@@ -290,7 +327,7 @@ class OutlookView(_View):
             except NotFound:
                 f = {"transactions": None, "avg_ticket": None}
             s = sales.get(iso)
-            out.append({"date": iso, "projected": True,
+            out.append({"date": iso, "projected": True, "is_today": False, "forecast_kind": "forward",
                         "net_sales": {"low": s["p10"], "mid": s["forecast"], "high": s["p90"]} if s else None,
                         "transactions": _range(f["transactions"]), "avg_ticket": _range(f["avg_ticket"]),
                         "expected_waste_usd": waste.get(iso, dict(ZERO)),

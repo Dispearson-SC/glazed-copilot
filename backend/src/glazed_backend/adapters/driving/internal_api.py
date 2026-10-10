@@ -168,10 +168,10 @@ def build_internal_router(c: Any) -> APIRouter:
         return uc_manager.StaffingView(c.metrics, names, c.flow_forecaster).execute(case, days)
 
     @r.get("/outlook")
-    def outlook(case: Ctx, days: int | None = None, store_id: str | None = None, as_of: date | None = None):
+    def outlook(case: Ctx, days: int | None = None, past_days: int | None = None, store_id: str | None = None, as_of: date | None = None):
         """Next days: sales, transactions, ticket, expected waste and lost sales as ranges; same use case as the public route."""
         own_case(case, store_id, as_of)
-        return uc_manager.OutlookView(c.metrics, names, c.forecasters, c.flow_forecaster).execute(case, days)
+        return uc_manager.OutlookView(c.metrics, names, c.forecasters, c.flow_forecaster).execute(case, days, past_days)
 
     @r.get("/inventory/projection")
     def projection(case: Ctx, sku: str, horizon: int = 7):

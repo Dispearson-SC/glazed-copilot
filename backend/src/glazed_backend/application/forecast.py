@@ -12,9 +12,10 @@ from ..metrics.accuracy import ScoredPoint, summarize
 from ..metrics.forecast import weekday_samples
 from ..metrics.types import SkuSeries
 from ..ports.forecast import ForecastResult, ForecastRow
+from ..adapters.driven.forecast import BaselineForecast
 
 STORE_CENSOR_SHARE = 0.25  # a store day is censored when stockout SKUs account for this share of its USD sales
-DEFAULT_PAST_DAYS, DEFAULT_AHEAD_DAYS = 27, 13
+DEFAULT_PAST_DAYS, DEFAULT_AHEAD_DAYS = 7, 7
 LOOKBACK_DAYS = 63  # history read before the first requested day: 8 same-weekday samples need 56
 FLOW_LOOKBACK_DAYS = 70
 
@@ -98,6 +99,11 @@ def _levels(rows: list[ForecastRow], price: dict[str, float] | None) -> dict[str
     return out
 
 
+def base_model() -> str:
+    from ..adapters.driven.forecast import BASELINE_MODEL
+    return BASELINE_MODEL
+
+
 class GetForecast:
     def __init__(self, cases, metrics, forecasters: list[Any]) -> None:
         self.cases, self.metrics, self.loader = cases, metrics, ForecastLoader(metrics, forecasters)
@@ -127,6 +133,7 @@ class GetForecast:
         net = {d: v for d, v in net.items() if d <= as_of}  # defence in depth: nothing after the case date is read
         calib = calibration_factor(loaded.history, net, loaded.result.origin) if store_view else None
         points, scored = self._points(loaded, store_view, net, calib["factor"] if calib else 1.0)
+        points = self._with_backtests(loaded, points, store_view, net, date_from, date_to)
         res = loaded.result
         last = max((p["date"] for p in points), default=None)
         horizon = max(0, (date.fromisoformat(last) - res.origin).days) if last else 0
@@ -135,6 +142,34 @@ class GetForecast:
                 "model_version": res.model_version, "unit": "usd" if level == "store" else "units",
                 "horizon_days": horizon, "points": points, "metrics_to_date": summarize(scored),
                 **({"calibration": calib, "band_method": "sqrt_sum_of_sku_variances"} if store_view else {})}
+
+    def _with_backtests(self, loaded: Loaded, points: list[dict[str, Any]], store: bool, net: dict[date, float],
+                        date_from: date, date_to: date) -> list[dict[str, Any]]:
+        """Every date <= as_of in the window gets a one-step-ahead forecast issued with data up to the day before it (the
+        file model where it covers the date, else the same-weekday 8w baseline, calibrated the same way). Per point:
+        NO LOOK-AHEAD. Past points are `forecast_kind: backtest` with the actual beside them; later ones are `forward`."""
+        as_of = loaded.as_of
+        if loaded.result.model == base_model():  # a baseline issued at as_of says nothing honest about past days
+            points = [p for p in points if p["date"] > as_of.isoformat()]
+        have = {p["date"] for p in points}
+        base = BaselineForecast()
+        d = date_from
+        while d <= min(date_to, as_of):
+            if d.isoformat() not in have:
+                known = d - timedelta(days=1)
+                hist = [SkuSeries(s.sku, s.price, s.shelf_life_days, tuple(r for r in s.rows if r.date <= known))
+                        for s in loaded.history]
+                res = base.forecast("", known, None, d, d, hist)
+                if res is not None and res.rows:
+                    net_k = {x: v for x, v in net.items() if x <= known}
+                    cal = calibration_factor(hist, net_k, known) if store else None
+                    one = Loaded(as_of, loaded.history, ForecastResult(res.model, res.model_version, known, res.rows))
+                    pts, _ = self._points(one, store, net, cal["factor"] if cal else 1.0)
+                    points += pts
+            d += timedelta(days=1)
+        for p in points:
+            p["forecast_kind"] = "backtest" if p["date"] <= as_of.isoformat() else "forward"
+        return sorted(points, key=lambda p: p["date"])
 
     def _points(self, loaded: Loaded, store: bool, net: dict[date, float] | None = None,
                 k: float = 1.0) -> tuple[list[dict[str, Any]], list[ScoredPoint]]:
@@ -275,10 +310,11 @@ class FlowForecast:
     def __init__(self, metrics, flow_forecaster) -> None:
         self.metrics, self.flow = metrics, flow_forecaster
 
-    def execute(self, case, target_date: date) -> dict[str, Any]:
+    def execute(self, case, target_date: date, backtest: bool = False) -> dict[str, Any]:
         as_of = case.sim_today
-        if target_date <= as_of:
+        if target_date <= as_of and not backtest:
             raise Unprocessable(f"target_date {target_date} must be after the case date {as_of}")
+        as_of = min(as_of, target_date - timedelta(days=1))  # a past day is forecast as known the day before
         history = [r for r in self.metrics.flow_history(case.store_id, as_of, as_of - timedelta(days=FLOW_LOOKBACK_DAYS))
                    if r["date"] <= as_of]  # clipped again: NO LOOK-AHEAD whatever the adapter returned
         res = self.flow.flow(case.store_id, as_of, target_date, history)
@@ -349,7 +385,8 @@ class StoreMetricForecast:
             points.append({"date": d.isoformat(), "forecast": _r(band["p50"]) if band else None,
                            "p10": _r(band["p10"]) if band else None, "p90": _r(band["p90"]) if band else None,
                            "baseline": _r(sum(base) / len(base)) if base else None, "actual": _r(act),
-                           "censored": False, "projected": d > as_of})
+                           "censored": False, "projected": d > as_of,
+                           "forecast_kind": "backtest" if d <= as_of else "forward"})
             d += timedelta(days=1)
         if not rows:
             raise NotFound(f"no flow data to forecast {metric} for store {case.store_id}")
