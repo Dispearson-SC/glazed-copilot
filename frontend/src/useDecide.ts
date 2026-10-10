@@ -66,6 +66,8 @@ export function useDecide(caseId: string, refresh: () => Promise<void> | void) {
   const decide = useCallback(
     (item: DecisionItem, approved: boolean, rejection?: Rejection): Promise<boolean> => {
       if (item.readOnly || !caseId) return Promise.resolve(false);
+      // A rejection is only ever sent with a reason (the RejectSheet collects it); never fall through to anything else.
+      if (!approved && !(rejection?.label || rejection?.text?.trim())) return Promise.resolve(false);
       const intent = `${item.id}:${approved ? "approve" : "reject"}`;
       const running = inflight.current.get(intent);
       if (running) return running;

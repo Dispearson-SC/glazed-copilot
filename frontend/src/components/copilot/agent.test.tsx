@@ -175,3 +175,20 @@ describe("AgentWindow", () => {
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
   });
 });
+
+describe("AnalysisCard decision buttons", () => {
+  it("blocks Aprobar while the analysis loads, keeps Rechazar available, and never submits a form", async () => {
+    const onApprove = vi.fn();
+    const onReject = vi.fn();
+    render(<AnalysisCard item={approval} analysis={{ status: "loading" }} mode="analizar" open onApprove={onApprove} onReject={onReject} />);
+    const approve = screen.getByRole("button", { name: /Aprobar/ });
+    const reject = screen.getByRole("button", { name: /Rechazar/ });
+    expect(approve).toBeDisabled();
+    expect(approve).toHaveAttribute("type", "button");
+    expect(reject).toHaveAttribute("type", "button");
+    await userEvent.click(approve);
+    await userEvent.click(reject);
+    expect(onApprove).not.toHaveBeenCalled();
+    expect(onReject).toHaveBeenCalledTimes(1);
+  });
+});
