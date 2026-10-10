@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApi } from "../ApiContext";
+import PageShell from "../components/PageShell";
 import { ErrorBox, useStores } from "../components";
 import { DEFAULT_SIM_TODAY } from "../config";
 import { useSession } from "../SessionContext";
@@ -47,7 +48,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-col w-full max-w-[480px] mx-auto gap-space-md">
+    <PageShell subtitle="Sucursal" columnClass="flex flex-col w-full max-w-[480px] mx-auto gap-space-md pt-space-xs">
       <section className="relative overflow-hidden rounded-[20px] bg-primary-container text-surface-container-lowest p-space-lg shadow-xl shadow-primary-container/20">
         <div className="absolute -right-12 -top-12 w-48 h-48 rounded-full bg-secondary-container/10 blur-2xl pointer-events-none"></div>
         <div className="relative z-10 flex flex-col gap-space-sm">
@@ -98,6 +99,6 @@ export default function LoginPage() {
           </button>
         </form>
       </section>
-    </div>
+    </PageShell>
   );
 }

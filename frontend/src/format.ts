@@ -18,7 +18,7 @@ export const weekdayShort = (iso: string): string =>
   new Intl.DateTimeFormat("es-MX", { weekday: "short", timeZone: "UTC" }).format(new Date(`${iso.slice(0, 10)}T00:00:00Z`));
 
 export const longDate = (iso: string): string =>
-  new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(
+  new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(
     new Date(`${iso.slice(0, 10)}T00:00:00Z`),
   );
 
@@ -28,3 +28,12 @@ export const avgTicket = (sales: number | null | undefined, tx: number | null | 
   sales == null || !tx ? "—" : usd(sales / tx);
 
 export const signedPct = (n: number): string => `${n >= 0 ? "+" : "-"}${Math.abs(n).toFixed(1)}%`;
+
+/** "dd/mm" of an ISO date. */
+export const dayMonth = (iso: string): string => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+
+/** Up to two initials from the first words that start with a letter ("50 Donut Holes" -> "DH"). */
+export const initials = (name: string): string => {
+  const words = name.split(/\s+/).filter((w) => /^\p{L}/u.test(w));
+  return (words.length ? words : name.split(/\s+/)).slice(0, 2).map((w) => w.charAt(0).toUpperCase()).join("");
+};

@@ -1,4 +1,5 @@
 import ChatView from "../chat/ChatView";
+import PageShell from "../components/PageShell";
 import { useStores } from "../components";
 import { useSession } from "../SessionContext";
 import { useChat } from "../useChat";
@@ -14,7 +15,7 @@ export default function ChatPage() {
   const store = stores.find((s) => s.store_id === storeId);
 
   return (
-    <section className="flex flex-col gap-space-md">
+    <PageShell subtitle="Chat" columnClass="flex flex-col w-full max-w-[640px] mx-auto gap-space-md pt-space-xs">
       <div data-testid="chat-header" className="relative overflow-hidden rounded-[20px] bg-primary-container text-surface-container-lowest p-space-lg shadow-xl shadow-primary-container/20">
         <div className="flex items-center gap-space-sm">
           <div className="w-9 h-9 rounded-full bg-surface-container-lowest/10 flex items-center justify-center text-tertiary-fixed-dim">
@@ -34,6 +35,6 @@ export default function ChatPage() {
       ) : (
         <ChatView chat={chat} />
       )}
-    </section>
+    </PageShell>
   );
 }

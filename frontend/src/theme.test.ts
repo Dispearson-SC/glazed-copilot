@@ -43,3 +43,14 @@ describe("legacy css layer", () => {
     expect(css).toContain(".pt-safe");
   });
 });
+
+describe("design parity", () => {
+  it("loads the same fonts as the design source (plus the body font its tailwind config names)", () => {
+    const html = readFileSync("index.html", "utf8");
+    expect(html).toContain("family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900");
+    expect(html).toContain("family=Poppins:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,200;1,300;1,400;1,500;1,600");
+    expect(html).toContain("family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200");
+    expect(html).toContain("Plus+Jakarta+Sans");
+    expect(html).toContain('name="apple-mobile-web-app-capable"');
+  });
+});

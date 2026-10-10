@@ -19,7 +19,7 @@ export default function BottomNav() {
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center min-w-[56px] min-h-[44px] px-space-sm py-1 rounded-full transition-all ${
+              `flex flex-col items-center justify-center min-w-[64px] min-h-[44px] px-space-sm py-1 rounded-full transition-all ${
                 isActive ? "text-secondary bg-surface-container font-bold" : "text-on-surface-variant hover:text-on-surface"
               }`
             }
