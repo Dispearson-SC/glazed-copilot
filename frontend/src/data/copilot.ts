@@ -94,6 +94,8 @@ export interface DecisionItem {
   /** Backend impact chips (technical cards). */
   chips: string[];
   warn: string;
+  /** Spanish labels of every kind merged into this issue (approvals). */
+  kinds?: string[];
 }
 
 const TIER_NAMES: Record<string, string> = { N1: "Automática", N2: "Propuesta", N3: "Diálogo" };
@@ -136,6 +138,7 @@ export function buildPendingItems(pending: PendingResponse | null, simToday: str
     icon: ACTION_ICONS[a.recommendation.action_type] ?? "bolt", level: tierLabel(a.tier), title: a.recommendation.label, summary: a.problem,
     value: benefitText(a.impact_usd), conf: a.confidence.score ?? 0, confPct: confText(a.confidence.score), deadline: deadlineText(a.deadline, simToday),
     supplier: "", arrive: "", cost: "", why: a.problem, chips: [], warn: "",
+    kinds: (a.kinds ?? []).map((k) => kindLabelEs(k)),
   }));
   const techs = pending.technical.map((t): DecisionItem => {
     const decidable = Boolean(t.issue_id && t.option_id);
@@ -150,13 +153,14 @@ export function buildPendingItems(pending: PendingResponse | null, simToday: str
   // The same issue can come back as an approval and as a technical line (or merged under several kinds): one card per issue_id,
   // and the approval wins because it asks for the manager's opinion.
   const approvalIds = new Set(approvals.map((a) => a.id));
+  const mergedIds = new Set(pending.approvals.flatMap((a) => a.merged_issue_ids ?? []));
   const seen = new Set<string>();
   const uniqueTechs = techs.filter((t) => {
-    if (approvalIds.has(t.id) || seen.has(t.id)) return false;
+    if (approvalIds.has(t.id) || mergedIds.has(t.id) || seen.has(t.id)) return false;
     seen.add(t.id);
     return true;
   });
-  const uniqueApprovals = approvals.filter((a, i) => approvals.findIndex((x) => x.id === a.id) === i);
+  const uniqueApprovals = approvals.filter((a, i) => approvals.findIndex((x) => x.id === a.id) === i && !mergedIds.has(a.id));
   return [...uniqueTechs, ...uniqueApprovals];
 }
 
@@ -521,6 +525,9 @@ const KIND_LABELS_ES: Record<string, string> = {
   compliance_deviation: "Acción aprobada sin ejecutar",
   orphan_sku: "Ventas sin producto en el catálogo",
   sku_key_mismatch: "Claves de producto que no coinciden",
+  inflated_order: "Pedido inflado",
+  expiring: "Próximo a caducar",
+  transfer_opportunity: "Oportunidad de traslado",
 };
 export const kindLabelEs = (kind: string | null | undefined, label?: string | null): string => label || (kind ? KIND_LABELS_ES[kind] : undefined) || "Advertencia";
 
