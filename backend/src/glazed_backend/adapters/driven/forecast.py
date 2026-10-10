@@ -61,8 +61,12 @@ class FileForecast(_Quantiles):
     OPTIONAL_Q = ("p20", "p50", "p80")
     PARAMS = ("mu", "alpha")
 
-    def __init__(self, path: str, origin: date = HOLDOUT_ORIGIN, model_version: str = "file") -> None:
+    PREFERRED_MODEL = "glm_poisson"  # the job writes one block of rows per model: summing them would multiply the store
+
+    def __init__(self, path: str, origin: date = HOLDOUT_ORIGIN, model_version: str = "file",
+                 model: str | None = None) -> None:
         self.path, self.origin, self.model_version = path, origin, model_version
+        self.model = model or os.environ.get("GLAZED_FORECAST_MODEL") or self.PREFERRED_MODEL
 
     def forecast(self, store_id: str, as_of: date, skus: list[str] | None, date_from: date, date_to: date,
                  history: list[SkuSeries]) -> ForecastResult | None:
@@ -83,6 +87,7 @@ class FileForecast(_Quantiles):
             data = [dict(zip(names, r)) for r in cur.fetchall()]
         except Exception:  # noqa: BLE001 - an unreadable file means "no file forecast": the caller falls back
             return None
+        data = self._one_model(data)
         rows = []
         for r in data:
             q = {"p10": float(r["p10"]), "p90": float(r["p90"])}
@@ -93,6 +98,18 @@ class FileForecast(_Quantiles):
         origin = first.get("forecast_origin") or self.origin
         return ForecastResult(first.get("model") or "file-forecast", str(first.get("model_version") or self.model_version),
                               origin, rows)
+
+
+    def _one_model(self, data: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """One model only (the preferred one, else the most frequent) and one row per SKU-day."""
+        models = [r.get("model") for r in data if r.get("model")]
+        if models:
+            keep = self.model if self.model in models else max(set(models), key=models.count)
+            data = [r for r in data if r.get("model") in (keep, None)]
+        seen: dict[tuple[Any, Any], dict[str, Any]] = {}
+        for r in data:
+            seen[(r["sku"], r["date"])] = r
+        return list(seen.values())
 
 
 class WeekdayFlow:

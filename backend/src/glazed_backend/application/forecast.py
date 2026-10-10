@@ -45,8 +45,46 @@ class ForecastLoader:
         for f in self.forecasters:
             res = f.forecast(store_id, as_of, [sku] if sku else None, date_from, date_to, history)
             if res is not None and res.rows and res.origin <= as_of:
+                once = {(r.sku, r.date): r for r in res.rows}  # a SKU-day counts once, whatever the adapter returned
+                if len(once) != len(res.rows):
+                    res = ForecastResult(res.model, res.model_version, res.origin, list(once.values()))
                 return Loaded(as_of, history, res)
         raise NotFound(f"no forecast is available for {sku or 'the store'} between {date_from} and {date_to}")
+
+
+CALIBRATION_DAYS, MIN_CALIBRATION_DAYS = 28, 7
+Z = {"p10": 1.2815515655446004, "p20": 0.8416212335729143, "p80": 0.8416212335729143, "p90": 1.2815515655446004}
+
+
+def calibration_factor(history: list[SkuSeries], net_sales: dict[date, float], origin: date) -> dict[str, Any] | None:
+    """Σ store net_sales / Σ(units x list price) over the 28 days up to the forecast origin. Units x list price ignores
+    discounts and returns and the SKUs outside the inventory table, so it is not the store's USD: this puts the SKU-level
+    model on the scale of store_daily_kpis.net_sales. None when the overlap is too short to trust."""
+    start = origin - timedelta(days=CALIBRATION_DAYS - 1)
+    value: dict[date, float] = {}
+    for s in history:
+        for r in s.rows:
+            if start <= r.date <= origin:
+                value[r.date] = value.get(r.date, 0.0) + r.sold * s.price
+    days = [d for d in value if d in net_sales and start <= d <= origin and value[d] > 0]
+    if len(days) < MIN_CALIBRATION_DAYS:
+        return None
+    sold, net = sum(value[d] for d in days), sum(net_sales[d] for d in days)
+    return {"factor": net / sold, "days": len(days), "window": {"from": start.isoformat(), "to": origin.isoformat()}} \
+        if sold > 0 and net > 0 else None
+
+
+def store_levels(rows: list[ForecastRow], weight: dict[str, float]) -> dict[str, float]:
+    """Store quantiles from SKU rows: the centre is the sum of the p50s; the spread is sqrt(sum of the SKU variances)
+    (SKU demand taken as independent), each side from its own p50-p10 / p90-p50 distance. Summing SKU quantiles would
+    assume every SKU lands at its p90 on the same day."""
+    centre = sum(r.forecast * weight[r.sku] for r in rows)
+    lo = sum(((r.forecast - r.quantiles["p10"]) / Z["p10"] * weight[r.sku]) ** 2 for r in rows) ** 0.5
+    hi = sum(((r.quantiles["p90"] - r.forecast) / Z["p90"] * weight[r.sku]) ** 2 for r in rows) ** 0.5
+    out = {"p10": max(0.0, centre - Z["p10"] * lo), "p50": centre, "p90": centre + Z["p90"] * hi}
+    if all("p20" in r.quantiles or "p80" in r.quantiles for r in rows):
+        out["p20"], out["p80"] = max(0.0, centre - Z["p20"] * lo), centre + Z["p80"] * hi
+    return dict(sorted(out.items(), key=lambda kv: kv[1]))
 
 
 def _levels(rows: list[ForecastRow], price: dict[str, float] | None) -> dict[str, float]:
@@ -81,16 +119,22 @@ class GetForecast:
         if date_from > date_to:
             raise DomainError("from must not be after to")
         loaded = self.loader.load(case.store_id, as_of, sku, date_from, date_to)
-        points, scored = self._points(loaded, level == "store")
+        store_view = level == "store"
+        net = self.metrics.store_net_sales(case.store_id, as_of, as_of - timedelta(days=LOOKBACK_DAYS + 56)) if store_view else {}
+        net = {d: v for d, v in net.items() if d <= as_of}  # defence in depth: nothing after the case date is read
+        calib = calibration_factor(loaded.history, net, loaded.result.origin) if store_view else None
+        points, scored = self._points(loaded, store_view, net, calib["factor"] if calib else 1.0)
         res = loaded.result
         last = max((p["date"] for p in points), default=None)
         horizon = max(0, (date.fromisoformat(last) - res.origin).days) if last else 0
         return {"store_id": case.store_id, "sku": sku if level == "sku" else None, "level": level,
                 "as_of": as_of.isoformat(), "forecast_origin": res.origin.isoformat(), "model": res.model,
                 "model_version": res.model_version, "unit": "usd" if level == "store" else "units",
-                "horizon_days": horizon, "points": points, "metrics_to_date": summarize(scored)}
+                "horizon_days": horizon, "points": points, "metrics_to_date": summarize(scored),
+                **({"calibration": calib, "band_method": "sqrt_sum_of_sku_variances"} if store_view else {})}
 
-    def _points(self, loaded: Loaded, store: bool) -> tuple[list[dict[str, Any]], list[ScoredPoint]]:
+    def _points(self, loaded: Loaded, store: bool, net: dict[date, float] | None = None,
+                k: float = 1.0) -> tuple[list[dict[str, Any]], list[ScoredPoint]]:
         as_of, res = loaded.as_of, loaded.result
         price = {s.sku: s.price for s in loaded.history}
         rows_by = {s.sku: {r.date: r for r in s.rows} for s in loaded.history}
@@ -104,19 +148,31 @@ class GetForecast:
             if not rows:
                 continue
             w = {r.sku: (price[r.sku] if store else 1.0) for r in rows}
-            lv = _levels(rows, w if store else None)
-            base_parts = [(weekday_samples(units_by[r.sku], d, as_of), w[r.sku]) for r in rows]
-            base = [sum(s) / len(s) * k for s, k in base_parts if s]
-            baseline = sum(base) if base else None
+            if store:
+                cw = {sku: v * k for sku, v in w.items()}
+                lv = store_levels(rows, cw)
+                samples = weekday_samples(net or {}, d, as_of)  # == day-summary vs_same_weekday_avg on net_sales
+                if samples:
+                    baseline = sum(samples) / len(samples)
+                else:
+                    parts = [(weekday_samples(units_by[r.sku], d, as_of), cw[r.sku]) for r in rows]
+                    base = [sum(s) / len(s) * kk for s, kk in parts if s]
+                    baseline = sum(base) if base else None
+            else:
+                lv = _levels(rows, None)
+                base = [sum(s) / len(s) for s in (weekday_samples(units_by[r.sku], d, as_of) for r in rows) if s]
+                baseline = sum(base) if base else None
             actual, censored = None, False
             if d <= as_of:  # NO LOOK-AHEAD: a date after as_of never has an actual, whatever the adapter returned
                 seen = [(rows_by[r.sku][d], w[r.sku]) for r in rows if d in rows_by[r.sku]]
                 if seen:
-                    actual = sum(x.sold * k for x, k in seen)
-                    hit = sum(x.sold * k for x, k in seen if x.stockout_hours > 0)
+                    actual = sum(x.sold * kk for x, kk in seen)
+                    hit = sum(x.sold * kk for x, kk in seen if x.stockout_hours > 0)
                     censored = (hit / actual >= STORE_CENSOR_SHARE if actual > 0 else False) if store \
                         else seen[0][0].stockout_hours > 0
-            fc = sum(r.forecast * w[r.sku] for r in rows)
+                    if store and net and d in net:
+                        actual = net[d]  # the store's real net sales, not units x list price
+            fc = lv["p50"] if store else sum(r.forecast * w[r.sku] for r in rows)
             pt = {"date": d.isoformat(), "forecast": _r(fc), "p10": _r(lv["p10"]), "p90": _r(lv["p90"]),
                   "baseline": _r(baseline), "actual": _r(actual), "censored": censored}
             if "p20" in lv or "p80" in lv:

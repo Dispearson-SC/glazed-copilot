@@ -530,6 +530,11 @@ class DuckDBMetrics:
                           " AND coalesce(dq_flags,'') NOT LIKE '%implausible_ticket%' ORDER BY date",
                           [store_id, start, as_of])
 
+    def store_net_sales(self, store_id: str, as_of: date, start: date) -> dict[date, float]:
+        rows = self._q("SELECT date, net_sales FROM store_daily_kpis WHERE store_id=? AND date BETWEEN ? AND ?"
+                       " AND net_sales IS NOT NULL", [store_id, start, as_of])
+        return {r[0]: float(r[1]) for r in rows}
+
     # -- Manager metrics inputs (Wave 12) ---------------------------------------
     def store_profile(self, store_id: str) -> dict[str, Any]:
         r = self._rows("SELECT s.format, si.region, coalesce(s.typical_open_hours, 12) open_hours FROM stores s"

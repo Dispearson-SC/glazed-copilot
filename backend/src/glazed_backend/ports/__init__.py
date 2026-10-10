@@ -32,6 +32,9 @@ class MetricsPort(Protocol):
     def flow_history(self, store_id: str, as_of: date, start: date) -> list[dict[str, Any]]:
         """Store daily {date, transactions, footfall|None, net_sales} from `start` to as_of, never past it."""
         ...
+    def store_net_sales(self, store_id: str, as_of: date, start: date) -> dict[date, float]:
+        """store_daily_kpis.net_sales per day from `start` to as_of (what day-summary averages for its baseline)."""
+        ...
     def store_profile(self, store_id: str) -> dict[str, Any]:
         """{format, region, open_hours} of the store."""
         ...

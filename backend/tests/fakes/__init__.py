@@ -48,6 +48,10 @@ class FakeMetrics:
         self.calls.append(("flow_history", store_id, as_of))
         return [dict(r) for r in self.flow if r["date"] >= start and (self.leak or r["date"] <= as_of)]
 
+    def store_net_sales(self, store_id, as_of, start):
+        return {r["date"]: float(r["net_sales"]) for r in self.flow
+                if r.get("net_sales") is not None and r["date"] >= start and (self.leak or r["date"] <= as_of)}
+
     # -- Wave 12 manager metrics inputs --------------------------------------------------------------------
     catalog: dict = {}  # sku -> {product_name, department, supplier_id, unit_cost, price, shelf_life_days}
     selling: set = set()  # SKUs with sales in the window
