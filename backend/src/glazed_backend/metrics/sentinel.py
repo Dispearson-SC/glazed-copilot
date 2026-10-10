@@ -74,6 +74,8 @@ def evaluate_decision(decision: dict[str, Any], executions: list[dict[str, Any]]
     lo, hi = base["simulated"]["net_usd_low"], base["simulated"]["net_usd_high"]
     lo = base["simulated"]["net_usd_mid"] if lo is None else lo
     hi = base["simulated"]["net_usd_mid"] if hi is None else hi
+    tol = max(1.0, 0.25 * abs(base["simulated"]["net_usd_mid"]))  # replays of one rule are often zero-width
+    lo, hi = min(lo, hi) - tol, max(lo, hi) + tol
     if lo <= net <= hi:
         return {**base, "diagnosis": "within_range",
                 "explanation": f"Observed net ${net:,.2f} is inside the simulated range [${lo:,.2f}, ${hi:,.2f}] (backtest)."}

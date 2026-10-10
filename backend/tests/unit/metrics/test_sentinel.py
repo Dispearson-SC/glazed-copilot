@@ -65,3 +65,11 @@ def test_outside_the_range_without_events_is_a_forecast_error():
 def test_without_a_measurable_outcome_the_diagnosis_stays_open():
     r = evaluate_decision(decision(), [ex("executed")], date(2026, 3, 14), None, [])
     assert r["diagnosis"] is None and "no measurable outcome" in r["explanation"]
+
+
+def test_a_zero_width_simulated_range_gets_a_tolerance_band():
+    exp = {"net_usd_mid": 40.0, "net_usd_low": 40.0, "net_usd_high": 40.0}
+    near = evaluate_decision(decision(expected=exp), [ex("executed")], date(2026, 3, 14), {"net_usd": 46.0}, [])
+    assert near["diagnosis"] == "within_range"  # +-25% of the mid
+    far = evaluate_decision(decision(expected=exp), [ex("executed")], date(2026, 3, 14), {"net_usd": 60.0}, [])
+    assert far["diagnosis"] == "forecast_error"
