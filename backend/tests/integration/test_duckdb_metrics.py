@@ -330,3 +330,11 @@ def test_staffing_history_is_the_stores_format_and_stops_at_as_of(m):
     assert got["format"] == "Shop-in-Shop" and len(got["rows"]) > 500
     assert max(r["date"] for r in got["rows"]) <= JUL and len({r["store_id"] for r in got["rows"]}) > 5
     assert all(r["staff_hours"] > 0 for r in got["rows"])
+
+
+def test_projection_and_next_delivery_dates_after_as_of_are_flagged_as_projections(m):
+    sku = m.demand_history(S, JUL, None, JUL - timedelta(days=5))[0].sku
+    proj = m.inventory_projection(S, JUL, sku, 5)
+    assert proj["daily"] and all(d["projected"] is True for d in proj["daily"])
+    assert all(p["projected"] is True for p in proj["in_transit"])
+    assert all(s["next_delivery_projected"] is True for s in m.supplier_performance(S, JUL))

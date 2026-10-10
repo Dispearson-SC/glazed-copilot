@@ -352,12 +352,13 @@ class DuckDBMetrics:
             arrivals = sum(p["qty_ordered"] for p in pos if max(p["expected_date"], ref + timedelta(days=1)) == d)
             dem = by.get(d.isoweekday(), overall)
             stock = stock + arrivals - dem
-            daily.append({"date": d.isoformat(), "arrivals": arrivals, "demand": _f(dem), "projected_qty": _f(stock)})
+            daily.append({"date": d.isoformat(), "arrivals": arrivals, "demand": _f(dem), "projected_qty": _f(stock),
+                          "projected": True})
             if stock < 0 and stockout is None:
                 stockout = d.isoformat()
         return {"store_id": store_id, "sku": sku, "as_of": as_of.isoformat(), "method": METHOD, "horizon": horizon,
                 "closing_qty": closing, "in_transit": [{"po_id": p["po_id"], "expected_date": p["expected_date"].isoformat(),
-                                                        "qty": p["qty_ordered"]} for p in pos],
+                                                        "qty": p["qty_ordered"], "projected": True} for p in pos],
                 "days_of_cover": _f(closing / overall) if overall else None, "daily": daily,
                 "projected_stockout_date": stockout}
 
@@ -459,7 +460,8 @@ class DuckDBMetrics:
                  "contract_lead_time_days": r["std_lt"], "contract_on_time_pct": _f(r["c_ot"], 1),
                  "contract_fill_pct": _f(r["c_fill"], 1), "window_days": 180,
                  "delivery_days": sorted(parse_delivery_days(r["delivery_days"])),
-                 "next_delivery": next_delivery_after(as_of, parse_delivery_days(r["delivery_days"])).isoformat()}
+                 "next_delivery": next_delivery_after(as_of, parse_delivery_days(r["delivery_days"])).isoformat(),
+                 "next_delivery_projected": True}
                 for r in rows]
 
     # -- Promos ------------------------------------------------------------------
