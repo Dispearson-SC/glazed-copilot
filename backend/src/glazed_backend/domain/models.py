@@ -222,3 +222,7 @@ class TraceEvent:
     def __post_init__(self) -> None:
         if self.kind not in TRACE_KINDS:
             raise DomainError(f"invalid trace kind {self.kind!r}")
+
+
+class CoreError(DomainError):
+    """Agent-Core unreachable or returned an unexpected response."""
