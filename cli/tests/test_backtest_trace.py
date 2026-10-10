@@ -7,8 +7,11 @@ RUN = {
     "run_id": "r1", "case_id": "c1", "store_id": "S030", "period_from": "2026-03-01",
     "period_to": "2026-03-14", "policy": "default", "label": "backtest", "created_at": "2026-10-10T10:00:00Z",
     "results": {
-        "waste_usd": 100.0, "lost_sales_usd": 50.0, "net_usd": -150.0,
-        "baseline": {"waste_usd": 300.0, "lost_sales_usd": 200.0, "net_usd": -500.0},
+        "label": "backtest", "days": 14, "note": "Estimates from a simple projection.",
+        "waste_usd": {"current": 300.0, "policy": 100.0, "delta": -200.0},
+        "lost_sales_usd": {"current": 200.0, "policy": 50.0, "delta": -150.0},
+        "net_usd": {"current": 500.0, "policy": 150.0, "delta": -350.0},
+        "daily": [{"date": "2026-03-01", "current": {"waste_usd": 1.0}, "policy": {"waste_usd": 0.5}}],
     },
 }
 
@@ -21,7 +24,8 @@ def test_backtest_run_posts_to_current_case(api, run):
     assert api.last_json() == {"date_from": "2026-03-01", "date_to": "2026-03-14", "policy": "default"}
     assert "BACKTEST" in r.output and "r1" in r.output
     assert "100.00" in r.output and "300.00" in r.output
-    assert "+350.00" in r.output  # net improvement vs current practice
+    assert "+350.00" in r.output  # net improvement vs current practice (lower net cost is better)
+    assert "0.50" not in r.output  # the per-day detail is not dumped into the summary
 
 
 def test_backtest_run_with_store_creates_backtest_case(api, run):
@@ -45,9 +49,9 @@ def test_backtest_show(api, run):
 
 def test_backtest_show_without_baseline_still_renders(api, run):
     api.on("GET", "/api/v1/backtests/r2", {**RUN, "run_id": "r2",
-           "results": {"waste_usd": 1.0, "lost_sales_usd": 2.0, "net_usd": -3.0, "extra": "x"}})
+           "results": {"waste_usd": {"current": 4.0, "policy": 1.0, "delta": -3.0}, "extra": "x"}})
     r = run("backtest", "show", "r2")
-    assert r.exit_code == 0 and "1.00" in r.output
+    assert r.exit_code == 0 and "4.00" in r.output and "1.00" in r.output
 
 
 EVENTS = [

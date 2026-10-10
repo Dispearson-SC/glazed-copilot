@@ -157,6 +157,7 @@ def test_backtest_replays_each_day_and_labels_results(w):
     r = run.results
     assert r["days"] == 3 and r["waste_usd"] == {"current": 30.0, "policy": 18.0, "delta": -12.0}
     assert r["lost_sales_usd"]["delta"] == -15.0
+    assert r["net_usd"] == {"current": 90.0, "policy": 63.0, "delta": -27.0}  # waste + lost sales
     assert w.bt.get(run.run_id).run_id == run.run_id
 
 

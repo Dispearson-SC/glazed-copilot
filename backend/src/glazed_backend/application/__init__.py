@@ -268,6 +268,10 @@ class RunBacktest:
                                    "note": "Estimates from a simple projection, not a guarantee."}
         for k, (cur, pol) in totals.items():
             results[k] = {"current": round(cur, 2), "policy": round(pol, 2), "delta": round(pol - cur, 2)}
+        cur_net = sum(v[0] for v in totals.values())
+        pol_net = sum(v[1] for v in totals.values())  # net cost = waste + lost sales; lower is better
+        results["net_usd"] = {"current": round(cur_net, 2), "policy": round(pol_net, 2),
+                              "delta": round(pol_net - cur_net, 2)}
         run = BacktestRun(new_id(), case.case_id, case.store_id, date_from, date_to, policy, results,
                           self.clock.now())
         self.backtests.add(run)

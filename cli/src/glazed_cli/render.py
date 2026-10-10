@@ -110,9 +110,16 @@ def trace_table(events: list[dict]) -> Table:
 _METRICS = [("waste_usd", "Waste ($)"), ("lost_sales_usd", "Lost sales ($)"), ("net_usd", "Net ($)")]
 
 
+def _triple(value: Any) -> tuple[Any, Any]:
+    """(current, policy) from the backend's {current, policy, delta}; a bare number is the policy value."""
+    if isinstance(value, dict):
+        return value.get("current"), value.get("policy")
+    return None, value
+
+
 def backtest_report(run: dict, out: Console) -> None:
     res = dict(run.get("results") or {})
-    base = res.pop("baseline", None) or {}
+    daily = res.pop("daily", None)
     out.print(f"[bold]BACKTEST[/bold] run {run['run_id']}  store={run['store_id']}  "
               f"{run['period_from']} .. {run['period_to']}  policy={run.get('policy') or 'default'}  "
               f"(label: {run.get('label', 'backtest')} - simulated, not real operations)")
@@ -122,13 +129,14 @@ def backtest_report(run: dict, out: Console) -> None:
     for key, label in _METRICS:
         if key not in res:
             continue
-        mine, theirs = res.pop(key), base.get(key)
-        if theirs is None:
-            t.add_row(label, fmt(mine), "-", "-")
+        current, policy = _triple(res.pop(key))
+        if current is None or policy is None:
+            t.add_row(label, fmt(policy), fmt(current), "-")
             continue
-        # Lower waste/lost sales is better; higher net is better.
-        gain = (mine - theirs) if key == "net_usd" else (theirs - mine)
-        t.add_row(label, fmt(mine), fmt(theirs), f"{gain:+,.2f}")
+        # All three are costs (waste, lost sales, net = both): lower under the policy is better.
+        t.add_row(label, fmt(policy), fmt(current), f"{current - policy:+,.2f}")
     out.print(t)
+    if daily:
+        out.print(f"({len(daily)} daily replays available in the run JSON: glazed --json backtest show {run['run_id']})")
     if res:
         render_object("Other results", res, out)
