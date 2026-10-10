@@ -1,13 +1,14 @@
 """Typer application: wiring only. Every command talks to the public API."""
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 import typer
 
-from glazed_cli import render
+from datetime import date as _date, timedelta
+
+from glazed_cli import render, turns
 from glazed_cli.client import Api, CliError, resolve_url
 from glazed_cli.state import State
 
@@ -134,6 +135,83 @@ def case_fork(ctx: typer.Context, title: Optional[str] = typer.Option(None, "--t
     State(current_case=child["case_id"]).save()
     c.out(child, lambda d: render.console().print(
         f"Forked {parent} -> [bold]{d['case_id']}[/bold]; now using the child."))
+
+
+# ---- ask / day / advance ----
+
+@app.command()
+@_guard
+def ask(ctx: typer.Context, question: str,
+        case: Optional[str] = typer.Option(None, "--case", help="Use this case without making it current."),
+        new: bool = typer.Option(False, "--new", help="Start an isolated case first (needs --store and --date)."),
+        store: Optional[str] = typer.Option(None, "--store"),
+        date: Optional[str] = typer.Option(None, "--date"),
+        timeout: float = typer.Option(120.0, "--timeout", help="Seconds to wait for the answer.")) -> None:
+    """Ask the copilot a question in the current case."""
+    c: Ctx = ctx.obj
+    if new:
+        if not store or not date:
+            raise CliError("--new needs --store and --date, e.g. --new --store S030 --date 2026-03-10.")
+        created = c.api.post("/api/v1/cases", {"store_id": store, "sim_today": date, "mode": "live"})
+        State(current_case=created["case_id"]).save()
+        case_id = created["case_id"]
+    else:
+        case_id = current_case_id(case)
+    out = render.console()
+    if c.as_json:
+        turn = turns.ask(c.api, case_id, question, timeout)
+        c.out(turn, lambda _: None)
+    else:
+        with out.status("Thinking..."):
+            turn = turns.ask(c.api, case_id, question, timeout)
+    if turn["status"] == "failed":
+        raise CliError(f"The turn failed: {turn.get('error') or 'unknown error'}")
+    if c.as_json:
+        return
+    if turn.get("reply"):
+        out.print(turn["reply"])
+    if turn["status"] == "waiting_approval":
+        pending = c.api.get("/api/v1/proposals", case_id=case_id, status="pending")
+        out.print("\n[yellow]This turn is waiting for your approval.[/yellow] "
+                  "Use `glazed decide <proposal_id> --approve|--reject`.")
+        if pending:
+            out.print(render.proposals_table(pending, "Pending proposals"))
+
+
+@app.command()
+@_guard
+def day(ctx: typer.Context, date: Optional[str] = typer.Option(None, "--date", help="YYYY-MM-DD; default sim_today-1."),
+        case: Optional[str] = typer.Option(None, "--case")) -> None:
+    """Day summary of the current case's store."""
+    c: Ctx = ctx.obj
+    case_id = current_case_id(case)
+    if not date:
+        sim_today = c.api.get(f"/api/v1/cases/{case_id}")["sim_today"]
+        date = (_date.fromisoformat(sim_today) - timedelta(days=1)).isoformat()
+    data = c.api.get(f"/api/v1/cases/{case_id}/day-summary", date=date)
+    c.out(data, lambda d: render.render_object(f"Day summary {date}", d, render.console()))
+
+
+@app.command()
+@_guard
+def advance(ctx: typer.Context, days: Optional[int] = typer.Option(None, "--days", min=1),
+            to: Optional[str] = typer.Option(None, "--to", help="Target date YYYY-MM-DD."),
+            case: Optional[str] = typer.Option(None, "--case")) -> None:
+    """Move the case clock forward and list the new alerts."""
+    c: Ctx = ctx.obj
+    if days is not None and to:
+        raise CliError("Use either --days or --to, not both.")
+    body = {"to": to} if to else {"days": days or 1}
+    data = c.api.post(f"/api/v1/cases/{current_case_id(case)}/advance", body)
+
+    def human(d: dict) -> None:
+        out = render.console()
+        out.print(f"sim_today is now [bold]{d['sim_today']}[/bold]")
+        if d["new_alerts"]:
+            out.print(render.alerts_table(d["new_alerts"], "New alerts"))
+        else:
+            out.print("No new alerts.")
+    c.out(data, human)
 
 
 def main() -> None:

@@ -58,3 +58,15 @@ def case_table(cases: list[dict], current: str | None) -> Table:
     return table("Cases", ["", "case_id", "store", "sim_today", "mode", "parent", "title"], (
         ["*" if c["case_id"] == current else "", c["case_id"], c["store_id"], c["sim_today"],
          c["mode"], c.get("parent_case_id"), c.get("title")] for c in cases))
+
+
+def alerts_table(alerts: list[dict], title: str = "Alerts") -> Table:
+    return table(title, ["alert_id", "type", "store", "severity_usd", "state", "as_of", "issue_key"], (
+        [a["alert_id"], a.get("alert_type"), a.get("store_id"), a.get("severity_usd"), a.get("state"),
+         a.get("as_of"), a.get("issue_key")] for a in alerts))
+
+
+def proposals_table(items: list[dict], title: str = "Proposals") -> Table:
+    return table(title, ["proposal_id", "action", "tier", "status", "params", "rationale"], (
+        [p["proposal_id"], p.get("action_type"), p.get("tier"), p.get("status"), p.get("params"),
+         p.get("rationale")] for p in items))
