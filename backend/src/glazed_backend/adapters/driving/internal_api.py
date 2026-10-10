@@ -55,6 +55,10 @@ def build_internal_router(c: Any) -> APIRouter:
         end = date_to or case.sim_today
         return c.metrics.kpis(case.store_id, case.sim_today, date_from or end - timedelta(days=6), end)
 
+    @r.get("/metrics/explain")
+    def explain(case: Ctx, metric: str):
+        return uc.ExplainMetric(c.cases, c.metrics).execute(case.case_id, metric)
+
     @r.get("/day-summary")
     def day_summary(case: Ctx, date: date | None = None):
         return uc.GetDaySummary(c.cases, c.metrics).execute(case.case_id, date)

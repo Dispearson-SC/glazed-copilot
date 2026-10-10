@@ -381,3 +381,40 @@ class RecordEvent:
                            canonical_agent_id(to_agent), kind, payload)
         self.trace.record(event)
         return event
+
+
+# metric -> (definition, formula, kpi keys that feed it). Values come from MetricsPort.kpis, never recomputed here.
+METRIC_CATALOG: dict[str, tuple[str, str, tuple[str, ...]]] = {
+    "net_sales": ("Net sales revenue in the window, after discounts and returns.", "sum(net_sales)", ()),
+    "units": ("Units sold in the window.", "sum(units_sold)", ()),
+    "transactions": ("Number of completed sales transactions.", "sum(transactions)", ()),
+    "footfall": ("Visitors counted entering the store.", "sum(footfall)", ()),
+    "conversion": ("Share of visitors who bought something, using only days with a valid footfall counter.",
+                   "sum(transactions) / sum(footfall) over days with conversion_valid",
+                   ("transactions", "footfall")),
+    "tx_per_staff_hour": ("Transactions handled per staffed hour: labour productivity.",
+                          "sum(transactions) / sum(staff_hours)", ("transactions",)),
+    "waste_usd": ("Cost of product written off as waste in the window.", "sum(waste_cost)", ()),
+    "stockout_hours": ("Hours a SKU was out of stock while the store was open.", "sum(stockout_hours)", ()),
+}
+
+
+class ExplainMetric:
+    """Definition, formula, value and inputs of one metric over the case window (last 7 days up to as_of)."""
+
+    WINDOW_DAYS = 7
+
+    def __init__(self, cases: CaseRepository, metrics: MetricsPort) -> None:
+        self.cases, self.metrics = cases, metrics
+
+    def execute(self, case_id: str, metric: str) -> dict[str, Any]:
+        if metric not in METRIC_CATALOG:
+            raise DomainError(f"unknown metric {metric!r}; known: {', '.join(METRIC_CATALOG)}")
+        case = _case(self.cases, case_id)
+        end = case.sim_today
+        start = end - timedelta(days=self.WINDOW_DAYS - 1)
+        kpis = self.metrics.kpis(case.store_id, case.sim_today, start, end)
+        definition, formula, inputs = METRIC_CATALOG[metric]
+        return {"metric": metric, "definition": definition, "formula": formula, "value": kpis.get(metric),
+                "inputs": {k: kpis.get(k) for k in inputs},
+                "window": {"date_from": start.isoformat(), "date_to": end.isoformat()}}

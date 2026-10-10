@@ -248,3 +248,32 @@ def test_record_event_canonicalizes_core_profile_ids(w):
     e = RecordEvent(w.cases, w.trace, w.clock).execute(c.case_id, "glazed_sentinel", "glazed_orchestrator",
                                                          "message", {"text": "x"})
     assert (e.from_agent, e.to_agent) == ("sentinel", "orchestrator")
+
+
+class _KpiStub:
+    def __init__(self):
+        self.calls = []
+
+    def kpis(self, store_id, as_of, date_from, date_to):
+        self.calls.append((store_id, as_of, date_from, date_to))
+        return {"store_id": store_id, "net_sales": 700.0, "units": 70, "transactions": 50, "footfall": 200,
+                "conversion": 0.25, "tx_per_staff_hour": 2.5, "waste_usd": 12.0, "stockout_hours": 4.0}
+
+
+def test_explain_metric_returns_definition_formula_value_inputs_for_the_case_window(w):
+    from glazed_backend.application import ExplainMetric
+    c = start(w)
+    stub = _KpiStub()
+    out = ExplainMetric(w.cases, stub).execute(c.case_id, "conversion")
+    assert stub.calls == [("S030", date(2026, 3, 10), date(2026, 3, 4), date(2026, 3, 10))]
+    assert out["metric"] == "conversion" and out["value"] == 0.25
+    assert out["definition"] and "footfall" in out["formula"]
+    assert out["inputs"] == {"transactions": 50, "footfall": 200}
+    assert out["window"] == {"date_from": "2026-03-04", "date_to": "2026-03-10"}
+
+
+def test_explain_metric_rejects_unknown_metric_listing_the_known_ones(w):
+    from glazed_backend.application import ExplainMetric
+    c = start(w)
+    with pytest.raises(DomainError, match="net_sales"):
+        ExplainMetric(w.cases, _KpiStub()).execute(c.case_id, "vibes")

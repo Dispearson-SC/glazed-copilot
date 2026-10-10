@@ -234,3 +234,13 @@ def test_record_event_from_core_tool_shape(env):
     ev = r.json()
     assert (ev["from_agent"], ev["kind"]) == ("sentinel", "message")
     assert "holiday" in ev["payload"]["text"] and ev["payload"]["note"] == "closed"
+
+
+def test_internal_metrics_explain(env):
+    client, _ = env
+    c = mkcase(client)
+    h = {"X-Glazed-Case": c["case_id"], "X-Glazed-Agent": "glazed_present"}
+    ok = client.get("/internal/v1/metrics/explain", headers=h, params={"metric": "net_sales"})
+    assert ok.status_code == 200 and ok.json()["value"] == 1000.0 and ok.json()["formula"]
+    bad = client.get("/internal/v1/metrics/explain", headers=h, params={"metric": "nope"})
+    assert bad.status_code == 400 and "net_sales" in bad.json()["detail"]
