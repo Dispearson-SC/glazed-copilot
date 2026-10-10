@@ -1,4 +1,24 @@
 name: glazed-copilot
+
+# Secrets are never written here. Run through `make up` (or pass `--env-file .env`) so
+# POSTGRES_PASSWORD and MINIMAX_API_KEY come from the git-ignored .env at the repository root.
+x-core: &core
+  build:
+    context: ../../Agent-Core/Core
+    dockerfile: ../../glazed-copilot/infra/core/Dockerfile
+  environment: &core-env
+    # Agent-Core creates and migrates its own app and DBOS databases through the admin URL.
+    AGENT_CORE_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change-me}@db:5432/agent_core
+    AGENT_CORE_ADMIN_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change-me}@db:5432/postgres
+    AGENT_CORE_HTTP_HOST: 0.0.0.0
+    AGENT_CORE_HTTP_PORT: "8000"
+    # LLM provider is MiniMax; Agent-Core reads the credential as MINIMAX_API.
+    MINIMAX_API: ${MINIMAX_API_KEY:-}
+    GLAZED_BACKEND_URL: http://backend:8080  # where the Glazed tools call the internal API
+  depends_on:
+    db:
+      condition: service_healthy
+
 services:
   db:
     image: postgres:16
@@ -27,28 +47,38 @@ services:
       GLAZED_DATABASE_URL: postgresql://glazed_app:glazed_dev@db:5432/glazed_app
       GLAZED_DUCKDB_PATH: /data/glazed.duckdb
       GLAZED_CORE_URL: http://core:8000
+      GLAZED_CORS_ORIGINS: ${GLAZED_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      BACKBOARD_API_KEY: ${BACKBOARD_API_KEY:-}
     volumes:
       - ../../Dataset/clean:/data:ro
     ports:
-      - "8100:8100"
+      - "${GLAZED_BACKEND_PORT:-8100}:8080"
 
-  # Built by the Agent-Core writer (branch vertical/glazed); may not build yet.
   core:
-    build:
-      context: ../../Agent-Core/Core
+    <<: *core
     container_name: glazed-core
+    command: ["python", "-m", "agent_core", "serve"]
+    environment: *core-env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 3)"]
+      interval: 10s
+      retries: 12
+      start_period: 30s
+    ports:
+      - "${GLAZED_CORE_HOST_PORT:-8001}:8000"
+
+  core-peer-worker:
+    <<: *core
+    container_name: glazed-core-peer-worker
+    command: ["python", "-m", "agent_core", "peer-worker"]
+    environment: *core-env
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GLAZED_BACKEND_URL: http://backend:8100
-    ports:
-      - "8000:8000"
+      core:
+        condition: service_healthy   # the core serve process creates and migrates the databases first
 
-  # frontend:   # placeholder, built by the frontend task
-  #   build: ../frontend
-  #   ports: ["5173:80"]
+  # frontend:   # run with `npm run dev` in frontend/ for now (http://localhost:5173)
 
 volumes:
   glazed_pgdata:
