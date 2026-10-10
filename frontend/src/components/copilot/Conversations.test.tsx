@@ -43,6 +43,9 @@ describe("Conversaciones (Agente)", () => {
     open();
     await userEvent.click(await screen.findByRole("button", { name: "Conversaciones anteriores" }));
     const sheet = await screen.findByRole("dialog", { name: "Conversaciones anteriores" });
+    // Rendered at <body> level (portal) and centred, never inside the fixed top bar.
+    expect(sheet.closest("header")).toBeNull();
+    expect(sheet.parentElement?.className).toContain("items-center");
     const rows = within(sheet).getAllByRole("button", { name: /^Abrir conversación/ });
     expect(rows.map((r) => r.getAttribute("data-case"))).toEqual(["c3", "c2", "c1"]);
     expect(within(sheet).queryByText("Archivada")).toBeNull();

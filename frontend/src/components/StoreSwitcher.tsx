@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useApi } from "../ApiContext";
 import { DEFAULT_SIM_TODAY } from "../config";
 import { isSingleStore, scopeStores, useAuth } from "../AuthContext";
@@ -86,7 +87,8 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
         <span className="min-w-0 flex-1">{children}</span>
         <span aria-hidden="true" className="material-symbols-outlined flex-shrink-0 text-[18px] text-on-surface-variant">expand_more</span>
       </button>
-      {open && (
+      {/* Portal to <body>: inside the blurred top bar, `fixed` would be positioned against the bar, not the viewport. */}
+      {open && createPortal(
         <div className="fixed inset-0 z-[60]">
           <div data-testid="store-backdrop" className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
           <div
@@ -137,7 +139,8 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
               })}
             </ul>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
