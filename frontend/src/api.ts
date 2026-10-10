@@ -1,4 +1,4 @@
-import type { AlertRecord, Case, CaseMode, DaySummary, DeliveriesResponse, ExpiringResponse, HistoryResponse, InventoryResponse, Kpis, Outlook, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, SupplierPerformance, TraceEvent, Turn, TurnRecord } from "./types";
+import type { AgentsStatusResponse, AlertRecord, Case, CaseDecisionBody, CaseDecisionResult, InboxCounts, IssueAnalysis, MemoryRecord, MessageContext, PendingResponse, CaseMode, DaySummary, DeliveriesResponse, ExpiringResponse, HistoryResponse, InventoryResponse, Kpis, Outlook, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, SupplierPerformance, TraceEvent, Turn, TurnRecord } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -55,8 +55,8 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
     listCases: (query: { store_id?: string }) => request<Case[]>("/cases", {}, query),
     createCase: (b: { store_id: string; sim_today: string; mode?: CaseMode; title?: string }) =>
       request<Case>("/cases", send("POST", b)),
-    sendMessage: (caseId: string, text: string) =>
-      request<{ turn_id: string }>(`/cases/${caseId}/messages`, send("POST", { text })),
+    sendMessage: (caseId: string, text: string, context?: MessageContext) =>
+      request<{ turn_id: string }>(`/cases/${caseId}/messages`, send("POST", context ? { text, context } : { text })),
     listTurns: (caseId: string) => request<TurnRecord[]>(`/cases/${caseId}/turns`),
     getTurn: (caseId: string, turnId: string) => request<Turn>(`/cases/${caseId}/turns/${turnId}`),
     listProposals: (query: { case_id?: string; status?: string }) =>
@@ -85,7 +85,18 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
       }),
     getDaySummary: (caseId: string, date?: string) =>
       request<DaySummary>(`/cases/${caseId}/day-summary`, {}, { date }),
-    getForecast: (caseId: string, q: { sku?: string; from?: string; to?: string; level?: "sku" | "store" } = {}) =>
+    getPending: (caseId: string) => request<PendingResponse>(`/cases/${caseId}/decisions/pending`),
+    getAnalysis: (caseId: string, issueId: string) => request<IssueAnalysis>(`/cases/${caseId}/issues/${encodeURIComponent(issueId)}/analysis`),
+    /** Atomic proposal + decision. The same Idempotency-Key replays the original outcome; 409 = already decided; 400 = rejecting without a reason. */
+    recordDecision: (caseId: string, b: CaseDecisionBody, opts: { idempotencyKey?: string } = {}) =>
+      request<CaseDecisionResult>(`/cases/${caseId}/decisions`, {
+        ...send("POST", b),
+        ...(opts.idempotencyKey ? { headers: { "Idempotency-Key": opts.idempotencyKey } } : {}),
+      }),
+    getMemories: (caseId: string, q: { category?: string; q?: string } = {}) => request<MemoryRecord[]>(`/cases/${caseId}/memories`, {}, q),
+    getAgentsStatus: () => request<AgentsStatusResponse>("/agents/status"),
+    getInboxCounts: (caseId: string) => request<InboxCounts>(`/cases/${caseId}/inbox-counts`),
+    getForecast: (caseId: string, q: { sku?: string; from?: string; to?: string; level?: "sku" | "store"; metric?: string } = {}) =>
       request<ForecastResponse>(`/cases/${caseId}/forecast`, {}, q),
     /** Trace events: only the chat history fallback reads them. */
     getTrace: (storeId: string, caseId: string) =>

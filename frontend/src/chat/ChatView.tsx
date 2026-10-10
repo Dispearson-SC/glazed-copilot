@@ -15,6 +15,7 @@ export const SUGGESTIONS = [
 type Chat = ReturnType<typeof useChat>;
 
 function MetaChip({ meta }: { meta: NonNullable<ChatMessage["meta"]> }) {
+  if (meta.elapsed_ms == null) return null;
   const secs = (meta.elapsed_ms / 1000).toFixed(1);
   return (
     <div className="flex items-center gap-1.5 mt-1 font-label-sm text-label-sm text-on-surface-variant">

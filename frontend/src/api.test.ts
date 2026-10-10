@@ -105,3 +105,51 @@ describe("forecast api", () => {
     expect(isUnavailable(new Error("x"))).toBe(false);
   });
 });
+
+describe("wave 14 routes", () => {
+  const setup = () => {
+    const f = vi.fn(async () => new Response("{}", { status: 200 }));
+    return { f, api: createApi("", f as unknown as typeof fetch), url: (i = 0) => (f.mock.calls[i] as unknown as [string])[0], init: (i = 0) => (f.mock.calls[i] as unknown as [string, RequestInit])[1] };
+  };
+
+  it("sends the chat context as a field of POST /messages", async () => {
+    const { api, url, init } = setup();
+    await api.sendMessage("c1", "Analiza", { issue_id: "S1|x|1", option_id: "o1", mode: "analizar" });
+    expect(url()).toBe("/api/v1/cases/c1/messages");
+    expect(JSON.parse(init().body as string)).toEqual({ text: "Analiza", context: { issue_id: "S1|x|1", option_id: "o1", mode: "analizar" } });
+  });
+
+  it("omits the context when there is none", async () => {
+    const { api, init } = setup();
+    await api.sendMessage("c1", "hola");
+    expect(JSON.parse(init().body as string)).toEqual({ text: "hola" });
+  });
+
+  it("GETs pending decisions, an issue analysis (id encoded), inbox counts, agents status and memories", async () => {
+    const { api, f, url } = setup();
+    await api.getPending("c1");
+    await api.getAnalysis("c1", "S1|stockout_risk|SKU-1");
+    await api.getInboxCounts("c1");
+    await api.getAgentsStatus();
+    await api.getMemories("c1", { category: "proveedores", q: "pan" });
+    await api.getForecast("c1", { metric: "footfall", level: "store" });
+    expect(f.mock.calls.map((c) => (c as unknown as [string])[0])).toEqual([
+      "/api/v1/cases/c1/decisions/pending",
+      "/api/v1/cases/c1/issues/S1%7Cstockout_risk%7CSKU-1/analysis",
+      "/api/v1/cases/c1/inbox-counts",
+      "/api/v1/agents/status",
+      "/api/v1/cases/c1/memories?category=proveedores&q=pan",
+      "/api/v1/cases/c1/forecast?metric=footfall&level=store",
+    ]);
+    expect(url(0)).toContain("pending");
+  });
+
+  it("POSTs the atomic decision with the Idempotency-Key header", async () => {
+    const { api, url, init } = setup();
+    await api.recordDecision("c1", { issue_id: "i1", option_id: "o1", approved: false, reason: "caro" }, { idempotencyKey: "k-9" });
+    expect(url()).toBe("/api/v1/cases/c1/decisions");
+    expect(init().method).toBe("POST");
+    expect(init().headers).toMatchObject({ "Idempotency-Key": "k-9" });
+    expect(JSON.parse(init().body as string)).toEqual({ issue_id: "i1", option_id: "o1", approved: false, reason: "caro" });
+  });
+});

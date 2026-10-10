@@ -55,7 +55,7 @@ describe("buildDayView", () => {
 describe("buildDayView with /outlook", () => {
   const outlook = {
     days: [
-      { date: "2026-07-19", net_sales: { low: 700, mid: 900, high: 1100 }, transactions: { mid: 118.4 }, ticket: { mid: 7.6 }, expected_waste_usd: { low: 5, mid: 8, high: 11 }, expected_lost_sales_usd: { low: 10, mid: 20, high: 30 }, weather: null },
+      { date: "2026-07-19", net_sales: { low: 700, mid: 900, high: 1100 }, transactions: { mid: 118.4 }, avg_ticket: { mid: 7.6 }, expected_waste_usd: { low: 5, mid: 8, high: 11 }, expected_lost_sales_usd: { low: 10, mid: 20, high: 30 }, weather: null },
     ],
   };
   it("prefers the outlook for Hoy and fills orders, ticket, waste and lost sales", () => {

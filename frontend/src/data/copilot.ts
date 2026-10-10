@@ -439,7 +439,7 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
 
   if (od) {
     if (od.transactions?.mid != null) view.orders.value = String(Math.round(od.transactions.mid));
-    if (od.ticket?.mid != null) view.ticket.value = usd(od.ticket.mid);
+    if (od.avg_ticket?.mid != null) view.ticket.value = usd(od.avg_ticket.mid);
     const waste: Range3 | null | undefined = od.expected_waste_usd;
     if (waste?.mid != null) view.waste = { label: "Merma esperada", value: usd(waste.mid), sub: `a costo · ${rangeText(waste.low, waste.high) ?? "Sin datos"}` };
     const lost = od.expected_lost_sales_usd;

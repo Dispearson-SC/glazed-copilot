@@ -56,9 +56,18 @@ export interface Execution {
 export type TurnStatus = "pending" | "done" | "failed" | "waiting_approval";
 
 export interface ReplyMeta {
-  source: "fast" | "agents";
+  source?: "fast" | "agents";
   template?: string;
-  elapsed_ms: number;
+  elapsed_ms?: number;
+  /** The issue context echoed by the backend. */
+  context?: { issue_id: string; option_id?: string | null; mode: "analizar" | "dialogo" };
+}
+
+/** `context` of POST /cases/{id}/messages. */
+export interface MessageContext {
+  issue_id: string;
+  option_id?: string;
+  mode: "analizar" | "dialogo";
 }
 
 export interface Turn {
@@ -70,6 +79,14 @@ export interface Turn {
   sanitized?: boolean;
   sanitized_fragments?: string[];
   reply_meta?: ReplyMeta | null;
+  /** Agents the orchestrator is consulting; present on every read of a turn. */
+  progress?: TurnProgress[];
+}
+
+export interface TurnProgress {
+  agent_id: string;
+  display_name_es: string;
+  state: "consulting" | "done";
 }
 
 export type TraceKind = "message" | "tool_call" | "tool_result" | "escalation";
@@ -127,6 +144,8 @@ export interface ForecastPoint {
   censored: boolean;
   stockout_hours?: number;
   quantiles?: Record<string, number>;
+  /** True for dates after as_of. */
+  projected?: boolean;
 }
 
 export interface ForecastMetrics {
@@ -155,6 +174,9 @@ export interface ForecastResponse {
   points: ForecastPoint[];
   metrics_to_date: ForecastMetrics;
   projected?: boolean;
+  /** Present on `?metric=` reads. */
+  metric?: string;
+  unit_label?: string;
 }
 
 // ---- Manager-day: stored conversation (GET /cases/{id}/turns) ----
@@ -258,6 +280,10 @@ export interface AlertRecord {
   as_of?: string;
   created_at?: string;
   issue_key?: string;
+  /** operacion | integridad | automatica */
+  category?: string;
+  agent_id?: string;
+  ts?: string;
   issue?: (Partial<Issue> & { options?: IssueOption[] }) | null;
 }
 
@@ -287,6 +313,11 @@ export interface InventoryItem {
   avg_daily_demand: number;
   days_of_cover: number | null;
   projected_stockout_date?: string | null;
+  status?: "critical" | "watch" | "ok";
+  status_reason?: string;
+  forecast_outflow_units?: number | null;
+  scheduled_in_units?: number | null;
+  next_delivery_date?: string | null;
 }
 
 export interface InventoryResponse {
@@ -311,15 +342,17 @@ export interface DeliveriesResponse {
   days: { date: string; projected: boolean; deliveries: DeliveryRow[] }[];
 }
 
-/** GET /cases/{id}/outlook?days=2 (approved, not deployed yet): next-days expectations. Shape as proposed by the backend owner; unverified until the route answers 200. */
+/** GET /cases/{id}/outlook?days=2: next-days expectations (verified against the live backend). */
 export interface OutlookDay {
   date: string;
   net_sales?: Range3 | null;
   transactions?: Range3 | null;
-  ticket?: Range3 | null;
+  avg_ticket?: Range3 | null;
   expected_waste_usd?: Range3 | null;
   expected_lost_sales_usd?: Range3 | null;
   weather?: null;
+  weather_note?: string;
+  projected?: boolean;
 }
 
 export interface Outlook {
@@ -354,4 +387,113 @@ export interface SupplierPerformance {
   on_time_pct: number;
   fill_pct: number;
   window_days: number;
+}
+
+// ---- Wave 14: pending decisions, analysis, atomic decision, memories, agents ----
+export interface PendingApproval {
+  issue_id: string;
+  title: string;
+  tier: string;
+  deadline: string | null;
+  impact_usd: Range3;
+  confidence: { score: number | null; calibrated: boolean };
+  problem: string;
+  recommendation: { option_id: string; label: string; action_type: string; params: Record<string, unknown> };
+  requires_approval: boolean;
+  kind?: string;
+  sku?: string | null;
+  product_name?: string | null;
+}
+
+export interface PendingTechnical {
+  /** null when the plan line has no decidable issue. */
+  issue_id: string | null;
+  option_id: string | null;
+  sku: string;
+  product_name?: string | null;
+  supplier_id?: string | null;
+  supplier_name?: string | null;
+  qty?: number | null;
+  expected_delivery?: string | null;
+  cost_usd: Range3;
+  why: string;
+  impact_chips: string[];
+  deadline: string | null;
+  confidence: number | null;
+  tier: string | null;
+  label: string;
+  warning?: string;
+  warning_codes?: string[];
+}
+
+/** GET /cases/{id}/decisions/pending */
+export interface PendingResponse {
+  as_of: string;
+  store_id: string;
+  approvals: PendingApproval[];
+  technical: PendingTechnical[];
+}
+
+/** GET /cases/{id}/issues/{issue_id}/analysis (Spanish, built by the backend). */
+export interface IssueAnalysis {
+  issue_id: string;
+  title: string;
+  tier: string;
+  deadline: string | null;
+  impact_usd: Range3;
+  confidence: { score: number | null; calibrated: boolean };
+  problem: string;
+  recommendation: { option_id: string; label: string; action_type: string; params: Record<string, unknown> };
+  pros: string[];
+  cons: string[];
+  requires_approval: boolean;
+  dialog: { why: string; if_accept: string; if_not_act: string; alternatives: { option_id: string; label: string; net_usd_mid: number | null }[] };
+}
+
+/** POST /cases/{id}/decisions */
+export interface CaseDecisionBody {
+  issue_id: string;
+  option_id: string;
+  approved: boolean;
+  reason?: string;
+}
+
+export interface CaseDecisionResult {
+  decision_id: string;
+  proposal_id: string;
+  status: string;
+  reason_category?: string;
+  idempotent_replay?: boolean;
+}
+
+/** GET /cases/{id}/memories */
+export interface MemoryRecord {
+  memory_id: string;
+  category: string;
+  text: string;
+  source: string;
+  cases_count: number;
+  verified: boolean;
+  created_at: string;
+  /** Created less than 24 hours ago. */
+  new: boolean;
+}
+
+export interface AgentStatus {
+  agent_id: string;
+  display_name_es: string;
+  status: "up" | "degraded" | "down";
+}
+
+/** GET /agents/status: every agent shares the Core state. */
+export interface AgentsStatusResponse {
+  connected: boolean;
+  agents: AgentStatus[];
+}
+
+/** GET /cases/{id}/inbox-counts */
+export interface InboxCounts {
+  approvals: number;
+  technical: number;
+  alerts: number;
 }
