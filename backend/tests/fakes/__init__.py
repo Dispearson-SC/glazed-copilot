@@ -61,6 +61,11 @@ class FakeMetrics:
     def promo_evaluation(self, store_id, as_of, promo_id):
         return {"promo_id": promo_id, "confidence": "low"}
 
+    def promo_audit(self, store_id, as_of, department, discount_pct):
+        self.calls.append(("promo_audit", store_id, as_of, department, discount_pct))
+        return {"department": department, "discount_pct": discount_pct, "verdict": "block", "recommendation": "do_nothing",
+                "similar": [{"promo_id": "PR002"}, {"promo_id": "PR005"}], "alternative": {"promo_id": "PR009"}}
+
     def history(self, store_id, as_of):
         return {"as_of": str(as_of)}
 

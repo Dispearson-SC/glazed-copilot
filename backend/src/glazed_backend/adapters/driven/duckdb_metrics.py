@@ -19,6 +19,7 @@ from ...metrics.issues import detect_issues
 from ...metrics.replay import calibrate
 from ...metrics.losses import lost_sales_window
 from ...metrics.plan import apply_min_order, plan_line
+from ...metrics.promo_audit import BASELINE, PromoRef, audit_promo, promo_issue
 from ...metrics.schedule import parse_delivery_days
 from ...metrics.snapshot import StoreSnapshot
 from ...metrics.types import Config, DayRow, Product, PurchaseOrder, StoreInfo
@@ -176,12 +177,48 @@ class DuckDBMetrics:
             ref = self._ref_date(store_id, as_of)
             self._issues[key] = detect_issues(self._snapshot(store_id, as_of), store_id, as_of, ref, self.config,
                                               self._calibration(store_id, as_of), limit=10_000)
+            self._issues[key] += self._promo_issues(store_id, as_of, ref)
+            self._issues[key].sort(key=lambda i: (-i["severity_usd"], i["issue_id"]))
             name = next((x.get("display_name") or x["name"] for x in self.stores() if x["store_id"] == store_id), store_id)
             for iss in self._issues[key]:
                 iss["store_display_name"] = name
             if len(self._issues) > 16:
                 self._issues.pop(next(iter(self._issues)))
         return self._issues[key]
+
+    def _promo_refs(self) -> list[PromoRef]:
+        if not hasattr(self, "_refs"):
+            self._refs = [PromoRef(r["promo_id"], r["promo_name"], r["department"], r["category"], float(r["discount_pct"] or 0),
+                                   r["start_date"], r["end_date"], BASELINE[r["promo_id"]][0], BASELINE[r["promo_id"]][1],
+                                   BASELINE[r["promo_id"]][2], BASELINE[r["promo_id"]][2] == "placebo")
+                          for r in self._rows("SELECT * FROM promotions ORDER BY promo_id") if r["promo_id"] in BASELINE]
+        return self._refs
+
+    def promo_audit(self, store_id: str, as_of: date, department: str, discount_pct: float) -> dict[str, Any]:
+        out = audit_promo(self._promo_refs(), department, float(discount_pct), as_of)
+        for s in out["similar"]:  # this store's own naive pre/post reading, next to the chain-wide one
+            ev = self.promo_evaluation(store_id, as_of, s["promo_id"])
+            s["store_evaluation"] = {"uplift_pct": ev.get("uplift_pct"), "caveat": ev.get("caveat"), "status": ev.get("status")}
+        return out
+
+    def _promo_issues(self, store_id: str, as_of: date, ref: date) -> list[dict[str, Any]]:
+        """Promotions running or starting within 7 days are treated as proposed templates and audited."""
+        region = (self._q("SELECT si.region FROM stores s LEFT JOIN sites si ON si.site_id=s.site_id WHERE s.store_id=?",
+                          [store_id]) or [[None]])[0][0]
+        n_stores = len(self.stores())
+        out = []
+        for r in self._promo_refs():
+            if r.placebo or r.end < as_of or r.start > as_of + timedelta(days=7):
+                continue
+            scope = self._q("SELECT region_scope FROM promotions WHERE promo_id=?", [r.promo_id])[0][0]
+            if scope and scope.upper() != "ALL" and scope != region:
+                continue
+            audit = audit_promo(self._promo_refs(), r.department, r.discount_pct, as_of)
+            if audit["verdict"] == "block":
+                out.append(promo_issue(store_id, as_of, ref, {"promo_id": r.promo_id, "name": r.name, "department": r.department,
+                                                              "discount_pct": r.discount_pct, "start": r.start.isoformat()},
+                                       audit, n_stores, self.config))
+        return out
 
     def issues(self, store_id: str, as_of: date, limit: int = 5) -> list[dict[str, Any]]:
         return copy.deepcopy(self._all_issues(store_id, as_of)[:limit])

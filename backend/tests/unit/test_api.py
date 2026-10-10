@@ -365,3 +365,14 @@ def test_advance_upgrades_a_legacy_alert_that_has_no_options(env):
     client.post(f"/api/v1/cases/{case['case_id']}/advance", json={"days": 1})
     alert = client.get("/api/v1/alerts", params={"store_id": "S030"}).json()[0]
     assert [o["option_id"] for o in alert["issue"]["options"]] == ["opt-place", "opt-none"]
+
+
+def test_internal_promo_audit_uses_the_case_store_and_date(env):
+    client, c = env
+    case = mkcase(client)
+    r = client.post("/internal/v1/promos/audit", headers={"X-Glazed-Case": case["case_id"]},
+                    json={"department": "bakery", "discount_pct": 15})
+    assert r.status_code == 200 and r.json()["verdict"] == "block"
+    assert ("promo_audit", "S030", date(2026, 3, 10), "bakery", 15.0) in c.metrics.calls
+    assert client.post("/internal/v1/promos/audit", headers={"X-Glazed-Case": case["case_id"]},
+                       json={"department": "bakery"}).status_code == 422

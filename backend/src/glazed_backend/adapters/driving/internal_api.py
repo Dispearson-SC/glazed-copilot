@@ -25,6 +25,12 @@ class ProposalBody(BaseModel):
     tier: str | None = None
 
 
+class PromoAuditBody(BaseModel):
+    """A proposed promotion template: department plus discount percentage."""
+    department: str
+    discount_pct: float
+
+
 class EventBody(BaseModel):
     """Either a trace event (from/to/kind/payload) or the Core `record_event` tool shape
     (type/date_from/date_to/note), attributed to the calling agent."""
@@ -100,6 +106,10 @@ def build_internal_router(c: Any) -> APIRouter:
     @r.get("/promos/{promo_id}/evaluation")
     def promo(case: Ctx, promo_id: str):
         return c.metrics.promo_evaluation(case.store_id, case.sim_today, promo_id)
+
+    @r.post("/promos/audit")
+    def promo_audit(case: Ctx, b: PromoAuditBody):
+        return c.metrics.promo_audit(case.store_id, case.sim_today, b.department, b.discount_pct)
 
     @r.get("/history")
     def history(case: Ctx):

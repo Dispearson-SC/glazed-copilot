@@ -175,3 +175,26 @@ def test_inflated_order_issue_has_evidence_and_deterministic_options(m):
     assert ev["waste_rate"] > 0.25 and ev["excess_over_optimum"] >= ev["case_size"] / 2
     assert i["options"][-1]["action_type"] == "do_nothing" and len(i["options"]) <= 4
     assert i == next(x for x in m.issues(S, AS_OF, limit=1000) if x["issue_id"] == i["issue_id"])
+
+
+def test_promo_audit_blocks_bakery_15_citing_pr002_and_pr005_with_pr009_as_alternative(m):
+    a = m.promo_audit(S, date(2026, 9, 1), "bakery", 15)
+    assert a["verdict"] == "block" and a["recommendation"] == "do_nothing"
+    assert {s["promo_id"] for s in a["similar"]} == {"PR002", "PR005"}
+    assert a["alternative"]["promo_id"] == "PR009" and a["noise_floor_pct"] == 10.0
+    assert all("store_evaluation" in s for s in a["similar"])
+
+
+def test_promo_audit_only_sees_promos_finished_before_as_of(m):
+    a = m.promo_audit(S, date(2025, 11, 20), "bakery", 15)  # PR002 ended 2025-11-16, PR005 has not started
+    assert [s["promo_id"] for s in a["similar"]] == ["PR002"]
+
+
+def test_upcoming_blocked_promo_raises_a_misleading_promo_issue(m):
+    # PR005 (Bakery 15%) starts 2026-02-09; PR002 (same scope, finished 2025-11-16) says it destroys margin
+    found = {i["promo_id"]: i for i in m.issues(S, date(2026, 2, 5), limit=1000) if i["kind"] == "misleading_promo"}
+    assert "PR005" in found and "PR013" not in found
+    i = found["PR005"]
+    assert i["options"][0]["action_type"] == "do_nothing" and i["recommended_option_id"] == i["options"][0]["option_id"]
+    # PR009 has not happened yet on 2026-02-05: the best known alternative is PR004 (no look-ahead)
+    assert any(o["action_type"] == "run_promo" and o["params"]["promo_ref"] == "PR004" for o in i["options"])
