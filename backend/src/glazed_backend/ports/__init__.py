@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Protocol
 
+from ..metrics.types import SkuSeries
 from ..domain import Alert, AlertState, BacktestRun, Case, Execution, Experience, Proposal, TraceEvent, TurnRecord
 
 
@@ -25,6 +26,12 @@ class MetricsPort(Protocol):
         ...
     def promo_audit(self, store_id: str, as_of: date, department: str, discount_pct: float) -> dict[str, Any]: ...
     def history(self, store_id: str, as_of: date) -> dict[str, Any]: ...
+    def demand_history(self, store_id: str, as_of: date, sku: str | None, start: date) -> list["SkuSeries"]:
+        """Daily rows of one SKU (or every SKU of the store when None) from `start` to as_of, never past it."""
+        ...
+    def flow_history(self, store_id: str, as_of: date, start: date) -> list[dict[str, Any]]:
+        """Store daily {date, transactions, footfall|None, net_sales} from `start` to as_of, never past it."""
+        ...
     def backtest_day(self, store_id: str, day: date, policy: str) -> dict[str, Any]:
         """Replay one day: {current: {waste_usd, lost_sales_usd}, policy: {...}} using only data <= day
         for decisions and the following day for outcomes."""

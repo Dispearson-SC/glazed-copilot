@@ -8,7 +8,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
-from ...application import decisions as uc_decisions, sentinel
+from ...application import decisions as uc_decisions, forecast as uc_forecast, sentinel
 from ...domain import AlertState, DomainError, NotFound
 from .store_names import StoreNames
 
@@ -234,6 +234,11 @@ def build_public_router(c: Any) -> APIRouter:
     def decisions(case_id: str, date_from: Annotated[date | None, Query(alias="from")] = None,
                   date_to: Annotated[date | None, Query(alias="to")] = None):
         return uc_decisions.ListDecisions(c.cases, c.proposals, c.executions, checker()).execute(case_id, date_from, date_to)
+
+    @r.get("/cases/{case_id}/forecast")
+    def forecast(case_id: str, sku: str | None = None, date_from: Annotated[date | None, Query(alias="from")] = None,
+                 date_to: Annotated[date | None, Query(alias="to")] = None, level: str | None = None):
+        return uc_forecast.GetForecast(c.cases, c.metrics, c.forecasters).execute(case_id, sku, date_from, date_to, level)
 
     @r.get("/cases/{case_id}/executions")
     def executions(case_id: str):

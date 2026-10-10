@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from ...application import TurnTracker
+from ..driven.forecast import BaselineForecast, WeekdayFlow
 from ..driven.memory import InMemoryTurns
 from ...domain import DomainError, FutureDate, InvalidTransition, NotFound
 from ...domain.models import CoreError
@@ -38,6 +39,8 @@ class Container:
     served: dict = field(default_factory=dict)  # (case_id, issue_id) -> issue as served, for option lookup
     warm_on_startup: bool = False  # production only: precompute recent briefings and init clients in the background
     briefings: Any = None  # BriefingService; built from the other ports when not given
+    forecasters: list = field(default_factory=lambda: [BaselineForecast()])  # ForecastPort adapters, first admissible wins
+    flow_forecaster: Any = field(default_factory=WeekdayFlow)  # FlowForecastPort
     turns: Any = field(default_factory=InMemoryTurns)  # TurnRepository: stored replies for the conversation history
 
 
@@ -114,13 +117,28 @@ def build_container(env: dict[str, str] | None = None) -> Container:
                          store.backtests, store.trace, SystemClock(),
                          BackboardMemory(key, store.assistants, display_name=StoreNames(metrics).of), "postgres",
                          "configured" if core_url else "missing", cors,
-                         float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier, warm_on_startup=True, turns=store.turns)
+                         float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier, warm_on_startup=True, turns=store.turns,
+                         forecasters=build_forecasters(env))
     classifier = build_classifier(env, None)
     return Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
                      InMemoryBacktests(), InMemoryTrace(), SystemClock(),
                      BackboardMemory(key, InMemoryAssistants(), display_name=StoreNames(metrics).of), "memory",
                      "configured" if core_url else "missing", cors,
-                         float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier, warm_on_startup=True)
+                         float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier, warm_on_startup=True,
+                         forecasters=build_forecasters(env))
+
+
+def build_forecasters(env: dict[str, str]) -> list[Any]:
+    """The Parquet forecast comes first when GLAZED_FORECAST_PATH points at an existing file; the baseline always
+    follows, so a missing file never breaks the service and cases dated before the file's origin still get a forecast."""
+    from datetime import date
+    from ..driven.forecast import FileForecast, HOLDOUT_ORIGIN
+    path = env.get("GLAZED_FORECAST_PATH", "")
+    chain: list[Any] = []
+    if path and os.path.isfile(path):
+        origin = env.get("GLAZED_FORECAST_ORIGIN")
+        chain.append(FileForecast(path, date.fromisoformat(origin) if origin else HOLDOUT_ORIGIN))
+    return chain + [BaselineForecast()]
 
 
 def build_classifier(env: dict[str, str], assistants: Any = None) -> Any:

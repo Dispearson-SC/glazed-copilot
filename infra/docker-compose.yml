@@ -51,9 +51,14 @@ services:
       GLAZED_CORS_ORIGINS: ${GLAZED_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       BACKBOARD_API_KEY: ${BACKBOARD_API_KEY:-}
       MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
+      # Holdout forecast (Parquet) produced by the separate forecast job. Absent file -> baseline forecast.
+      GLAZED_FORECAST_PATH: ${GLAZED_FORECAST_PATH:-/forecast/forecast.parquet}
     volumes:
       - ../../Dataset/clean:/data:ro
       - ../../Dataset/raw:/raw:ro
+      # GLAZED_FORECAST_DIR defaults to an empty placeholder dir so `make up` never depends on the file existing;
+      # the Makefile points it at ../Dataset/forecast/out when that directory is present.
+      - ${GLAZED_FORECAST_DIR:-./no-forecast}:/forecast:ro
     ports:
       - "${GLAZED_BACKEND_PORT:-8100}:8080"
 

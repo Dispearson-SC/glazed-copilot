@@ -3,6 +3,8 @@ PY ?= python3
 # Always an absolute --env-file: compose reads .env from infra/ otherwise and MINIMAX_API ends up empty.
 COMPOSE = docker compose -f $(CURDIR)/infra/docker-compose.yml $(if $(wildcard $(CURDIR)/.env),--env-file $(CURDIR)/.env,$(warning .env missing: secrets will be empty))
 API_URL ?= http://localhost:8100
+# Mounted read-only at /forecast in the backend when the forecast job output exists (else a placeholder dir).
+export GLAZED_FORECAST_DIR ?= $(if $(wildcard $(abspath $(CURDIR)/../Dataset/forecast/out)),$(abspath $(CURDIR)/../Dataset/forecast/out))
 
 deps:
 	cd backend && $(PY) -m pip install --target .deps -e . --no-deps && $(PY) -m pip install --target .deps duckdb fastapi uvicorn httpx "psycopg[binary]" pytest pydantic

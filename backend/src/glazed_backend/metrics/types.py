@@ -74,3 +74,12 @@ class Config:
     markdown_discount: float = 0.30
     markdown_recovery: tuple[float, float, float] = (0.25, 0.50, 0.75)  # assumed elasticity (low, mid, high)
     extra: dict = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SkuSeries:
+    """Daily history of one SKU in one store, plus what segmenting and USD conversion need."""
+    sku: str
+    price: float
+    shelf_life_days: int | None
+    rows: tuple[DayRow, ...]

@@ -273,3 +273,19 @@ def test_observed_outcome_names_realized_waste_lost_sales_and_censoring(m):
     opt = next(o for o in over["options"] if o["action_type"] in ("adjust_order_qty", "skip_order"))
     got = m.observed_outcome(S, date(2026, 3, 14), opt["action_type"], {**opt["params"], "decision_as_of": AS_OF.isoformat()})
     assert got["waste_usd"] >= 0 and got["lost_sales_usd"] >= 0 and isinstance(got["censored"], bool)
+
+
+def test_demand_history_never_returns_a_row_after_as_of_and_carries_price_and_shelf_life(m):
+    series = m.demand_history(S, AS_OF, None, AS_OF - timedelta(days=30))
+    assert len(series) > 10
+    dates = [r.date for s in series for r in s.rows]
+    assert max(dates) <= AS_OF and min(dates) >= AS_OF - timedelta(days=30)
+    assert all(s.price > 0 for s in series) and any(s.shelf_life_days is not None for s in series)
+    one = m.demand_history(S, AS_OF, series[0].sku, AS_OF - timedelta(days=5))
+    assert [s.sku for s in one] == [series[0].sku]
+
+
+def test_flow_history_has_transactions_and_never_passes_as_of(m):
+    rows = m.flow_history(S, AS_OF, AS_OF - timedelta(days=20))
+    assert 15 <= len(rows) <= 21 and max(r["date"] for r in rows) <= AS_OF
+    assert all(r["transactions"] is not None and r["net_sales"] is not None for r in rows)

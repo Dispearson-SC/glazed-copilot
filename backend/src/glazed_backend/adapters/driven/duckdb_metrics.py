@@ -30,7 +30,7 @@ from ...metrics.plan import apply_min_order, plan_line
 from ...metrics.promo_audit import BASELINE, PromoRef, audit_promo, promo_issue
 from ...metrics.schedule import next_delivery_after, parse_delivery_days
 from ...metrics.snapshot import StoreSnapshot
-from ...metrics.types import Config, DayRow, Product, PurchaseOrder, StoreInfo
+from ...metrics.types import Config, DayRow, Product, PurchaseOrder, SkuSeries, StoreInfo
 
 METHOD = "simple_v0"
 METRICS_METHOD = "glazed_metrics_v1"
@@ -504,6 +504,27 @@ class DuckDBMetrics:
         for r in rows:
             r["waste_usd"] = waste.get(r["week_start"], 0.0)
         return {"store_id": store_id, "as_of": as_of.isoformat(), "weeks": rows}
+
+    # -- Forecast inputs ---------------------------------------------------------
+    def demand_history(self, store_id: str, as_of: date, sku: str | None, start: date) -> list[SkuSeries]:
+        """Daily rows (units sold, stockout hours) per SKU from `start` to as_of; the SQL itself stops at as_of."""
+        rows = self._rows(
+            "SELECT i.sku, i.date, i.received_qty, i.units_sold, i.expired_qty, i.closing_qty, i.stockout_hours,"
+            " p.list_price_base price, p.shelf_life_days FROM inventory_daily i JOIN products p USING (sku)"
+            " WHERE i.store_id=? AND i.date BETWEEN ? AND ? AND (?::VARCHAR IS NULL OR i.sku=?)"
+            " ORDER BY i.sku, i.date", [store_id, start, as_of, sku, sku])
+        by: dict[str, tuple[float, int | None, list[DayRow]]] = {}
+        for r in rows:
+            by.setdefault(r["sku"], (float(r["price"] or 0), r["shelf_life_days"], []))[2].append(DayRow(
+                r["date"], int(r["received_qty"] or 0), int(r["units_sold"] or 0), int(r["expired_qty"] or 0),
+                int(r["closing_qty"] or 0), float(r["stockout_hours"] or 0.0)))
+        return [SkuSeries(k, price, life, tuple(rs)) for k, (price, life, rs) in by.items()]
+
+    def flow_history(self, store_id: str, as_of: date, start: date) -> list[dict[str, Any]]:
+        """Store daily transactions, footfall (null when the conversion data is not valid) and net sales to as_of."""
+        return self._rows("SELECT date, transactions, CASE WHEN conversion_valid THEN footfall END footfall, net_sales"
+                          " FROM store_daily_kpis WHERE store_id=? AND date BETWEEN ? AND ? ORDER BY date",
+                          [store_id, start, as_of])
 
     # -- Sentinel ----------------------------------------------------------------
     def observed_outcome(self, store_id: str, as_of: date, action_type: str, params: dict[str, Any]) -> dict[str, Any] | None:

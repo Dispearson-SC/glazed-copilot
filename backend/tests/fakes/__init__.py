@@ -8,6 +8,7 @@ from glazed_backend.adapters.driven.memory import (  # noqa: F401
     InMemoryAlerts, InMemoryBacktests, InMemoryCases, InMemoryExecutions, InMemoryProposals, InMemoryTrace,
 )
 from glazed_backend.domain import FutureDate
+from glazed_backend.metrics.types import DayRow, SkuSeries
 
 
 class FakeClock:
@@ -29,6 +30,23 @@ class FakeMetrics:
     def _guard(self, as_of: date, d: date) -> None:
         if d > as_of:
             raise FutureDate(f"{d} > as_of {as_of}")
+
+    series: list = []  # SkuSeries served by demand_history
+    flow: list = []  # {date, transactions, footfall, net_sales} served by flow_history
+    leak = False  # True: ignore as_of like a buggy adapter, so tests prove the service enforces no-look-ahead
+
+    def demand_history(self, store_id, as_of, sku, start):
+        self.calls.append(("demand_history", store_id, as_of, sku))
+        out = []
+        for s in self.series:
+            if sku in (None, s.sku):
+                out.append(SkuSeries(s.sku, s.price, s.shelf_life_days, tuple(
+                    r for r in s.rows if r.date >= start and (self.leak or r.date <= as_of))))
+        return out
+
+    def flow_history(self, store_id, as_of, start):
+        self.calls.append(("flow_history", store_id, as_of))
+        return [dict(r) for r in self.flow if r["date"] >= start and (self.leak or r["date"] <= as_of)]
 
     def stores(self):
         return [{"store_id": "S030", "name": "Gate Area West", "format": "Shop-in-Shop", "site_id": "ST12",
@@ -102,3 +120,13 @@ class FakeCore:
 
     def list_transcript(self, conversation_id, store_id):
         return list(self.transcript)
+
+
+def make_series(sku: str, price: float, start: date, end: date, units, shelf_life=None, stockout=lambda d: 0.0) -> SkuSeries:
+    """A SKU with one DayRow per day in [start, end]; `units(d)` is the units sold that day."""
+    from datetime import timedelta
+    rows, d = [], start
+    while d <= end:
+        rows.append(DayRow(d, 0, int(units(d)), 0, 5, float(stockout(d))))
+        d += timedelta(days=1)
+    return SkuSeries(sku, price, shelf_life, tuple(rows))
