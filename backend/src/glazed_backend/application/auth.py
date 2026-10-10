@@ -125,7 +125,7 @@ class LoginThrottle:
 class Login:
     def __init__(self, users: Any, hasher: PasswordHasher, throttle: LoginThrottle) -> None:
         self.users, self.hasher, self.throttle = users, hasher, throttle
-        self._dummy = hasher.hash("not-a-real-password")  # verified when the email is unknown, to even out timing
+        self._dummy: str | None = None  # hashed on first use; verified when the email is unknown, to even out timing
 
     def execute(self, email: str, password: str, client: str) -> User:
         key = f"{(email or '').strip().lower()}|{client}"
@@ -136,6 +136,8 @@ class Login:
             user = self.users.get_by_email(normalize_email(email))
         except DomainError:
             user = None
+        if user is None and self._dummy is None:
+            self._dummy = self.hasher.hash("not-a-real-password")
         ok = self.hasher.verify(password or "", user.password_hash if user else self._dummy)
         if not (user and ok and user.active):
             self.throttle.failure(key)
