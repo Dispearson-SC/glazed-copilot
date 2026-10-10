@@ -198,3 +198,26 @@ def test_upcoming_blocked_promo_raises_a_misleading_promo_issue(m):
     assert i["options"][0]["action_type"] == "do_nothing" and i["recommended_option_id"] == i["options"][0]["option_id"]
     # PR009 has not happened yet on 2026-02-05: the best known alternative is PR004 (no look-ahead)
     assert any(o["action_type"] == "run_promo" and o["params"]["promo_ref"] == "PR004" for o in i["options"])
+
+
+def test_school_break_ahead_raises_a_calendar_uplift_issue_with_store_department_effects(m):
+    # school break starts 2026-06-01; looking from 2026-05-29 it is inside the next 7 days
+    found = [i for i in m.issues(S, date(2026, 5, 29), limit=1000) if i["kind"] == "calendar_uplift"]
+    assert [f["event"]["type"] for f in found] == ["school_break", "holiday"]  # National Donut Day falls on 06-05
+    i = found[0]
+    assert i["issue_id"] == f"{S}|calendar_uplift|school_break-2026-06-01"
+    adj = i["options"][0]
+    assert adj["action_type"] == "adjust_order_qty" and adj["params"]["effects"]
+    assert all({"department", "effect_pct", "n", "shrunk"} <= set(e) for e in adj["params"]["effects"])
+    assert i["options"][-1]["action_type"] == "do_nothing" and i["options"][-1]["cost_usd"] > 0
+
+
+def test_no_calendar_issue_without_an_event_in_the_next_7_days(m):
+    assert not [i for i in m.issues(S, date(2026, 7, 28), limit=1000) if i["kind"] == "calendar_uplift"]
+
+
+def test_calendar_effect_uses_only_history_up_to_as_of(m):
+    a = [i for i in m.issues(S, date(2026, 5, 29), limit=1000) if i["kind"] == "calendar_uplift"][0]
+    ns = {e["department"]: e["n"] for e in a["options"][0]["params"]["effects"]}
+    cutoff = m._q("SELECT count(*) FROM calendar WHERE is_school_break AND NOT is_holiday AND date<=?", [date(2026, 5, 29)])[0][0]
+    assert ns and all(0 < n <= cutoff for n in ns.values())  # June break days are in the future: never counted

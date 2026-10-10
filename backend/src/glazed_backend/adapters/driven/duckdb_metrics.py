@@ -18,6 +18,7 @@ from ...metrics.backtest import backtest_sku
 from ...metrics.issues import detect_issues
 from ...metrics.replay import calibrate
 from ...metrics.losses import lost_sales_window
+from ...metrics.calendar_effect import calendar_issue, event_effect
 from ...metrics.plan import apply_min_order, plan_line
 from ...metrics.promo_audit import BASELINE, PromoRef, audit_promo, promo_issue
 from ...metrics.schedule import parse_delivery_days
@@ -49,6 +50,7 @@ class DuckDBMetrics:
         self._snaps: dict[tuple[str, date], StoreSnapshot] = {}
         self._calib: dict[tuple[str, date], Any] = {}
         self._issues: dict[tuple[str, date], list[dict[str, Any]]] = {}
+        self._fmt_days: dict[str, list[dict[str, Any]]] = {}
         self.config = Config()
 
     # -- helpers -----------------------------------------------------------------
@@ -177,7 +179,7 @@ class DuckDBMetrics:
             ref = self._ref_date(store_id, as_of)
             self._issues[key] = detect_issues(self._snapshot(store_id, as_of), store_id, as_of, ref, self.config,
                                               self._calibration(store_id, as_of), limit=10_000)
-            self._issues[key] += self._promo_issues(store_id, as_of, ref)
+            self._issues[key] += self._promo_issues(store_id, as_of, ref) + self._calendar_issues(store_id, as_of, ref)
             self._issues[key].sort(key=lambda i: (-i["severity_usd"], i["issue_id"]))
             name = next((x.get("display_name") or x["name"] for x in self.stores() if x["store_id"] == store_id), store_id)
             for iss in self._issues[key]:
@@ -218,6 +220,60 @@ class DuckDBMetrics:
                 out.append(promo_issue(store_id, as_of, ref, {"promo_id": r.promo_id, "name": r.name, "department": r.department,
                                                               "discount_pct": r.discount_pct, "start": r.start.isoformat()},
                                        audit, n_stores, self.config))
+        return out
+
+    def _format_days(self, store_id: str) -> tuple[list[dict[str, Any]], str]:
+        """Daily units, sales and cost per store x department for every store of this store's format (all dates;
+        callers cut at as_of). Cached per format."""
+        fmt = self._q("SELECT format FROM stores WHERE store_id=?", [store_id])[0][0]
+        if fmt not in self._fmt_days:
+            self._fmt_days[fmt] = self._rows(
+                "SELECT v.store_id, v.date, v.department, any_value(v.is_school_break) sb, any_value(v.is_holiday) hol,"
+                " sum(v.units_sold) units, sum(v.net_sales) sales, sum(v.units_sold*p.unit_cost) cost_total"
+                " FROM v_sales_enriched v JOIN products p USING (sku) WHERE v.store_id IN"
+                " (SELECT store_id FROM stores WHERE format=?) GROUP BY 1,2,3", [fmt])
+        return self._fmt_days[fmt], fmt
+
+    def _calendar_issues(self, store_id: str, as_of: date, ref: date) -> list[dict[str, Any]]:
+        ahead = self._rows("SELECT date, is_school_break sb, is_holiday hol, holiday_name FROM calendar"
+                           " WHERE date>? AND date<=? ORDER BY date", [as_of, as_of + timedelta(days=7)])
+        events = []
+        for typ, name, pick in (("school_break", "School break", lambda r: r["sb"]),
+                                ("holiday", "Holiday", lambda r: r["hol"])):
+            days = [r for r in ahead if pick(r)]
+            if days:
+                label = name if typ == "school_break" else ", ".join(sorted({r["holiday_name"] or "holiday" for r in days}))
+                events.append({"type": typ, "name": label, "days": [r["date"] for r in days]})
+        if not events:
+            return []
+        rows, _ = self._format_days(store_id)
+        rows = [r for r in rows if r["date"] <= as_of]
+        recent = {r[0]: (r[1], r[2]) for r in self._q(
+            "SELECT date, is_school_break, is_holiday FROM calendar WHERE date>? AND date<=?",
+            [as_of - timedelta(days=14), as_of])}
+        out = []
+        for ev in events:
+            idx = 0 if ev["type"] == "school_break" else 1
+            if sum(1 for v in recent.values() if v[idx]) >= 7:
+                continue  # the last 56 days of history already carry the effect: the plan reflects it
+            flag = (lambda r: r["sb"] and not r["hol"]) if ev["type"] == "school_break" else (lambda r: r["hol"])
+            ordinary = lambda r: not r["sb"] and not r["hol"]  # noqa: E731
+            deps: list[dict[str, Any]] = []
+            for dep in sorted({r["department"] for r in rows if r["store_id"] == store_id}):
+                mine = [r for r in rows if r["department"] == dep and r["store_id"] == store_id]
+                grp = [r for r in rows if r["department"] == dep]
+                eff = event_effect([r["units"] for r in mine if flag(r)], [r["units"] for r in mine if ordinary(r)],
+                                   [r["units"] for r in grp if flag(r)], [r["units"] for r in grp if ordinary(r)])
+                recent28 = [r for r in mine if as_of - timedelta(days=28) < r["date"] <= as_of]
+                units = sum(r["units"] for r in recent28)
+                if eff is None or units <= 0:
+                    continue
+                deps.append({"department": dep, "effect": eff, "units_per_day": units / 28.0,
+                             "avg_price": sum(r["sales"] for r in recent28) / units,
+                             "avg_cost": sum(r["cost_total"] for r in recent28) / units})
+            iss = calendar_issue(store_id, as_of, ref, ev, deps, self.config)
+            if iss:
+                out.append(iss)
         return out
 
     def issues(self, store_id: str, as_of: date, limit: int = 5) -> list[dict[str, Any]]:
