@@ -1,8 +1,8 @@
 import { isUnavailable, type Api } from "../api";
-import { avgTicket, clockTime, dayMonth, longDate, shiftDate, signedPct, signedUsd, usd, usdWhole, weekdayDay } from "../format";
+import { avgTicket, clockTime, dayMonth, longDate, shiftDate, shortDate, signedPct, signedUsd, usd, usdWhole, weekdayDay } from "../format";
 import type {
   AgentStatus, AlertRecord, DaySummary, DeliveriesResponse, ExpiringResponse, ForecastResponse, InventoryResponse, Issue, IssueAnalysis, OrderPlan,
-  Outlook, OutlookDay, MemoryRecord, PendingResponse, Range3, TurnProgress,
+  Outlook, OutlookDay, MemoryRecord, PendingResponse, PromoParams, Range3, Recommendation, TurnProgress,
 } from "../types";
 
 /**
@@ -102,6 +102,50 @@ export interface DecisionItem {
   isTransfer?: boolean;
   /** Product of the card (approvals): sku, else the recommendation's params.sku. */
   sku?: string;
+  /** Detail of an `activate_promo` recommendation (approvals); undefined for every other action. */
+  promo?: PromoView;
+}
+
+/** "Activar promoción" option, formatted for the cards and the analysis. */
+export interface PromoView {
+  label: string;
+  /** "Activar promoción −20% por 5 días (lun 20 jul–vie 24 jul)". */
+  primary: string;
+  /** Units at risk, avoided waste, expected lift and confidence. */
+  details: string[];
+  /** Muted line with the basis of the lift estimate; "" when absent. */
+  basis: string;
+  /** Data caveat ("promo lift estimated from history"); "" when absent. */
+  caveat: string;
+}
+
+const LIFT_CONFIDENCE_ES: Record<string, string> = { low: "baja", medium: "media", high: "alta" };
+const PROMO_LABEL = "Activar promoción";
+const isNum = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
+const isIsoDate = (d: unknown): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}/.test(d) && !Number.isNaN(Date.parse(d.slice(0, 10)));
+
+/** Formats an `activate_promo` option; null for any other action or params without the essentials. */
+export function promoView(option: { action_type?: string; params?: Record<string, unknown> | null; data_caveat?: string | null } | null | undefined): PromoView | null {
+  if (!option || option.action_type !== "activate_promo") return null;
+  const p = (option.params ?? {}) as Partial<PromoParams>;
+  if (!isNum(p.discount_pct) || !isNum(p.days)) return null;
+  const dates = isIsoDate(p.start_date) && isIsoDate(p.end_date) ? ` (${shortDate(p.start_date)}–${shortDate(p.end_date)})` : "";
+  const details: string[] = [];
+  if (isNum(p.expected_units_cleared) && isNum(p.units_at_risk)) details.push(`Vende ~${Math.round(p.expected_units_cleared)} de ${Math.round(p.units_at_risk)} unidades en riesgo`);
+  if (isNum(p.waste_avoided_usd)) details.push(`Merma evitada ${signedUsd(p.waste_avoided_usd)}`);
+  if (isNum(p.expected_lift_pct)) {
+    const [low, high] = Array.isArray(p.lift_range_pct) ? p.lift_range_pct : [];
+    const range = isNum(low) && isNum(high) ? ` (${low}–${high}%)` : "";
+    const conf = p.lift_confidence && LIFT_CONFIDENCE_ES[p.lift_confidence] ? ` · confianza ${LIFT_CONFIDENCE_ES[p.lift_confidence]}` : "";
+    details.push(`Aumento esperado ${p.expected_lift_pct}%${range}${conf}`);
+  }
+  return {
+    label: PROMO_LABEL,
+    primary: `${PROMO_LABEL} −${p.discount_pct}% por ${p.days} días${dates}`,
+    details,
+    basis: typeof p.lift_basis === "string" ? p.lift_basis : "",
+    caveat: option.data_caveat ?? "",
+  };
 }
 
 const TIER_NAMES: Record<string, string> = { N1: "Automática", N2: "Propuesta", N3: "Diálogo" };
@@ -120,6 +164,7 @@ const ACTION_ICONS: Record<string, string> = {
   skip_order: "remove_shopping_cart",
   adjust_order_qty: "tune",
   markdown_end_of_day: "sell",
+  activate_promo: "sell",
   transfer: "swap_horiz",
   transfer_stock: "swap_horiz",
 };
@@ -152,6 +197,7 @@ export function buildPendingItems(pending: PendingResponse | null, simToday: str
     kinds: (a.kinds ?? []).map((k) => kindLabelEs(k)),
     isTransfer: a.kind === "transfer_opportunity" || a.recommendation.action_type === "transfer_stock",
     sku: a.sku ?? (typeof a.recommendation.params?.sku === "string" ? a.recommendation.params.sku : undefined),
+    promo: promoView(a.recommendation) ?? undefined,
   }));
   const techs = pending.technical.map((t): DecisionItem => {
     const decidable = Boolean(t.issue_id && t.option_id);
@@ -191,6 +237,14 @@ export type AnalysisState =
   | { status: "error"; message: string }
   | { status: "ok"; data: IssueAnalysis };
 
+const promoLines = (v: PromoView): string[] => [...v.details, v.basis, ...(v.caveat ? [v.caveat] : [])];
+
+/** The recommendation label, plus the promo detail when the recommended option is a promotion. */
+function recommendationLines(r: Recommendation): string[] {
+  const promo = promoView(r);
+  return promo ? [r.label, promo.primary, ...promoLines(promo)] : [r.label];
+}
+
 const sec = (label: string, icon: string, color: string, items: string[]): AnalysisSection => {
   const clean = items.filter(Boolean);
   return { label, icon, color, items: clean.length ? clean : NONE };
@@ -201,12 +255,16 @@ export function analysisSections(mode: "analizar" | "dialogo", a: IssueAnalysis)
   if (mode === "analizar")
     return [
       sec("Problema", "report", "#7a5649", [a.problem]),
-      sec("Recomendación", "recommend", "#331b11", [a.recommendation.label]),
+      sec("Recomendación", "recommend", "#331b11", recommendationLines(a.recommendation)),
       sec("Pros", "add_circle", "#cb9564", a.pros),
       sec("Contras", "remove_circle", "#82746f", a.cons),
       ...(a.requires_approval ? [sec("Requiere tu aprobación", "how_to_reg", "#4b3025", [`${tierLabel(a.tier)}: la decisión es tuya.`])] : []),
     ];
-  const alts = a.dialog.alternatives.map((x) => (x.net_usd_mid == null ? x.label : `${x.label} (efecto neto ${usd(x.net_usd_mid)})`));
+  const alts = a.dialog.alternatives.flatMap((x) => {
+    const promo = promoView(x);
+    const name = promo ? promo.primary : x.label;
+    return [x.net_usd_mid == null ? name : `${name} (efecto neto ${usd(x.net_usd_mid)})`, ...(promo ? promoLines(promo) : [])];
+  });
   return [
     sec("Por qué", "help", "#7a5649", [a.dialog.why]),
     sec("Si aceptas", "check_circle", "#cb9564", [a.dialog.if_accept]),

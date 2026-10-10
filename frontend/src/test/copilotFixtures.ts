@@ -174,6 +174,25 @@ export const analysisApproval: IssueAnalysis = {
   },
 };
 
+// ---- activate_promo (FIXTURE: the backend is not live yet) ----
+export const promoParams = {
+  sku: "SKU-100502", discount_pct: 20, days: 5, start_date: "2026-07-20", end_date: "2026-07-24", expected_lift_pct: 35, lift_range_pct: [20, 50] as [number, number],
+  units_at_risk: 48, expected_units_cleared: 36, waste_avoided_usd: 42.5, lift_confidence: "medium" as const, promo_ids: ["P-17"], lift_basis: "Basado en 6 promociones similares de los últimos 90 días",
+};
+export const promoOption = {
+  option_id: "pr0m0a1b2c3d", label: "Activar promoción −20% en 12 Croiss-Ant Donuts", action_type: "activate_promo", params: promoParams as unknown as Record<string, unknown>,
+  data_caveat: "promo lift estimated from history", risks: ["El aumento real puede quedar por debajo del rango"],
+};
+/** The promo is the recommendation of an overstock issue. */
+export const pendingPromo: PendingResponse = { ...pendingA, technical: [], approvals: [{ ...pendingA.approvals[0], recommendation: promoOption }] };
+/** The promo is an alternative: the recommendation is the markdown. */
+export const analysisPromoAlt: IssueAnalysis = {
+  ...analysisApproval,
+  recommendation: { option_id: "m4rkd0wn", label: "Rebajar al cierre", action_type: "markdown_end_of_day", params: {} },
+  dialog: { ...analysisApproval.dialog, alternatives: [{ option_id: promoOption.option_id, label: promoOption.label, net_usd_mid: 31.2, action_type: "activate_promo", params: promoOption.params, data_caveat: promoOption.data_caveat }, { option_id: "a0f43dce40dc", label: "No hacer nada", net_usd_mid: 0 }] },
+};
+export const analysisPromoRec: IssueAnalysis = { ...analysisApproval, recommendation: promoOption };
+
 // ---- GET /cases/d17217ea4550/memories (real shapes) ----
 import type { MemoryRecord } from "../types";
 

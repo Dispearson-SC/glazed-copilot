@@ -1,4 +1,5 @@
 import type { DecisionItem } from "../../data/copilot";
+import PromoBlock from "./PromoBlock";
 
 /** "Se necesita aprobación / opinión": the only action is to analyze it with the copilot. */
 export default function ApprovalCard({ item, onAnalyze }: { item: DecisionItem; onAnalyze: (i: DecisionItem) => void }) {
@@ -22,6 +23,7 @@ export default function ApprovalCard({ item, onAnalyze }: { item: DecisionItem; 
           ))}
         </ul>
       )}
+      {item.promo && <PromoBlock promo={item.promo} />}
       {item.summary && <p className="m-0 text-[13px] leading-[19px] text-on-surface-variant">{item.summary}</p>}
       <div className="flex items-center gap-3">
         <span className="font-headline-sm text-headline-sm font-bold text-primary">{item.value || "Sin datos"}</span>
