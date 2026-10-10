@@ -125,6 +125,86 @@ describe("useChat", () => {
       await new Promise((r) => setTimeout(r, 40));
       expect(getTurn).not.toHaveBeenCalled();
     });
+
+    it("keeps the working bubble through one 500 and then shows the reply with no error", async () => {
+      const getTurn = vi
+        .fn()
+        .mockRejectedValueOnce(new ApiError(500, "boom"))
+        .mockResolvedValue({ turn_id: "t7", status: "done", reply: "Listo" });
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(result.current.messages[1]?.text).toBe("Listo"));
+      expect(result.current.messages.map((m) => m.role)).toEqual(["user", "assistant"]);
+      expect(getTurn).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries network errors (status 0) too", async () => {
+      const getTurn = vi
+        .fn()
+        .mockRejectedValueOnce(new ApiError(0, "sin red"))
+        .mockResolvedValue({ turn_id: "t7", status: "done", reply: "Listo" });
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(result.current.messages[1]?.text).toBe("Listo"));
+    });
+
+    it("resets the error counter after a successful poll", async () => {
+      const e = () => new ApiError(500, "boom");
+      const pend = { turn_id: "t7", status: "pending" as const };
+      const getTurn = vi
+        .fn()
+        .mockRejectedValueOnce(e()).mockRejectedValueOnce(e()).mockRejectedValueOnce(e()).mockRejectedValueOnce(e())
+        .mockResolvedValueOnce(pend)
+        .mockRejectedValueOnce(e()).mockRejectedValueOnce(e()).mockRejectedValueOnce(e()).mockRejectedValueOnce(e())
+        .mockResolvedValue({ turn_id: "t7", status: "done", reply: "Listo" });
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(result.current.messages[1]?.text).toBe("Listo"));
+    });
+
+    it("shows a non-retry error once repeated 500s exhaust the budget, keeping the bubble until then", async () => {
+      const getTurn = vi.fn().mockRejectedValue(new ApiError(500, "boom"));
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(result.current.messages[1]?.text).toBe("El copiloto sigue trabajando…"));
+      await waitFor(() => expect(result.current.messages[1]?.role).toBe("error"));
+      expect(result.current.messages[1]?.text).toBe("No pude confirmar el estado; vuelve a cargar");
+      expect(result.current.messages[1]?.retryText).toBeUndefined();
+      expect(getTurn).toHaveBeenCalledTimes(5);
+    });
+
+    it("fails immediately, with retry, on a non-404 4xx", async () => {
+      const getTurn = vi.fn().mockRejectedValue(new ApiError(400, "malo"));
+      const { result } = setup(fakeApi({ listTurns: vi.fn(async () => [pendingTurn]), getTurn }));
+      await waitFor(() => expect(result.current.messages[1]?.role).toBe("error"));
+      expect(result.current.messages[1]).toMatchObject({ text: "malo", retryText: "hola" });
+      expect(getTurn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("live turn polling errors", () => {
+    it("survives one 500 and shows the reply", async () => {
+      const getTurn = vi
+        .fn()
+        .mockRejectedValueOnce(new ApiError(500, "boom"))
+        .mockResolvedValue({ turn_id: "t1", status: "done", reply: "Pide 40" });
+      const { result } = setup(fakeApi({ getTurn }));
+      await act(async () => { await result.current.send("hola"); });
+      expect(result.current.messages.map((m) => m.role)).toEqual(["user", "assistant"]);
+    });
+
+    it("shows a non-retry error when repeated 500s exhaust the budget", async () => {
+      const getTurn = vi.fn().mockRejectedValue(new ApiError(500, "boom"));
+      const { result } = setup(fakeApi({ getTurn }));
+      await act(async () => { await result.current.send("hola"); });
+      expect(result.current.messages.at(-1)).toMatchObject({ role: "error", text: "No pude confirmar el estado; vuelve a cargar" });
+      expect(result.current.messages.at(-1)?.retryText).toBeUndefined();
+      expect(result.current.status).toBe("idle");
+    });
+
+    it("fails immediately on a 400", async () => {
+      const getTurn = vi.fn().mockRejectedValue(new ApiError(400, "malo"));
+      const { result } = setup(fakeApi({ getTurn }));
+      await act(async () => { await result.current.send("hola"); });
+      expect(result.current.messages.at(-1)).toMatchObject({ role: "error", text: "malo", retryText: "hola" });
+      expect(getTurn).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("tolerates a 404 right after the POST, then shows the reply", async () => {
