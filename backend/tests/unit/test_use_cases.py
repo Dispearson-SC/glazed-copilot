@@ -418,3 +418,22 @@ def test_get_turn_marks_a_sanitized_reply_in_the_payload(w):
     assert out["sanitized"] is True and out["sanitized_fragments"] == ["螃蟹贡献"]
     w.core.turns[tid] = {"turn_id": "x", "status": "finished", "text": "Todo bien"}
     assert "sanitized" not in get.execute(c.case_id, tid)
+
+
+def test_a_turn_core_never_finishes_fails_as_stale_even_after_a_backend_restart(w):
+    """The in-process tracker is lost on restart; the stored turn's ts still ages it. Past `stale_s` a turn Core
+    keeps reporting as running (e.g. its worker crashed) fails instead of showing 'still working' forever."""
+    from glazed_backend.adapters.driven.memory import InMemoryTurns
+    from glazed_backend.domain.models import TurnRecord
+
+    turns = InMemoryTurns()
+    c = start(w)
+    turns.add(TurnRecord("t1", c.case_id, c.store_id, w.clock.now(), "hola"))
+    w.core.turns["t1"] = {"turn_id": "t1", "status": "running", "text": None}
+    get = GetTurn(w.cases, w.core, TurnTracker(), w.clock, timeout_s=600, turns=turns, stale_s=1800)
+    w.clock._now += timedelta(seconds=700)
+    out = get.execute(c.case_id, "t1")
+    assert out["status"] == "pending" and out["still_running"] is True
+    w.clock._now += timedelta(seconds=1200)
+    out = get.execute(c.case_id, "t1")
+    assert out["status"] == "failed" and "stale" in out["error"]

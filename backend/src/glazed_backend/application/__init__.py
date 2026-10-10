@@ -136,12 +136,15 @@ class GetTurn:
 
     def __init__(self, cases: CaseRepository, core: CorePort, tracker: TurnTracker | None = None,
                  clock: Clock | None = None, timeout_s: float = 600.0, grace_s: float = 120.0,
-                 turns: TurnRepository | None = None) -> None:
+                 turns: TurnRepository | None = None, stale_s: float = 1800.0) -> None:
         self.cases, self.core, self.tracker, self.clock = cases, core, tracker, clock
-        self.timeout_s, self.grace_s, self.turns = timeout_s, grace_s, turns
+        self.timeout_s, self.grace_s, self.turns, self.stale_s = timeout_s, grace_s, turns, stale_s
 
     def _age(self, turn_id: str) -> float | None:
         started = self.tracker.started_at(turn_id) if self.tracker and self.clock else None
+        if started is None and self.clock is not None and self.turns is not None:
+            rec = self.turns.get(turn_id)  # the tracker is in-process: after a restart the stored ts still ages it
+            started = rec.ts if rec is not None else None
         return (self.clock.now() - started).total_seconds() if started else None
 
     def execute(self, case_id: str, turn_id: str) -> dict[str, Any]:
@@ -289,6 +292,9 @@ class GetTurn:
         if core_status in ("failed", "error"):
             return {**out, "status": "failed", "error": raw.get("error") or text or "Agent-Core reported a failed turn"}
         overdue = age is not None and age > self.timeout_s
+        if age is not None and age > self.stale_s:  # Core keeps saying running but never finishes (dead worker)
+            return {**out, "status": "failed",
+                    "error": f"stale turn: no answer from Agent-Core after {self.stale_s:g}s"}
         if overdue and core_status not in _LIVE_STATUSES:
             return {**out, "status": "failed",
                     "error": f"turn timed out after {self.timeout_s:g}s without an answer from Agent-Core"}
