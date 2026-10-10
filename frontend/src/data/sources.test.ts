@@ -11,7 +11,6 @@ describe("data sources the backend does not serve yet", () => {
     const calls = await Promise.all([
       src.fetchForecastMetric(probe, "c1", "traffic"),
       src.fetchInventoryStatus(probe, "c1"),
-      src.fetchMemories(probe, "c1"),
       src.fetchAutonomyLog(probe, "c1"),
       src.revertAutonomy(probe, "c1", "x"),
       src.fetchAgentsStatus(probe),

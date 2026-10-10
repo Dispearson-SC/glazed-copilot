@@ -376,13 +376,12 @@ describe("useChat turn progress", () => {
   const consulting = [{ agent_id: "supply", display_name_es: "Analista de abastecimiento", state: "consulting" as const }, { agent_id: "past", display_name_es: "Analista histórico", state: "done" as const }];
 
   it("exposes the agents being consulted while the turn is pending and clears them when it is done", async () => {
-    const getTurn = vi
-      .fn()
-      .mockResolvedValueOnce({ turn_id: "t1", status: "pending", progress: consulting })
-      .mockResolvedValue({ turn_id: "t1", status: "done", reply: "listo", progress: [] });
+    let finished = false;
+    const getTurn = vi.fn(async () => (finished ? { turn_id: "t1", status: "done" as const, reply: "listo", progress: [] } : { turn_id: "t1", status: "pending" as const, progress: consulting }));
     const { result } = setup(fakeApi({ getTurn }));
     await act(async () => { void result.current.send("hola"); });
     await waitFor(() => expect(result.current.progress).toEqual(consulting));
+    finished = true;
     await waitFor(() => expect(result.current.status).toBe("idle"));
     expect(result.current.progress).toEqual([]);
   });

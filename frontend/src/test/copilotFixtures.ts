@@ -173,3 +173,13 @@ export const analysisApproval: IssueAnalysis = {
     alternatives: [{ option_id: "a0f43dce40dc", label: "No hacer nada", net_usd_mid: 0 }],
   },
 };
+
+// ---- GET /cases/d17217ea4550/memories (real shapes) ----
+import type { MemoryRecord } from "../types";
+
+export const memoriesA: MemoryRecord[] = [
+  { memory_id: "rej-7d7ee16b9f3a", category: "preferencias", text: "Rechazaste omitir el pedido de 6 Bacon Donuts el 2026-07-19: «Este proveedor siempre llega tarde» (motivo: otro).", source: "rejection_reason", cases_count: 1, verified: false, created_at: "2026-10-10T11:10:18.710389+00:00", new: true },
+  { memory_id: "dec-3c379580f251", category: "proveedores", text: "Aprobaste omitir el pedido de 12 Croiss-Ant Donuts el 2026-07-19.", source: "decision_log", cases_count: 3, verified: true, created_at: "2026-10-09T09:00:00+00:00", new: false },
+  { memory_id: "bb-1", category: "demanda", text: "La dona glaseada recibe 1.9 veces lo que vende.", source: "backboard", cases_count: 1, verified: false, created_at: "2026-10-01T09:00:00+00:00", new: false },
+  { memory_id: "bb-2", category: "eventos", text: "Bloqueo del 14 de marzo: -38% de afluencia.", source: "backboard", cases_count: 1, verified: true, created_at: "2026-09-01T09:00:00+00:00", new: false },
+];

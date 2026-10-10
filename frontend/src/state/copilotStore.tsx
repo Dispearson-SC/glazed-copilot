@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
-import type { AnalysisRef, CopilotContext, DayKey, Memory, Tab } from "../data/copilot";
+import type { AnalysisRef, CopilotContext, DayKey, Tab } from "../data/copilot";
 
 export interface CopilotState {
   tab: Tab;
@@ -16,8 +16,6 @@ export interface CopilotState {
   accepted: number;
   /** Ids already decided (accepted, approved or rejected) in this session. */
   handled: string[];
-  /** Memories created by a rejection, newest first. */
-  learned: Memory[];
   analyses: AnalysisRef[];
   seq: number;
 }
@@ -33,7 +31,6 @@ export const initialCopilotState: CopilotState = {
   toast: null,
   accepted: 0,
   handled: [],
-  learned: [],
   analyses: [],
   seq: 1,
 };
@@ -49,8 +46,7 @@ export type CopilotAction =
   | { type: "closeReject" }
   | { type: "toast"; text: string | null }
   | { type: "analysis"; itemId: string; title: string; mode: AnalysisRef["mode"]; at: number; issueId?: string; optionId?: string }
-  | { type: "handled"; id: string; accepted: boolean }
-  | { type: "learned"; memory: Memory };
+  | { type: "handled"; id: string; accepted: boolean };
 
 export function copilotReducer(s: CopilotState, a: CopilotAction): CopilotState {
   switch (a.type) {
@@ -84,8 +80,6 @@ export function copilotReducer(s: CopilotState, a: CopilotAction): CopilotState 
     case "handled":
       if (s.handled.includes(a.id)) return s;
       return { ...s, handled: [...s.handled, a.id], accepted: s.accepted + (a.accepted ? 1 : 0), menuFor: null };
-    case "learned":
-      return { ...s, learned: [a.memory, ...s.learned] };
   }
 }
 

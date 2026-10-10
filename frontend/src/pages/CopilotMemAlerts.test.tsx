@@ -1,7 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { alertsA, historyA, integrityA, pendingA, suppliersA } from "../test/copilotFixtures";
+import { alertsA, integrityA, memoriesA, pendingA } from "../test/copilotFixtures";
 import { caseA, fakeApi, renderPage } from "../test/helpers";
 import CopilotPage from "./CopilotPage";
 
@@ -11,8 +11,7 @@ const api = (over = {}) =>
     listProposals: async () => [],
     getPending: async () => pendingA,
     listIssues: vi.fn(async (_c: string, q: { category?: string } = {}) => (q.category === "integrity" ? integrityA : [])),
-    getHistory: async () => historyA,
-    getSupplierPerformance: async () => suppliersA,
+    getMemories: vi.fn(async () => memoriesA),
     listAlerts: vi.fn(async () => alertsA),
     ...over,
   });
@@ -24,25 +23,26 @@ async function open(tab: RegExp, a = api()) {
 }
 
 describe("Memorias window", () => {
-  it("lists memories from the decision log and supplier performance, with the design's filters", async () => {
+  it("lists the memories served by /memories with the design's filters, and the new ones are flagged", async () => {
     await open(/^Memorias/);
     expect(await screen.findByRole("heading", { name: "Memorias técnicas" })).toBeInTheDocument();
-    expect(await screen.findByText("«Prefiero quedarme corto»")).toBeInTheDocument();
-    expect(screen.getByText(/Summit Frozen Foods: 90.1% a tiempo/)).toBeInTheDocument();
+    expect(await screen.findByText(/Aprobaste omitir el pedido de 12 Croiss-Ant Donuts/)).toBeInTheDocument();
+    expect(screen.getAllByText("Nuevo aprendizaje")).toHaveLength(1);
+    expect(screen.getByText("3 casos · verificada")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { pressed: false }).map((b) => b.textContent)).toEqual(expect.arrayContaining(["Proveedores", "Demanda", "Eventos", "Preferencias"]));
     expect(screen.getByRole("button", { name: "Todas", pressed: true })).toBeInTheDocument();
   });
 
   it("filters by category and by search text", async () => {
     await open(/^Memorias/);
-    await screen.findByText("«Prefiero quedarme corto»");
+    await screen.findByText(/Aprobaste omitir/);
     await userEvent.click(screen.getByRole("button", { name: "Proveedores" }));
-    expect(screen.queryByText("«Prefiero quedarme corto»")).toBeNull();
-    expect(screen.getByText(/Summit/)).toBeInTheDocument();
+    expect(screen.queryByText(/Bacon Donuts/)).toBeNull();
+    expect(screen.getByText(/Aprobaste omitir/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Todas" }));
-    await userEvent.type(screen.getByRole("searchbox", { name: "Buscar una memoria" }), "quedarme");
-    expect(screen.getByText("«Prefiero quedarme corto»")).toBeInTheDocument();
-    expect(screen.queryByText(/Summit/)).toBeNull();
+    await userEvent.type(screen.getByRole("searchbox", { name: "Buscar una memoria" }), "bacon");
+    expect(screen.getByText(/Bacon Donuts/)).toBeInTheDocument();
+    expect(screen.queryByText(/Aprobaste omitir/)).toBeNull();
   });
 
   it("shows an honest empty state when nothing matches", async () => {
@@ -51,19 +51,37 @@ describe("Memorias window", () => {
     expect(screen.getByText("Sin memorias que coincidan")).toBeInTheDocument();
   });
 
-  it("adds a 'Nuevo aprendizaje' memory only after a rejection was accepted by the backend", async () => {
-    const a = api();
+  it("says 'Disponible pronto' when the route answers 404 and the error otherwise", async () => {
+    const { ApiError } = await import("../api");
+    await open(/^Memorias/, api({ getMemories: async () => { throw new ApiError(404, "nf"); } }));
+    expect(await screen.findByText("Disponible pronto")).toBeInTheDocument();
+  });
+
+  it("shows the error when the route fails", async () => {
+    const { ApiError } = await import("../api");
+    await open(/^Memorias/, api({ getMemories: async () => { throw new ApiError(500, "boom"); } }));
+    expect(await screen.findByText("No se pudieron cargar las memorias.")).toBeInTheDocument();
+  });
+
+  it("badges the capsule with the memories created in the last 24 hours", async () => {
+    renderPage(api(), "/copiloto", "/copiloto", <CopilotPage />);
+    expect(await screen.findByRole("button", { name: "Memorias, 1 pendientes" })).toBeInTheDocument();
+  });
+
+  it("after a rejection it refetches /memories instead of adding a local entry", async () => {
+    const created = { ...memoriesA[0], memory_id: "rej-new", text: "Rechazaste pedir 10 unidades: «Mal momento»", new: true };
+    const getMemories = vi.fn().mockResolvedValueOnce(memoriesA.slice(1)).mockResolvedValue([created, ...memoriesA.slice(1)]);
+    const a = api({ getMemories });
     renderPage(a, "/copiloto", "/copiloto", <CopilotPage />);
     await userEvent.click(await screen.findByRole("button", { name: /^Decisiones/ }));
     const card = (await screen.findByRole("heading", { name: /Pedir 10 unidades/ })).closest("article")!;
     await userEvent.click(within(card).getByRole("button", { name: /Rechazar/ }));
     await userEvent.click(screen.getByRole("button", { name: "Mal momento" }));
     await userEvent.click(screen.getByRole("button", { name: "Enviar motivo y rechazar" }));
-    await screen.findByRole("status");
-    expect(await screen.findByRole("button", { name: "Memorias, 1 pendientes" })).toBeInTheDocument();
+    await vi.waitFor(() => expect(getMemories.mock.calls.length).toBeGreaterThan(1));
     await userEvent.click(screen.getByRole("button", { name: /^Memorias/ }));
-    expect(await screen.findByText("Nuevo aprendizaje")).toBeInTheDocument();
-    expect(screen.getByText("Motivo: Mal momento")).toBeInTheDocument();
+    expect(await screen.findByText("Rechazaste pedir 10 unidades: «Mal momento»")).toBeInTheDocument();
+    expect(screen.queryByText("Ajustará próximas propuestas")).toBeNull();
   });
 });
 

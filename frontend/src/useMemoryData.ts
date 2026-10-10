@@ -1,5 +1,6 @@
 import { useApi } from "./ApiContext";
-import type { Issue, AlertRecord, HistoryResponse, SupplierPerformance } from "./types";
+import { fetchMemories, type Source } from "./data/copilot";
+import type { Issue, AlertRecord, MemoryRecord } from "./types";
 import { usePolling } from "./usePolling";
 
 /** Open alerts of the store plus the integrity issues of the case. Kept on while the page is open so the capsule badge is right. */
@@ -21,18 +22,12 @@ export function useWarningsData(storeId: string, caseId: string, refreshKey = 0)
   return res.data;
 }
 
-/** Decision log and supplier performance for the Memorias window. A failing source is simply absent. */
-export function useMemoryData(caseId: string, enabled: boolean, refreshKey = 0) {
+export type MemoryState = "loading" | "ok" | "soon" | "error";
+
+/** Memories of the case (GET /memories). Polled while the page is open so the capsule badge counts the new ones. */
+export function useMemoryData(caseId: string, refreshKey = 0) {
   const api = useApi();
-  const res = usePolling<{ history: HistoryResponse | null; suppliers: SupplierPerformance[] | null } | null>(
-    async () => {
-      if (!caseId || !enabled) return null;
-      const [history, suppliers] = await Promise.allSettled([api.getHistory(caseId), api.getSupplierPerformance(caseId)]);
-      return { history: history.status === "fulfilled" ? history.value : null, suppliers: suppliers.status === "fulfilled" ? suppliers.value : null };
-    },
-    60_000,
-    enabled,
-    [caseId, enabled, refreshKey],
-  );
-  return { data: res.data, loading: res.loading };
+  const res = usePolling<Source<MemoryRecord[]> | null>(async () => (caseId ? await fetchMemories(api, caseId) : null), 60_000, true, [caseId, refreshKey]);
+  const state: MemoryState = res.data?.status === "ok" ? "ok" : res.data?.status === "soon" ? "soon" : res.error ? "error" : "loading";
+  return { records: res.data?.status === "ok" ? res.data.data : null, state: res.data ? state : res.error ? "error" : "loading", refresh: res.refresh };
 }

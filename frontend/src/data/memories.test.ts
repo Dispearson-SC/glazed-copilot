@@ -1,37 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { alertsA, historyA, integrityA, suppliersA } from "../test/copilotFixtures";
-import { buildMemories, buildWarnings, filterMemories, filterWarnings, type Memory } from "./copilot";
-
-const learned: Memory = { id: "l", cat: "preferencias", icon: "school", tag: "Motivo: Precio o costo", text: "Precio o costo", src: "Rechazo · hoy · X", conf: "Ajustará próximas propuestas", isNew: true };
+import { alertsA, integrityA, memoriesA } from "../test/copilotFixtures";
+import { buildMemories, buildWarnings, filterMemories, filterWarnings } from "./copilot";
 
 describe("buildMemories", () => {
-  const all = buildMemories({ history: historyA, suppliers: suppliersA, learned: [learned] });
+  const all = buildMemories(memoriesA);
 
-  it("puts new learnings first, then decisions, then supplier facts; skips pending decisions", () => {
-    expect(all[0]).toBe(learned);
-    expect(all.map((m) => m.id)).toEqual(["l", "dec-d1", "dec-d2", "dec-d3", "sup-SUP03"]);
+  it("maps the backend memories in the order served (newest first), with the design's categories", () => {
+    expect(all.map((m) => [m.id, m.cat])).toEqual([
+      ["rej-7d7ee16b9f3a", "preferencias"], ["dec-3c379580f251", "proveedores"], ["bb-1", "demanda"], ["bb-2", "eventos"],
+    ]);
   });
 
-  it("turns a rejection into a manager preference quoting the reason", () => {
-    expect(all[1]).toMatchObject({ cat: "preferencias", tag: "Motivo de rechazo", text: "«Prefiero quedarme corto»", src: "Rechazo · Omitir pedido · SKU-100473" });
+  it("flags only memories created in the last 24 hours as 'Nuevo aprendizaje'", () => {
+    expect(all.map((m) => Boolean(m.isNew))).toEqual([true, false, false, false]);
   });
 
-  it("turns approvals into demand or event memories by issue kind", () => {
-    expect(all[2]).toMatchObject({ cat: "demanda", tag: "Decisión aprobada", text: "Aprobaste: Omitir pedido de SKU-100502." });
-    expect(all[3]).toMatchObject({ cat: "eventos" });
-  });
-
-  it("states supplier performance with backend numbers only", () => {
-    expect(all[4]).toMatchObject({
-      cat: "proveedores", tag: "Proveedor", text: "Summit Frozen Foods: 90.1% a tiempo, entrega real de 2.17 días y surte el 99.9%.",
-      src: "Desempeño de proveedores · 180 días", conf: "667 pedidos",
-    });
+  it("writes source, case count and verification from backend fields", () => {
+    expect(all[0]).toMatchObject({ tag: "Preferencia del gerente", icon: "person", src: "Motivo de rechazo · 10/10", conf: "1 caso · sin verificar" });
+    expect(all[1]).toMatchObject({ tag: "Proveedor", icon: "local_shipping", src: "Registro de decisiones · 09/10", conf: "3 casos · verificada" });
+    expect(all[2].src).toBe("Experiencia de la sucursal · 01/10");
+    expect(all[3]).toMatchObject({ tag: "Evento", conf: "1 caso · verificada" });
   });
 
   it("filters by category and by search text", () => {
-    expect(filterMemories(all, "proveedores", "").map((m) => m.id)).toEqual(["sup-SUP03"]);
-    expect(filterMemories(all, "todas", "summit").map((m) => m.id)).toEqual(["sup-SUP03"]);
-    expect(filterMemories(all, "todas", "  ")).toHaveLength(5);
+    expect(filterMemories(all, "proveedores", "").map((m) => m.id)).toEqual(["dec-3c379580f251"]);
+    expect(filterMemories(all, "todas", "bacon").map((m) => m.id)).toEqual(["rej-7d7ee16b9f3a"]);
+    expect(filterMemories(all, "todas", "  ")).toHaveLength(4);
   });
 });
 

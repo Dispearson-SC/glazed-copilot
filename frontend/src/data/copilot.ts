@@ -2,7 +2,7 @@ import { isUnavailable, type Api } from "../api";
 import { avgTicket, dayMonth, longDate, shiftDate, signedPct, usd, usdWhole, weekdayDay } from "../format";
 import type {
   AlertRecord, DaySummary, DeliveriesResponse, ExpiringResponse, ForecastResponse, InventoryResponse, Issue, IssueAnalysis, Kpis, OrderPlan,
-  DecisionLogEntry, HistoryResponse, Outlook, OutlookDay, PendingResponse, Range3, SupplierPerformance, TurnProgress,
+  Outlook, OutlookDay, MemoryRecord, PendingResponse, Range3, TurnProgress,
 } from "../types";
 
 /**
@@ -57,8 +57,6 @@ export const SOON_TEXT = "Disponible pronto";
 export const fetchForecastMetric = async (_api: Api, _caseId: string, _metric: string): Promise<Source<never>> => SOON;
 /** /inventory status fields: critical / follow-up / ok (pending). */
 export const fetchInventoryStatus = async (_api: Api, _caseId: string): Promise<Source<never>> => SOON;
-/** GET /cases/{id}/memories (pending). */
-export const fetchMemories = async (_api: Api, _caseId: string): Promise<Source<never>> => SOON;
 /** GET /cases/{id}/autonomy/log (pending). */
 export const fetchAutonomyLog = async (_api: Api, _caseId: string): Promise<Source<never>> => SOON;
 /** POST /cases/{id}/autonomy/{action_id}/revert (pending). */
@@ -407,51 +405,44 @@ export function buildScheduled(d: DeliveriesResponse | null, limit = 4): Schedul
 }
 
 // ---------------------------------------------------------------------------------------------
-// Memorias: decision_log (GET /history) + supplier performance + rejections learned in this session.
-// GET /cases/{id}/memories (pending) will replace all of it behind `fetchMemories`.
+// Memorias: GET /cases/{id}/memories (decision log, rejection reasons and the store's experiences, newest first).
 // ---------------------------------------------------------------------------------------------
-const ACTION_LABELS: Record<string, string> = {
-  place_order: "Compra",
-  skip_order: "Omitir pedido",
-  adjust_order_qty: "Ajustar pedido",
-  markdown_end_of_day: "Descuento al cierre",
-  transfer: "Transferencia",
+const MEMORY_META: Record<string, { icon: string; tag: string }> = {
+  proveedores: { icon: "local_shipping", tag: "Proveedor" },
+  demanda: { icon: "bakery_dining", tag: "Demanda" },
+  eventos: { icon: "celebration", tag: "Evento" },
+  preferencias: { icon: "person", tag: "Preferencia del gerente" },
 };
-const actionLabel = (a: string): string => ACTION_LABELS[a] ?? a;
-const skuOf = (d: DecisionLogEntry): string => d.sku || d.issue_id.split("|")[2] || d.issue_id;
+const MEMORY_SOURCES: Record<string, string> = {
+  decision_log: "Registro de decisiones",
+  rejection_reason: "Motivo de rechazo",
+  backboard: "Experiencia de la sucursal",
+};
 
-function decisionMemory(d: DecisionLogEntry): Memory | null {
-  const date = dayMonth(d.created_at);
-  if (d.status === "rejected") {
+export function buildMemories(records: readonly MemoryRecord[] | null): Memory[] {
+  return (records ?? []).map((r): Memory => {
+    const meta = MEMORY_META[r.category] ?? { icon: "psychology", tag: r.category };
     return {
-      id: `dec-${d.decision_id}`, cat: "preferencias", icon: "person", tag: "Motivo de rechazo",
-      text: d.reason ? `«${d.reason}»` : "Rechazada sin motivo", src: `Rechazo · ${actionLabel(d.action_type)} · ${skuOf(d)}`, conf: date,
+      id: r.memory_id,
+      cat: r.category as MemoryCategory,
+      icon: meta.icon,
+      tag: meta.tag,
+      text: r.text,
+      src: `${MEMORY_SOURCES[r.source] ?? r.source} · ${dayMonth(r.created_at)}`,
+      conf: `${r.cases_count} ${r.cases_count === 1 ? "caso" : "casos"} · ${r.verified ? "verificada" : "sin verificar"}`,
+      ...(r.new ? { isNew: true } : {}),
     };
-  }
-  if (d.status === "approved") {
-    return {
-      id: `dec-${d.decision_id}`, cat: d.kind === "calendar_uplift" ? "eventos" : "demanda", icon: d.kind === "calendar_uplift" ? "celebration" : "bakery_dining",
-      tag: "Decisión aprobada", text: `Aprobaste: ${actionLabel(d.action_type)} de ${skuOf(d)}.`, src: `Registro de decisiones · ${d.tier ?? ""}`.trim(), conf: date,
-    };
-  }
-  return null;
+  });
 }
 
-function supplierMemory(s: SupplierPerformance): Memory {
-  return {
-    id: `sup-${s.supplier_id}`, cat: "proveedores", icon: "local_shipping", tag: "Proveedor",
-    text: `${s.supplier_name}: ${s.on_time_pct}% a tiempo, entrega real de ${s.lead_time_mean_days} días y surte el ${s.fill_pct}%.`,
-    src: `Desempeño de proveedores · ${s.window_days} días`, conf: `${s.received_pos} pedidos`,
-  };
-}
-
-export function buildMemories(input: { history: HistoryResponse | null; suppliers: SupplierPerformance[] | null; learned: Memory[] }): Memory[] {
-  const decisions = [...(input.history?.decision_log ?? [])]
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .map(decisionMemory)
-    .filter((m): m is Memory => m !== null)
-    .slice(0, 30);
-  return [...input.learned, ...decisions, ...(input.suppliers ?? []).map(supplierMemory)];
+/** GET /cases/{id}/memories. 404/501 mean "not deployed": the UI says "Disponible pronto". */
+export async function fetchMemories(api: Api, caseId: string): Promise<Source<MemoryRecord[]>> {
+  try {
+    return { status: "ok", data: await api.getMemories(caseId) };
+  } catch (e) {
+    if (isUnavailable(e)) return SOON;
+    throw e;
+  }
 }
 
 export function filterMemories(list: Memory[], cat: string, query: string): Memory[] {

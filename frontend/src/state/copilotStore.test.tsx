@@ -1,13 +1,10 @@
 import { act, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Memory } from "../data/copilot";
 import { CopilotProvider, copilotReducer, initialCopilotState, useCopilot } from "./copilotStore";
-
-const learned: Memory = { id: "l1", cat: "preferencias", icon: "school", tag: "Motivo: Precio o costo", text: "Precio o costo", src: "Rechazo · hoy · Pedido", conf: "Ajustará próximas propuestas", isNew: true };
 
 describe("copilotReducer", () => {
   it("starts on the Agente window with no context, menu, sheet or toast", () => {
-    expect(initialCopilotState).toMatchObject({ tab: "agente", day: "hoy", memFilter: "todas", alertFilter: "todas", ctx: null, menuFor: null, rejectFor: null, toast: null, accepted: 0, handled: [], learned: [], analyses: [] });
+    expect(initialCopilotState).toMatchObject({ tab: "agente", day: "hoy", memFilter: "todas", alertFilter: "todas", ctx: null, menuFor: null, rejectFor: null, toast: null, accepted: 0, handled: [], analyses: [] });
   });
 
   it("changes window and closes the open menu", () => {
@@ -44,11 +41,6 @@ describe("copilotReducer", () => {
     const b = copilotReducer(a, { type: "handled", id: "a1", accepted: false });
     expect(b).toMatchObject({ handled: ["t1", "a1"], accepted: 1 });
     expect(copilotReducer(b, { type: "handled", id: "a1", accepted: false }).handled).toEqual(["t1", "a1"]);
-  });
-
-  it("prepends learned memories", () => {
-    const s = copilotReducer(initialCopilotState, { type: "learned", memory: learned });
-    expect(s.learned).toEqual([learned]);
   });
 
   it("clears the pinned context", () => {

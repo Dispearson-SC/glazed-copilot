@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { filterMemories, type Memory } from "../../data/copilot";
+import { filterMemories, SOON_TEXT, type Memory } from "../../data/copilot";
+import type { MemoryState } from "../../useMemoryData";
 
 export const MEMORY_FILTERS = [
   ["todas", "Todas"],
@@ -32,12 +33,12 @@ export default function MemoriesWindow({
   memories,
   filter,
   onFilter,
-  loading,
+  state,
 }: {
   memories: Memory[];
   filter: string;
   onFilter: (f: string) => void;
-  loading: boolean;
+  state: MemoryState;
 }) {
   const [query, setQuery] = useState("");
   const shown = filterMemories(memories, filter, query);
@@ -71,7 +72,7 @@ export default function MemoriesWindow({
             </div>
           </article>
         ))}
-        {shown.length === 0 && <p className="m-0 py-6 text-center text-[13px] text-on-surface-variant">{loading ? "Cargando memorias…" : "Sin memorias que coincidan"}</p>}
+        {shown.length === 0 && <p className="m-0 py-6 text-center text-[13px] text-on-surface-variant">{state === "loading" ? "Cargando memorias…" : state === "soon" ? SOON_TEXT : state === "error" ? "No se pudieron cargar las memorias." : "Sin memorias que coincidan"}</p>}
       </div>
       <p className="m-0 text-[12px] leading-[18px] text-on-surface-variant">Las memorias se escriben solo después de una decisión o de un resultado medido. Con un solo caso, el copiloto lo dice y la confianza queda baja.</p>
     </main>

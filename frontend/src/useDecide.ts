@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useApi } from "./ApiContext";
 import { ApiError } from "./api";
-import type { DecisionItem, Memory } from "./data/copilot";
+import type { DecisionItem } from "./data/copilot";
 import { useCopilot } from "./state/copilotStore";
 
 export interface Rejection {
@@ -15,7 +15,7 @@ const isDefinitive = (e: unknown): boolean => e instanceof ApiError && e.status 
 
 /**
  * Atomic decision on the real backend: POST /cases/{id}/decisions (proposal and decision in one call).
- * Local state (card removed, toast, learned memory) changes only after the backend accepted the decision.
+ * Local state (card removed, toast) changes only after the backend accepted the decision.
  */
 export function useDecide(caseId: string, refresh: () => Promise<void> | void) {
   const api = useApi();
@@ -55,18 +55,7 @@ export function useDecide(caseId: string, refresh: () => Promise<void> | void) {
       if (approved) {
         showToast(`${item.kind === "approval" ? "Aprobada" : "Aceptada"}: ${item.title}. Quedó registrada.`);
       } else {
-        const memory: Memory = {
-          id: `learned-${item.id}`,
-          cat: "preferencias",
-          icon: "school",
-          tag: `Motivo: ${label}`,
-          text: rejection?.text.trim() ? `«${rejection.text.trim()}»` : label,
-          src: `Rechazo · hoy · ${item.title}`,
-          conf: "Ajustará próximas propuestas",
-          isNew: true,
-        };
-        dispatch({ type: "learned", memory });
-        showToast(`Motivo registrado como «${label}». El copiloto aprenderá de esto.`);
+        showToast(`Motivo registrado como «${label}». El copiloto aprenderá de esto.`); // the backend creates the memory; the page refetches /memories
       }
       void refresh();
       return true;
