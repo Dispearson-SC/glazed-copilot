@@ -13,8 +13,14 @@ from typing import Any
 import duckdb
 
 from ...domain import FutureDate, NotFound
+from ...metrics.plan import apply_min_order, plan_line
+from ...metrics.schedule import parse_delivery_days
+from ...metrics.snapshot import StoreSnapshot
+from ...metrics.types import Config, DayRow, Product, PurchaseOrder, StoreInfo
 
 METHOD = "simple_v0"
+METRICS_METHOD = "glazed_metrics_v1"
+SNAPSHOT_DAYS = 120
 _DOW = {"Daily": {1, 2, 3, 4, 5, 6, 7}, "Mon": {1}, "Tue": {2}, "Wed": {3}, "Thu": {4}, "Fri": {5},
         "Sat": {6}, "Sun": {7}}
 
@@ -34,6 +40,8 @@ class DuckDBMetrics:
     def __init__(self, path: str) -> None:
         self._con = duckdb.connect(path, read_only=True)
         self._lock = threading.Lock()
+        self._snaps: dict[tuple[str, date], StoreSnapshot] = {}
+        self.config = Config()
 
     # -- helpers -----------------------------------------------------------------
     def _q(self, sql: str, params: list[Any] | None = None) -> list[tuple]:
@@ -218,38 +226,79 @@ class DuckDBMetrics:
                 "days_of_cover": _f(closing / overall) if overall else None, "daily": daily,
                 "projected_stockout_date": stockout}
 
-    # -- Order plan --------------------------------------------------------------
-    def order_plan(self, store_id: str, as_of: date) -> dict[str, Any]:
+    # -- Snapshot (the only place that reads inputs for glazed_metrics) ----------
+    def _snapshot(self, store_id: str, as_of: date) -> StoreSnapshot:
+        key = (store_id, as_of)
+        if key in self._snaps:
+            return self._snaps[key]
         ref = self._ref_date(store_id, as_of)
-        rows = self._rows(
-            "SELECT i.sku, p.product_name, p.supplier_id, p.case_size, p.unit_cost, s.delivery_days,"
-            " i.closing_qty, coalesce(t.qty,0) transit"
-            " FROM inventory_daily i JOIN products p USING (sku) LEFT JOIN suppliers s USING (supplier_id)"
-            " LEFT JOIN (SELECT sku, sum(qty_ordered) qty FROM purchase_orders WHERE store_id=? AND order_date<=?"
-            "   AND (received_date IS NULL OR received_date>?) GROUP BY sku) t USING (sku)"
-            " WHERE i.store_id=? AND i.date=? AND p.status IS DISTINCT FROM 'Discontinued'",
-            [store_id, as_of, as_of, store_id, ref])
-        p74 = {(r[0], int(r[1])): float(r[2]) for r in self._q(
-            "SELECT sku, isodow(date), quantile_cont(units_sold, 0.74) FROM inventory_daily"
-            " WHERE store_id=? AND date<=? AND date>? GROUP BY 1,2", [store_id, ref, ref - timedelta(days=56)])}
+        start = ref - timedelta(days=SNAPSHOT_DAYS)
+        inv = self._rows("SELECT sku, date, received_qty, units_sold, expired_qty, closing_qty, stockout_hours"
+                         " FROM inventory_daily WHERE store_id=? AND date>? AND date<=? ORDER BY sku, date",
+                         [store_id, start, ref])
+        rows: dict[str, list[DayRow]] = {}
+        for r in inv:
+            rows.setdefault(r["sku"], []).append(DayRow(
+                r["date"], int(r["received_qty"] or 0), int(r["units_sold"] or 0), int(r["expired_qty"] or 0),
+                int(r["closing_qty"] or 0), float(r["stockout_hours"] or 0.0)))
+        prods = {r["sku"]: Product(r["sku"], r["product_name"], r["supplier_id"], float(r["list_price_base"] or 0),
+                                   float(r["unit_cost"] or 0), int(r["case_size"] or 1), r["shelf_life_days"])
+                 for r in self._rows("SELECT * FROM products WHERE sku IN (SELECT DISTINCT sku FROM inventory_daily"
+                                     " WHERE store_id=?) AND status IS DISTINCT FROM 'Discontinued'", [store_id])}
+        pos = [PurchaseOrder(r["po_id"], r["sku"], r["order_date"], r["expected_date"],
+                             r["received_date"] if r["received_date"] and r["received_date"] <= as_of else None,
+                             int(r["qty_ordered"] or 0), r["qty_received"])
+               for r in self._rows("SELECT po_id, sku, order_date, expected_date, received_date, qty_ordered, qty_received"
+                                   " FROM purchase_orders WHERE store_id=? AND order_date<=? AND order_date>?"
+                                   " ORDER BY order_date, po_id", [store_id, as_of, ref - timedelta(days=200)])]
+        sups = self._rows("SELECT supplier_id, supplier_name, standard_lead_time_days, min_order_value, delivery_days"
+                          " FROM suppliers")
+        oh = self._q("SELECT coalesce(typical_open_hours, 12) FROM stores WHERE store_id=?", [store_id])
+        closed = frozenset(r[0] for r in self._q(
+            "SELECT date FROM store_calendar WHERE store_id=? AND status<>'open' AND date>? AND date<=?",
+            [store_id, start, as_of]))
+        snap = StoreSnapshot(
+            StoreInfo(float(oh[0][0]) if oh else 12.0, closed), prods, rows, pos,
+            {s["supplier_id"]: (parse_delivery_days(s["delivery_days"]), int(s["standard_lead_time_days"] or 1),
+                                float(s["min_order_value"] or 0)) for s in sups},
+            {s["supplier_id"]: s["supplier_name"] for s in sups})
+        if len(self._snaps) >= 16:
+            self._snaps.pop(next(iter(self._snaps)))
+        self._snaps[key] = snap
+        return snap
+
+    # -- Order plan --------------------------------------------------------------
+    def _plan_lines(self, snap: StoreSnapshot, store_id: str, as_of: date) -> list[dict[str, Any]]:
+        ref = self._ref_date(store_id, as_of)
         lines = []
-        for r in rows:
-            days = _delivery_days(r["delivery_days"])
-            nxt = next((k for k in range(1, 8) if (ref + timedelta(days=k)).isoweekday() in days), 1)
-            need = sum(p74.get((r["sku"], (ref + timedelta(days=k)).isoweekday()), 0.0) for k in range(1, nxt + 1))
-            usable = (r["closing_qty"] or 0) + r["transit"]
-            short = need - usable
-            if short <= 0:
+        for sku in snap.products:
+            state = snap.state_at(sku, ref)
+            if state is None:
                 continue
-            cs = r["case_size"] or 1
-            qty = int(math.ceil(short / cs) * cs)
-            lines.append({"sku": r["sku"], "product_name": r["product_name"], "supplier_id": r["supplier_id"],
-                          "qty_units": qty, "case_size": cs, "cases": qty // cs, "est_cost_usd": _f(qty * (r["unit_cost"] or 0)),
-                          "days_to_next_delivery": nxt, "usable_stock": usable, "demand_p74": _f(need)})
-        lines.sort(key=lambda l: -l["est_cost_usd"])
-        return {"store_id": store_id, "as_of": as_of.isoformat(), "method": METHOD,
-                "note": "Placeholder plan (p74 same-weekday demand x days to next delivery - usable stock). "
-                        "glazed_metrics will replace it.", "lines": lines[:50], "total_lines": len(lines)}
+            rec, sold = snap.window_totals(sku, ref)
+            ln = plan_line(state, self.config, snap.typical_order_qty(sku, ref), rec, sold)
+            if ln:
+                ln["supplier_name"] = snap.supplier_names.get(ln["supplier_id"])
+                lines.append(ln)
+        apply_min_order(lines, {k: v[2] for k, v in snap.suppliers.items()})
+        lines.sort(key=lambda l: (-l["stockout_risk_without_order"], -l["est_cost_usd"], l["sku"]))
+        return lines
+
+    def order_plan(self, store_id: str, as_of: date) -> dict[str, Any]:
+        snap = self._snapshot(store_id, as_of)
+        lines = self._plan_lines(snap, store_id, as_of)
+        totals: dict[str, float] = {}
+        for ln in lines:
+            totals[ln["supplier_id"]] = totals.get(ln["supplier_id"], 0.0) + ln["est_cost_usd"]
+        return {"store_id": store_id, "as_of": as_of.isoformat(), "method": METRICS_METHOD,
+                "note": "Newsvendor (1-day), order-up-to (2-14 days) and (s,S) (non-perishables) with a per-SKU "
+                        "service level Cu/(Cu+Co). Estimates, not guarantees.",
+                "suppliers": [{"supplier_id": k, "supplier_name": snap.supplier_names.get(k),
+                               "order_value_usd": round(v, 2), "min_order_value": snap.suppliers.get(k, (0, 0, 0.0))[2]}
+                              for k, v in sorted(totals.items())],
+                "lines": lines[:50], "total_lines": len(lines),
+                "data_caveats": ["Salvage value 0 (no markdown history).",
+                                 "Delivery days follow suppliers.delivery_days; closures are known only up to as_of."]}
 
     # -- Suppliers ---------------------------------------------------------------
     def supplier_performance(self, store_id: str, as_of: date) -> list[dict[str, Any]]:

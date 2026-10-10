@@ -55,11 +55,22 @@ def test_inventory_projection(m):
     assert len(p["daily"]) == 7 and "projected_stockout_date" in p and p["method"] == "simple_v0"
 
 
-def test_order_plan_is_marked_simple(m):
+def test_order_plan_lines_carry_the_reorder_contract(m):
     plan = m.order_plan(S, AS_OF)
-    assert plan["method"] == "simple_v0" and "glazed_metrics" in plan["note"]
+    assert plan["method"] == "glazed_metrics_v1" and plan["as_of"] == "2026-03-10" and plan["lines"]
     for line in plan["lines"]:
-        assert line["qty_units"] % line["case_size"] == 0 and line["qty_units"] > 0
+        assert line["qty"] % line["case_size"] == 0 and line["qty"] > 0 and line["cases"] * line["case_size"] == line["qty"]
+        assert 0 < line["service_level_target"] < 1 and line["method"] in {"newsvendor", "order_up_to", "sS"}
+        assert line["qty_range"]["low"] <= line["qty_range"]["high"] and line["supplier_name"]
+        assert {"projected_stockout_date", "order_deadline", "stockout_risk_without_order", "vs_current_practice",
+                "min_order_warning", "expected_waste_usd", "expected_lost_sales_usd"} <= line.keys()
+
+
+def test_snapshot_never_contains_information_after_as_of(m):
+    snap = m._snapshot(S, AS_OF)
+    assert all(r.date <= AS_OF for rows in snap.rows.values() for r in rows)
+    assert all(p.order_date <= AS_OF and (p.received_date is None or p.received_date <= AS_OF) for p in snap.pos)
+    assert all(d <= AS_OF for d in snap.store.closed_dates)
 
 
 def test_supplier_performance_uses_only_received_by_as_of(m):
