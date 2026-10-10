@@ -1,12 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { dateLabel } from "../../format";
+import { useSession } from "../../SessionContext";
+import { useCopilot } from "../../state/copilotStore";
 import { useConversations } from "../../useConversations";
+import { useCurrentCase } from "../../useCurrentCase";
 
 const pill =
-  "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-full border border-partition/60 bg-white px-4 font-label-md text-label-md font-semibold normal-case tracking-normal text-secondary shadow-card disabled:opacity-40";
+  "-mt-2 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-partition/60 bg-white p-0 text-secondary shadow-card disabled:opacity-40";
 
-/** Agente window: start a new conversation or reopen an earlier one (a conversation is a case of the same store and sim date). */
-export default function ConversationBar({ storeId, simToday, caseId }: { storeId: string; simToday: string; caseId: string }) {
+/** Fixed top row: new conversation (left), the day switcher (children, centre) and earlier conversations (right). Both actions switch to the Agente tab first. */
+export default function ConversationBar({ storeId, children, className = "" }: { storeId: string; children: ReactNode; className?: string }) {
+  const session = useSession();
+  const { dispatch } = useCopilot();
+  const { currentCase } = useCurrentCase(storeId, session.refreshKey);
+  const caseId = currentCase?.case_id ?? "";
+  const simToday = currentCase?.sim_today ?? "";
   const [open, setOpen] = useState(false);
   const { conversations, previews, busy, error, startNew, select } = useConversations(storeId, simToday, caseId, open);
 
@@ -17,20 +25,37 @@ export default function ConversationBar({ storeId, simToday, caseId }: { storeId
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  if (!caseId) return null;
   return (
     <>
-      <div className="mb-3 flex flex-wrap justify-center gap-2">
-        <button type="button" disabled={busy} onClick={() => void startNew()} className={pill}>
-          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">add_comment</span>
-          Nueva conversación
+      <div className={`mx-auto flex max-w-[640px] items-start justify-center gap-2 px-4 ${className}`}>
+        <button
+          type="button"
+          aria-label="Nueva conversación"
+          disabled={busy || !caseId}
+          onClick={() => {
+            dispatch({ type: "tab", tab: "agente" });
+            void startNew();
+          }}
+          className={pill}
+        >
+          <span aria-hidden="true" className="material-symbols-outlined text-[22px]">add_comment</span>
         </button>
-        <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className={pill}>
-          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">history</span>
-          Conversaciones anteriores
+        {children}
+        <button
+          type="button"
+          aria-label="Conversaciones anteriores"
+          aria-haspopup="dialog"
+          disabled={!caseId}
+          onClick={() => {
+            dispatch({ type: "tab", tab: "agente" });
+            setOpen(true);
+          }}
+          className={pill}
+        >
+          <span aria-hidden="true" className="material-symbols-outlined text-[22px]">history</span>
         </button>
       </div>
-      {error && <p role="alert" className="m-0 mb-3 text-center font-label-sm text-label-sm text-on-error-container">{error}</p>}
+      {error && <p role="alert" className="m-0 text-center font-label-sm text-label-sm text-on-error-container">{error}</p>}
       {open && (
         <div className="fixed inset-0 z-[60]">
           <div data-testid="conversations-backdrop" className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />

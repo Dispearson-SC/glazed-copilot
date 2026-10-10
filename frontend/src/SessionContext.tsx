@@ -4,8 +4,10 @@ interface Session {
   /** Store chosen by the user in the Home selector ("" = none yet). */
   storeId: string;
   setStoreId: (id: string) => void;
-  /** Case chosen in the login picker ("" = the store's default live case). */
+  /** Case chosen in the session for the current store ("" = the store's remembered or default live case). */
   caseId: string;
+  /** Session choices by store id: a case chosen in one store never applies to another. */
+  caseIds: Record<string, string>;
   /** `forStoreId` is the store the case belongs to (the session store may still be unset on first load). */
   setCaseId: (id: string, forStoreId?: string) => void;
   /** Bumped after the simulated clock advances so pages refetch. */
@@ -51,7 +53,7 @@ function writeStoredCase(storeId: string, id: string) {
   }
 }
 
-const Ctx = createContext<Session>({ storeId: "", setStoreId: () => {}, caseId: "", setCaseId: () => {}, refreshKey: 0, bump: () => {} });
+const Ctx = createContext<Session>({ storeId: "", setStoreId: () => {}, caseId: "", setCaseId: () => {}, caseIds: {}, refreshKey: 0, bump: () => {} });
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [storeId, setStoreIdState] = useState(readStoredStore);
@@ -61,14 +63,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
   const storeRef = useRef(storeId);
   storeRef.current = storeId;
-  const [caseId, setCaseIdState] = useState("");
+  const [caseIds, setCaseIds] = useState<Record<string, string>>({});
   const setCaseId = useCallback((id: string, forStoreId?: string) => {
-    writeStoredCase(forStoreId ?? storeRef.current, id);
-    setCaseIdState(id);
+    const target = forStoreId ?? storeRef.current;
+    writeStoredCase(target, id);
+    setCaseIds((m) => ({ ...m, [target]: id }));
   }, []);
+  const caseId = caseIds[storeId] ?? "";
   const [refreshKey, setKey] = useState(0);
   const bump = useCallback(() => setKey((k) => k + 1), []);
-  const value = useMemo(() => ({ storeId, setStoreId, caseId, setCaseId, refreshKey, bump }), [storeId, setStoreId, caseId, setCaseId, refreshKey, bump]);
+  const value = useMemo(() => ({ storeId, setStoreId, caseId, caseIds, setCaseId, refreshKey, bump }), [storeId, setStoreId, caseId, caseIds, setCaseId, refreshKey, bump]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

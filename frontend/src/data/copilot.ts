@@ -1,5 +1,5 @@
 import { isUnavailable, type Api } from "../api";
-import { avgTicket, clockTime, dayMonth, longDate, shiftDate, signedPct, usd, usdWhole, weekdayDay } from "../format";
+import { avgTicket, clockTime, dayMonth, longDate, shiftDate, signedPct, signedUsd, usd, usdWhole, weekdayDay } from "../format";
 import type {
   AgentStatus, AlertRecord, DaySummary, DeliveriesResponse, ExpiringResponse, ForecastResponse, InventoryResponse, Issue, IssueAnalysis, OrderPlan,
   Outlook, OutlookDay, MemoryRecord, PendingResponse, Range3, TurnProgress,
@@ -82,7 +82,7 @@ export interface DecisionItem {
   level: string;
   title: string;
   summary: string;
-  /** Expected benefit range, e.g. "+$38.43 a $45.00". */
+  /** Expected benefit range, e.g. "+$38.43 a +$45.00". */
   value: string;
   conf: number;
   confPct: string;
@@ -100,6 +100,8 @@ export interface DecisionItem {
   kinds?: string[];
   /** A stock transfer between stores (kind transfer_opportunity / action transfer_stock). */
   isTransfer?: boolean;
+  /** Product of the card (approvals): sku, else the recommendation's params.sku. */
+  sku?: string;
 }
 
 const TIER_NAMES: Record<string, string> = { N1: "Automática", N2: "Propuesta", N3: "Diálogo" };
@@ -122,12 +124,12 @@ const ACTION_ICONS: Record<string, string> = {
   transfer_stock: "swap_horiz",
 };
 
-function benefitText(r: Range3 | null | undefined): string {
+export function benefitText(r: Range3 | null | undefined): string {
   if (!r) return "";
   const { low, mid, high } = r;
-  if (low != null && high != null && low !== high) return `+${usd(low)} a ${usd(high)}`;
+  if (low != null && high != null && low !== high) return `${signedUsd(low)} a ${signedUsd(high)}`;
   const one = mid ?? low ?? high;
-  return one ? `+${usd(one)}` : "";
+  return one == null ? "" : signedUsd(one);
 }
 
 /** Technical confidence: a bare number (old) or {score, calibrated} (Wave 15). */
@@ -149,6 +151,7 @@ export function buildPendingItems(pending: PendingResponse | null, simToday: str
     supplier: "", arrive: "", cost: "", why: a.problem, chips: [], warn: "",
     kinds: (a.kinds ?? []).map((k) => kindLabelEs(k)),
     isTransfer: a.kind === "transfer_opportunity" || a.recommendation.action_type === "transfer_stock",
+    sku: a.sku ?? (typeof a.recommendation.params?.sku === "string" ? a.recommendation.params.sku : undefined),
   }));
   const techs = pending.technical.map((t): DecisionItem => {
     const decidable = Boolean(t.issue_id && t.option_id);

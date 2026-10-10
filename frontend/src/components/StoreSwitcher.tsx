@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useApi } from "../ApiContext";
 import { DEFAULT_SIM_TODAY } from "../config";
 import { useSession } from "../SessionContext";
+import { useCurrentCase } from "../useCurrentCase";
 import { storeLabel, type Store } from "../types";
 
 /** True when the store is closed (or not yet open) on the simulated date. Absent dates mean selectable. */
@@ -12,13 +13,18 @@ export const storeClosedReason = (s: Store, simToday: string = DEFAULT_SIM_TODAY
 export default function StoreSwitcher({ children, className = "" }: { children: ReactNode; className?: string }) {
   const api = useApi();
   const session = useSession();
-  const { storeId, setStoreId, setCaseId, bump } = session;
+  const { storeId, setStoreId, bump } = session;
   const [stores, setStores] = useState<Store[]>([]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   // The stores request resolves later: it must judge the store chosen by then, not the one at first render.
   const storeIdRef = useRef(storeId);
   storeIdRef.current = storeId;
+  // Stores open and close on the simulated date of the active case.
+  const { currentCase } = useCurrentCase(storeId || stores[0]?.store_id || "", session.refreshKey);
+  const simToday = currentCase?.sim_today ?? DEFAULT_SIM_TODAY;
+  const simTodayRef = useRef(simToday);
+  simTodayRef.current = simToday;
 
   useEffect(() => {
     let alive = true;
@@ -31,7 +37,8 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
         const cur = storeIdRef.current;
         if (cur && s.length > 0) {
           const found = s.find((x) => x.store_id === cur);
-          if (!found || storeClosedReason(found)) setStoreId(s.find((x) => !storeClosedReason(x))?.store_id ?? "");
+          const today = simTodayRef.current;
+          if (!found || storeClosedReason(found, today)) setStoreId(s.find((x) => !storeClosedReason(x, today))?.store_id ?? "");
         }
       })
       .catch(() => {});
@@ -57,7 +64,6 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
     setQuery("");
     if (id === current && id === storeId) return;
     setStoreId(id);
-    setCaseId("");
     bump();
   };
 
@@ -80,25 +86,28 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
           <div
             role="dialog"
             aria-label="Elegir sucursal"
-            className="absolute inset-x-4 top-[calc(4rem+env(safe-area-inset-top))] mx-auto flex max-h-[70vh] max-w-[480px] flex-col rounded-[20px] border border-partition/60 bg-elevation p-3 shadow-card"
+            className="absolute inset-x-4 top-[calc(4rem+env(safe-area-inset-top))] mx-auto flex max-h-[85dvh] max-w-[480px] flex-col rounded-[20px] border border-partition/60 bg-elevation p-3 shadow-card"
           >
-            <h2 className="mb-2 px-1 font-headline-sm text-headline-sm text-primary" style={{ fontFamily: "Inter, 'Playfair Display', serif" }}>
+            <h2 className="mb-1 px-1 font-headline-sm text-headline-sm text-primary" style={{ fontFamily: "Inter, 'Playfair Display', serif" }}>
               Sucursales
             </h2>
-            <input
-              type="search"
-              role="searchbox"
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar sucursal"
-              aria-label="Buscar sucursal"
-              className="mb-2 h-11 w-full rounded-[14px] border border-partition/60 bg-white px-3 font-body-md text-body-md"
-            />
+            <div className="relative mx-1 my-2">
+              <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[22px] text-on-surface-variant">search</span>
+              <input
+                type="search"
+                role="searchbox"
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar sucursal"
+                aria-label="Buscar sucursal"
+                className="box-border min-h-[48px] w-full rounded-[14px] border border-partition/60 bg-white py-2 pl-12 pr-4 font-body-md text-[16px]"
+              />
+            </div>
             <ul className="m-0 flex-1 list-none space-y-1 overflow-y-auto p-0">
               {shown.length === 0 && <li className="px-2 py-3 font-body-md text-body-md text-on-surface-variant">Sin resultados</li>}
               {shown.map((s) => {
-                const closed = storeClosedReason(s);
+                const closed = storeClosedReason(s, simToday);
                 const isCurrent = s.store_id === current;
                 const label = storeLabel(s);
                 return (

@@ -40,18 +40,21 @@ const ensureDefaultCase = (api: Api, storeId: string) => ensureCaseAt(api, store
 
 export function useCurrentCase(storeId: string, refreshKey = 0) {
   const api = useApi();
-  const { caseId } = useSession();
+  const { caseIds } = useSession();
+  const caseId = caseIds[storeId] ?? "";
   const res = usePolling(
     async () => {
       if (!storeId) return null;
       const cases = await api.listCases({ store_id: storeId });
-      const remembered = caseId ? "" : readStoredCase(storeId);
+      // A chosen id only counts when it is one of this store's cases.
+      const chosen = caseId && cases.some((c) => c.case_id === caseId && c.store_id === storeId) ? caseId : "";
+      const remembered = chosen ? "" : readStoredCase(storeId);
       if (remembered && cases.some((c) => c.case_id === remembered)) return pickCase(cases, remembered);
-      if (caseId || liveAt(cases, DEFAULT_SIM_TODAY).length > 0) return pickCase(cases, caseId);
+      if (chosen || liveAt(cases, DEFAULT_SIM_TODAY).length > 0) return pickCase(cases, chosen);
       try {
-        return pickCase(await ensureDefaultCase(api, storeId), caseId);
+        return pickCase(await ensureDefaultCase(api, storeId), chosen);
       } catch {
-        return pickCase(cases, caseId);
+        return pickCase(cases, chosen);
       }
     },
     60_000,

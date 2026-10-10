@@ -546,6 +546,8 @@ export interface NoteResult {
 /** GET /cases/{id}/transfers/options: stock to move between stores before it expires. */
 export interface TransferOption {
   option_id: string;
+  /** Issue this option answers, when the backend says so. */
+  issue_id?: string | null;
   sku: string;
   product_name: string;
   from_store: string;

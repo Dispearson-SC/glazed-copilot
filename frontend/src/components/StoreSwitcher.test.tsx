@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiProvider } from "../ApiContext";
 import { SessionProvider, useSession } from "../SessionContext";
 import { useCurrentCase } from "../useCurrentCase";
-import { fakeApi, store, store2 } from "../test/helpers";
+import { caseA, fakeApi, store, store2 } from "../test/helpers";
 import StoreSwitcher, { storeClosedReason } from "./StoreSwitcher";
 
 function Probe() {
@@ -43,6 +43,18 @@ describe("StoreSwitcher", () => {
     expect(current).toHaveAttribute("aria-current", "true");
   });
 
+  it("judges closed stores against the active case's date, not the default date", async () => {
+    const api = fakeApi({
+      listStores: async () => [store, { ...store2, closed_on: "2026-07-22" }],
+      listCases: vi.fn(async () => [{ ...caseA, sim_today: "2026-07-25" }]),
+    });
+    setup(api);
+    await waitFor(() => expect(api.listCases).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole("button", { name: /cambiar sucursal/i }));
+    const closed = await screen.findByRole("button", { name: `${store2.display_name}, Cerrada` });
+    await waitFor(() => expect(closed).toBeDisabled());
+  });
+
   it("filters by search, case-insensitive", async () => {
     setup();
     await userEvent.click(screen.getByRole("button", { name: /cambiar sucursal/i }));
@@ -73,7 +85,7 @@ describe("StoreSwitcher", () => {
   });
 
   it("disables closed stores with the label Cerrada", async () => {
-    const api = fakeApi({ listStores: vi.fn(async () => [store, { ...store2, closed_on: "2026-07-01" }]) });
+    const api = fakeApi({ listStores: vi.fn(async () => [store, { ...store2, closed_on: "2026-07-01" }]), listCases: async () => [{ ...caseA, sim_today: "2026-07-19" }] });
     setup(api);
     await userEvent.click(screen.getByRole("button", { name: /cambiar sucursal/i }));
     const btn = await screen.findByRole("button", { name: new RegExp(store2.display_name!) });

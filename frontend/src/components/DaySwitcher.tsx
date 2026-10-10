@@ -47,10 +47,29 @@ export default function DaySwitcher({ storeId, className = "" }: { storeId: stri
     if (!currentCase || busy) return;
     setBusy(true);
     try {
-      const res = await api.advanceCase(currentCase.case_id, { days: 1 });
-      const n = res.outcomes?.length ?? 0;
-      if (n > 0) say(outcomesText(n));
-      session.bump();
+      const next = shiftDate(currentCase.sim_today, 1);
+      let list = await api.listCases({ store_id: storeId });
+      const existing = liveAt(list, next)[0];
+      if (existing) {
+        session.setCaseId(existing.case_id, storeId);
+        session.bump();
+        return;
+      }
+      const newest = list.reduce((m, c) => (c.mode === "live" && c.sim_today > m ? c.sim_today : m), "");
+      if (currentCase.sim_today >= newest) {
+        const res = await api.advanceCase(currentCase.case_id, { days: 1 });
+        const n = res.outcomes?.length ?? 0;
+        if (n > 0) say(outcomesText(n));
+        session.bump();
+        return;
+      }
+      // An older case never moves its clock: open (or create, once) the case of the next date instead.
+      list = await ensureCaseAt(api, storeId, next);
+      const pick = liveAt(list, next)[0];
+      if (pick) {
+        session.setCaseId(pick.case_id, storeId);
+        session.bump();
+      }
     } catch (e) {
       say((e as Error).message);
     } finally {
