@@ -25,6 +25,8 @@ const labelClass: Record<BarKind, string> = {
   nodata: "text-on-surface-variant",
 };
 
+const styleOf = (p: ActivityPoint): BarKind => (p.value == null && p.kind !== "forecast" ? "nodata" : p.kind);
+
 export default function ActivityChart({ points, model }: { points: ActivityPoint[]; model?: string | null }) {
   const today = points.find((p) => p.kind === "today")?.date ?? points[0]?.date;
   const [hover, setHover] = useState<string | null>(null);
@@ -73,10 +75,10 @@ export default function ActivityChart({ points, model }: { points: ActivityPoint
                 data-testid={`activity-bar-${p.date}`}
                 data-kind={p.kind}
                 title={`${p.date}: ${p.value == null ? "sin datos" : money(p.value)}${p.kind === "forecast" ? " (proyección)" : ""}`}
-                className={`w-full max-w-[28px] rounded-t-lg transition-all ${barClass[p.kind]}`}
+                className={`w-full max-w-[28px] rounded-t-lg transition-all ${barClass[styleOf(p)]}`}
                 style={{ height: `${p.value == null ? 24 : Math.max(4, Math.round((p.value / max) * MAX_PX))}px` }}
               ></div>
-              <span className={`font-label-sm text-label-sm capitalize ${labelClass[p.kind]}`}>
+              <span className={`font-label-sm text-label-sm capitalize ${labelClass[p.kind === "today" ? "today" : styleOf(p)]}`}>
                 {p.kind === "today" ? "hoy" : weekdayShort(p.date)}
               </span>
             </div>

@@ -112,7 +112,7 @@ describe("DashboardPage activity chart", () => {
   it("shows the real value of the active bar in the tooltip, defaulting to the day shown", async () => {
     open(fakeApi({ getForecast: async () => forecastFor() }));
     const tip = await screen.findByTestId("activity-tooltip");
-    expect(tip).toHaveTextContent("$206.00");
+    expect(tip).toHaveTextContent("$733.91");
     const { default: userEvent } = await import("@testing-library/user-event");
     await userEvent.hover(screen.getByTestId("activity-col-2026-03-12"));
     expect(tip).toHaveTextContent("$108.00");
@@ -124,7 +124,7 @@ describe("DashboardPage activity chart", () => {
     expect(await screen.findByTestId("activity-model")).toHaveTextContent("glm_poisson");
   });
 
-  it("falls back to 7 actual days quietly, without a model caption, when the forecast route is missing", async () => {
+  it("draws 7 actual days quietly, without a model caption, when the forecast route is missing", async () => {
     const api = fakeApi();
     open(api);
     await screen.findByTestId("activity-bar-2026-03-10");
@@ -134,10 +134,25 @@ describe("DashboardPage activity chart", () => {
     expect(new Set(dates)).toEqual(new Set(["2026-03-04", "2026-03-05", "2026-03-06", "2026-03-07", "2026-03-08", "2026-03-09"]));
   });
 
-  it("also falls back, quietly, when the forecast route fails with a server error", async () => {
+  it("also stays quiet when the forecast route fails with a server error", async () => {
     open(fakeApi({ getForecast: vi.fn(async () => { throw new ApiError(500, "boom"); }) }));
     await screen.findByTestId("activity-bar-2026-03-10");
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("takes actuals from day summaries even when the forecast carries none for the past", async () => {
+    const f = forecastFor();
+    open(fakeApi({ getForecast: async () => ({ ...f, points: f.points.map((p) => ({ ...p, actual: null })) }) }));
+    await screen.findByTestId("activity-bar-2026-03-09");
+    expect(screen.getByTestId("activity-bar-2026-03-09")).toHaveAttribute("data-kind", "actual");
+    expect(screen.getByTestId("activity-bar-2026-03-09")).toHaveAttribute("title", expect.stringContaining("$733.91"));
+  });
+
+  it("keeps the day-shown marker even when that day has no sales", async () => {
+    open(fakeApi({
+      getDaySummary: vi.fn(async (_id: string, date?: string) => ({ ...daySummaryA, date: date ?? "2026-03-10", totals: date === undefined ? null : daySummaryA.totals })),
+    }));
+    expect(await screen.findByTestId("activity-bar-2026-03-10")).toHaveAttribute("data-kind", "today");
   });
 
   it("marks a day without data", async () => {

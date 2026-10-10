@@ -17,14 +17,12 @@ import { usePolling } from "../usePolling";
 
 const PROJECTED_DAYS = 3;
 
-/** 7 actual days ending at `day`, then the next projected days; an actual is never read past `day`. */
+/** 7 actual days ending at `day` (from day summaries), then the next projected days from the forecast. */
 function buildPoints(day: string, forecast: ForecastResponse | null, trend: DaySummary[] | null): ActivityPoint[] {
   const actuals = lastSevenDays(day).map((date): ActivityPoint => {
-    const kind = date === day ? "today" : "actual";
-    const value = forecast
-      ? (forecast.points.find((p) => p.date === date)?.actual ?? null)
-      : (trend?.find((d) => d.date === date)?.totals?.net_sales ?? null);
-    return value == null ? { date, kind: "nodata", value: null } : { date, kind, value };
+    const value = trend?.find((d) => d.date === date)?.totals?.net_sales ?? null;
+    if (date === day) return { date, kind: "today", value };
+    return value == null ? { date, kind: "nodata", value: null } : { date, kind: "actual", value };
   });
   const future = (forecast?.points ?? [])
     .filter((p) => p.date > day)
@@ -50,17 +48,16 @@ export default function DashboardPage() {
     false,
     [caseId, simToday, session.refreshKey],
   );
-  // Without a forecast the chart falls back to actuals only; the six earlier days come from day summaries.
-  const needTrend = !forecast.loading && !forecast.data;
+  // Actuals always come from day summaries (the forecast route only carries future days); the summary day is already loaded.
   const trend = usePolling(
     async () => {
-      if (!needTrend || !caseId || !day) return null;
+      if (!caseId || !day) return null;
       const prev = lastSevenDays(day).slice(0, 6);
       return [...(await Promise.all(prev.map((d) => api.getDaySummary(caseId, d)))), summary.data!];
     },
     60_000,
     false,
-    [caseId, day, session.refreshKey, needTrend],
+    [caseId, day, session.refreshKey],
   );
   const error = storesError ?? caseError;
   const data = summary.data;
@@ -85,7 +82,7 @@ export default function DashboardPage() {
           <PageHeader date={data.date} simToday={simToday ?? data.as_of} />
           <HeroCard summary={data} />
           <MetricCards summary={data} />
-          {(forecast.data || trend.data) && <ActivityChart points={points} model={forecast.data?.model} />}
+          {trend.data && <ActivityChart points={points} model={forecast.data?.model} />}
           <TopProducts summary={data} />
           <ActionsFooter asOf={data.as_of} />
         </>
