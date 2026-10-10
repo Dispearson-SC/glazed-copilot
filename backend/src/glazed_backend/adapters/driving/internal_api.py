@@ -82,6 +82,11 @@ def build_internal_router(c: Any) -> APIRouter:
         end = date_to or case.sim_today
         return names.tag(c.metrics.kpis(case.store_id, case.sim_today, date_from or end - timedelta(days=6), end), case.store_id)
 
+    @r.get("/snapshot")
+    def snapshot(case: Ctx):
+        """Everything a specialist usually needs in one call (KPIs, top issues, order plan, suppliers, decisions)."""
+        return jsonable_encoder(c.briefings.snapshot(case))
+
     @r.get("/metrics/explain")
     def explain(case: Ctx, metric: str):
         return uc.ExplainMetric(c.cases, c.metrics).execute(case.case_id, metric)

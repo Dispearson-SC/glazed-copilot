@@ -27,7 +27,7 @@ from ...metrics.sentinel import HORIZON_DAYS
 from ...metrics.calendar_effect import calendar_issue, event_effect
 from ...metrics.plan import apply_min_order, plan_line
 from ...metrics.promo_audit import BASELINE, PromoRef, audit_promo, promo_issue
-from ...metrics.schedule import parse_delivery_days
+from ...metrics.schedule import next_delivery_after, parse_delivery_days
 from ...metrics.snapshot import StoreSnapshot
 from ...metrics.types import Config, DayRow, Product, PurchaseOrder, StoreInfo
 
@@ -446,7 +446,8 @@ class DuckDBMetrics:
             " quantile_cont(date_diff('day', po.order_date, po.received_date), 0.9) lt_p90,"
             " 100.0*avg(CASE WHEN po.received_date<=po.expected_date THEN 1 ELSE 0 END) on_time,"
             " 100.0*sum(po.qty_received)/nullif(sum(po.qty_ordered),0) fill,"
-            " s.standard_lead_time_days std_lt, 100*s.contract_on_time_rate c_ot, 100*s.contract_fill_rate c_fill"
+            " s.standard_lead_time_days std_lt, 100*s.contract_on_time_rate c_ot, 100*s.contract_fill_rate c_fill,"
+            " s.delivery_days"
             " FROM purchase_orders po JOIN suppliers s USING (supplier_id)"
             " WHERE po.store_id=? AND po.received_date IS NOT NULL AND po.received_date<=? AND po.order_date>?"
             " GROUP BY ALL ORDER BY pos DESC", [store_id, as_of, as_of - timedelta(days=180)])
@@ -454,7 +455,10 @@ class DuckDBMetrics:
                  "lead_time_mean_days": _f(r["lt_mean"]), "lead_time_p90_days": _f(r["lt_p90"]),
                  "on_time_pct": _f(r["on_time"], 1), "fill_pct": _f(r["fill"], 1),
                  "contract_lead_time_days": r["std_lt"], "contract_on_time_pct": _f(r["c_ot"], 1),
-                 "contract_fill_pct": _f(r["c_fill"], 1), "window_days": 180} for r in rows]
+                 "contract_fill_pct": _f(r["c_fill"], 1), "window_days": 180,
+                 "delivery_days": sorted(parse_delivery_days(r["delivery_days"])),
+                 "next_delivery": next_delivery_after(as_of, parse_delivery_days(r["delivery_days"])).isoformat()}
+                for r in rows]
 
     # -- Promos ------------------------------------------------------------------
     def promo_evaluation(self, store_id: str, as_of: date, promo_id: str) -> dict[str, Any]:

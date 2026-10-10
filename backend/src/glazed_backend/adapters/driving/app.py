@@ -35,6 +35,7 @@ class Container:
     turn_tracker: Any = field(default_factory=TurnTracker)
     classifier: Any = None  # TextClassifierPort (Jev via Backboard, LLM fallback); None -> escape labels
     served: dict = field(default_factory=dict)  # (case_id, issue_id) -> issue as served, for option lookup
+    briefings: Any = None  # BriefingService; built from the other ports when not given
 
 
 DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -54,6 +55,10 @@ class _NoCore:
 
 
 def create_app(c: Container) -> FastAPI:
+    if c.briefings is None:
+        from ...application.briefing import BriefingService, SnapshotBuilder
+        from .store_names import StoreNames
+        c.briefings = BriefingService(SnapshotBuilder(c.metrics, c.proposals, StoreNames(c.metrics).of, c.served), c.clock)
     app = FastAPI(title="glazed-backend")
     app.add_middleware(CORSMiddleware, allow_origins=c.cors_origins or DEFAULT_CORS_ORIGINS,
                        allow_methods=["GET", "POST", "PATCH", "OPTIONS"], allow_headers=["*"])

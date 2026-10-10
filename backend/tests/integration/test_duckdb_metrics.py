@@ -1,5 +1,5 @@
 import os
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -121,6 +121,14 @@ def test_supplier_performance_uses_only_received_by_as_of(m):
     rows = m.supplier_performance(S, AS_OF)
     assert rows and all(0 <= r["on_time_pct"] <= 100 and 0 <= r["fill_pct"] <= 100 for r in rows)
     assert all({"lead_time_mean_days", "lead_time_p90_days", "contract_on_time_pct"} <= r.keys() for r in rows)
+
+
+def test_supplier_performance_gives_the_next_delivery_after_as_of(m):
+    rows = m.supplier_performance(S, AS_OF)
+    for r in rows:
+        nd = date.fromisoformat(r["next_delivery"])
+        assert AS_OF < nd <= AS_OF + timedelta(days=8)
+        assert nd.isoweekday() in r["delivery_days"]
 
 
 def test_promo_evaluation(m):
