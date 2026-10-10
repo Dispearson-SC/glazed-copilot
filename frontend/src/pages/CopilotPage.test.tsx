@@ -36,6 +36,22 @@ describe("Decisiones window", () => {
     expect(screen.getByText(/mínimo del proveedor/)).toBeInTheDocument();
   });
 
+  it("takes the capsule badges from /inbox-counts", async () => {
+    open(apiWith({ getInboxCounts: async () => ({ approvals: 27, technical: 11, alerts: 2 }) }));
+    expect(await screen.findByRole("button", { name: "Decisiones, 38 pendientes" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Alertas, 2 pendientes" })).toBeInTheDocument();
+  });
+
+  it("falls back to the loaded lists when /inbox-counts is unavailable", async () => {
+    open();
+    expect(await screen.findByRole("button", { name: "Decisiones, 2 pendientes" })).toBeInTheDocument();
+  });
+
+  it("shows how many agents are connected from /agents/status", async () => {
+    open(apiWith({ getAgentsStatus: async () => ({ connected: true, agents: [{ agent_id: "supply", display_name_es: "Analista de abastecimiento", status: "up" }, { agent_id: "past", display_name_es: "Analista histórico", status: "up" }] }) }));
+    expect(await screen.findByText("Listo · 2 agentes conectados")).toBeInTheDocument();
+  });
+
   it("shows empty states when nothing is pending", async () => {
     await openDecisiones(apiWith({ getPending: async () => ({ ...pendingA, approvals: [], technical: [] }) }));
     expect(await screen.findByText("Nada pendiente de tu opinión por ahora.")).toBeInTheDocument();

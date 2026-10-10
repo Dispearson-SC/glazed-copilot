@@ -86,12 +86,20 @@ const wrap = ({ children }: { children: ReactNode }) => (
 const props = { caseId: "c1", items, pendingLine: "1 esperan tu opinión · 1 listas para aceptar", onApprove: () => {}, onReject: () => {} };
 
 describe("AgentWindow", () => {
-  it("shows the orb status, title and pending line; never invents an agent count", () => {
+  it("shows the orb status, title and pending line; without /agents/status it never invents an agent count", () => {
     render(<AgentWindow chat={chatOf()} {...props} />, { wrapper: wrap });
     expect(screen.getByRole("heading", { name: "¿Qué decidimos hoy?" })).toBeInTheDocument();
     expect(screen.getByText("Listo")).toBeInTheDocument();
     expect(screen.getByText("1 esperan tu opinión · 1 listas para aceptar")).toBeInTheDocument();
     expect(screen.queryByText(/agentes conectados/)).toBeNull();
+  });
+
+  it("shows 'Listo · N agentes conectados' from /agents/status, and no connection when the Core is down", () => {
+    const up = { connected: true, agents: [1, 2, 3].map((i) => ({ agent_id: `a${i}`, display_name_es: `A${i}`, status: "up" as const })) };
+    const { rerender } = render(<AgentWindow chat={chatOf()} {...props} agents={up} />, { wrapper: wrap });
+    expect(screen.getByText("Listo · 3 agentes conectados")).toBeInTheDocument();
+    rerender(<AgentWindow chat={chatOf()} {...props} agents={{ connected: false, agents: up.agents.map((a) => ({ ...a, status: "down" as const })) }} />);
+    expect(screen.getByText("Sin conexión con los agentes")).toBeInTheDocument();
   });
 
   it("shows 'Pensando…' while a turn runs, with the wait pill", () => {

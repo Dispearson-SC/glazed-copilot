@@ -6,6 +6,7 @@ import { consultingText, fetchIssueAnalysis, type AnalysisRef, type AnalysisStat
 import { clockTime } from "../../format";
 import { useCopilot } from "../../state/copilotStore";
 import type { ChatMessage } from "../../chatHistory";
+import type { AgentsStatusResponse } from "../../types";
 import type { useChat } from "../../useChat";
 import AgentOrb from "./AgentOrb";
 import AnalysisCard from "./AnalysisCard";
@@ -37,6 +38,14 @@ function AssistantBubble({ m }: { m: ChatMessage }) {
   );
 }
 
+/** Orb status line: 'Listo · N agentes conectados' once /agents/status answers (every agent shares the Core state). */
+function agentsLine(a: AgentsStatusResponse | null): string {
+  if (!a) return "Listo";
+  if (!a.connected) return "Sin conexión con los agentes";
+  const n = a.agents.filter((x) => x.status !== "down").length;
+  return `Listo · ${n} ${n === 1 ? "agente conectado" : "agentes conectados"}`;
+}
+
 /** Fetches the backend analysis of the issue once and hands it to the card. */
 function AnalysisLoader({ caseId, item, mode, open, busy, onApprove, onReject }: { caseId: string; item: DecisionItem; mode: AnalysisRef["mode"]; open: boolean; busy: boolean; onApprove: (i: DecisionItem) => void; onReject: (i: DecisionItem) => void }) {
   const api = useApi();
@@ -62,6 +71,7 @@ export default function AgentWindow({
   items,
   openIds,
   busyId = null,
+  agents = null,
   pendingLine,
   onApprove,
   onReject,
@@ -74,6 +84,8 @@ export default function AgentWindow({
   openIds?: string[];
   /** Card with a decision request in flight. */
   busyId?: string | null;
+  /** GET /agents/status; null while unknown or when the route is missing. */
+  agents?: AgentsStatusResponse | null;
   pendingLine: string;
   onApprove: (item: DecisionItem) => void;
   onReject: (item: DecisionItem) => void;
@@ -117,7 +129,7 @@ export default function AgentWindow({
         <div className="mx-auto max-w-[640px] px-4 pb-4">
           <section className="flex flex-col items-center px-2 pb-4 pt-5 text-center">
             <AgentOrb size={116} />
-            <span className="mt-2 font-label-sm text-label-sm text-on-surface-variant">{busy ? "Pensando…" : "Listo"}</span>
+            <span className="mt-2 font-label-sm text-label-sm text-on-surface-variant">{busy ? "Pensando…" : agentsLine(agents)}</span>
             <h1 className="m-0 mt-2 font-headline-lg text-headline-lg tracking-tight text-primary">¿Qué decidimos hoy?</h1>
             <p className="m-0 mt-1 font-body-md text-body-md text-on-surface-variant">{pendingLine}</p>
           </section>

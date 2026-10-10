@@ -21,6 +21,7 @@ import { useMemoryData, useWarningsData } from "../useMemoryData";
 import { useCopilotData } from "../useCopilotData";
 import { useCurrentCase } from "../useCurrentCase";
 import { useDecide } from "../useDecide";
+import { useInbox } from "../useInbox";
 
 function CopilotShell() {
   const { state, dispatch, showToast } = useCopilot();
@@ -36,7 +37,11 @@ function CopilotShell() {
   const branch_ = useBranchData(caseId, simToday, state.tab === "sucursal", session.refreshKey);
   const warningsData = useWarningsData(storeId, caseId, session.refreshKey);
   const memoryData = useMemoryData(caseId, state.tab === "memorias", session.refreshKey);
-  const { decide, busyId } = useDecide(caseId, data.refresh);
+  const inbox = useInbox(caseId, session.refreshKey);
+  const { decide, busyId } = useDecide(caseId, async () => {
+    await data.refresh();
+    await inbox.refreshCounts();
+  });
   const [site, branch] = splitStoreName(active ? storeLabel(active) : "Sucursal");
 
   // Every decision seen this session stays available to the chat cards even after it is decided.
@@ -47,7 +52,7 @@ function CopilotShell() {
   const techs = visible.length - approvals;
   const pendingLine = `${approvals} esperan tu opinión · ${techs} listas para aceptar`;
   const warnings = warningsData ? buildWarnings(warningsData) : [];
-  const badges: CapsuleBadges = { decisiones: visible.length, memorias: state.learned.length, alertas: warnings.length };
+  const badges: CapsuleBadges = { decisiones: inbox.counts ? inbox.counts.approvals + inbox.counts.technical : visible.length, memorias: state.learned.length, alertas: inbox.counts ? inbox.counts.alerts : warnings.length };
 
   const openCard = useCallback(
     (item: DecisionItem, mode: "analizar" | "dialogo") => {
@@ -80,6 +85,7 @@ function CopilotShell() {
           items={[...known.current.values()]}
           openIds={visible.map((i) => i.id)}
           busyId={busyId}
+          agents={inbox.agents}
           pendingLine={data.items.length || !data.loading ? pendingLine : ""}
           onApprove={(i) => void decide(i, true)}
           onReject={(i) => dispatch({ type: "openReject", id: i.id })}
