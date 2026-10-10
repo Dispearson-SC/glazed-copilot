@@ -39,7 +39,7 @@ def load_parquet_dir(directory: str, url: str, schema: str = "glazed", prefix: s
 
 
 if __name__ == "__main__":
-    d = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("GLAZED_PARQUET_DIR", "../Dataset/clean")
+    d = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("GLAZED_PARQUET_DIR", "../data/clean")
     url = os.environ.get("GLAZED_DATABASE_URL", "postgresql://glazed_app:glazed_dev@localhost:55432/glazed_app")
     for t, n in load_parquet_dir(d, url).items():
         print(f"{t}: {n}")

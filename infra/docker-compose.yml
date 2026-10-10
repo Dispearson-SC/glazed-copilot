@@ -2,6 +2,8 @@ name: glazed-copilot
 
 # Secrets are never written here. Run through `make up` (or pass `--env-file .env`) so
 # POSTGRES_PASSWORD and MINIMAX_API_KEY come from the git-ignored .env at the repository root.
+# Everything the stack needs is inside this repository: agent-core/ and vendor/dataset-road2tech/ are git submodules,
+# data/clean and data/forecast/out are produced by `make data`. See README.md and .env.example.
 x-core: &core
   build:
     context: ../agent-core/Core
@@ -27,7 +29,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     ports:
-      - "55432:5432"
+      - "${GLAZED_BIND_ADDR:-127.0.0.1}:55432:5432"
     volumes:
       - glazed_pgdata:/var/lib/postgresql/data
       - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-glazed.sql:ro
@@ -53,8 +55,8 @@ services:
       MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
       # Voice (push-to-talk): STT/TTS proxied through the backend so the key never reaches the browser.
       GLAZED_VOICE: ${GLAZED_VOICE:-true}
-      GLAZED_TTS_VOICE: ${GLAZED_TTS_VOICE:-Spanish_ConfidentWoman}
-      GLAZED_TTS_MODEL: ${GLAZED_TTS_MODEL:-speech-2.8-turbo}
+      GLAZED_TTS_VOICE: ${GLAZED_TTS_VOICE:-Spanish_Intonategirl}
+      GLAZED_TTS_MODEL: ${GLAZED_TTS_MODEL:-speech-2.8-hd}
       GLAZED_STT_MODEL: ${GLAZED_STT_MODEL:-asr-1.0}
       # Login. Values come from the git-ignored .env; GLAZED_AUTH_REQUIRED=false keeps /api/v1 open until the UI integrates.
       GLAZED_AUTH_REQUIRED: ${GLAZED_AUTH_REQUIRED:-false}
@@ -72,13 +74,12 @@ services:
       # Holdout forecast (Parquet) produced by the separate forecast job. Absent file -> baseline forecast.
       GLAZED_FORECAST_PATH: ${GLAZED_FORECAST_PATH:-/forecast/forecast.parquet}
     volumes:
-      - ../../Dataset/clean:/data:ro
-      - ../../Dataset/raw:/raw:ro
-      # GLAZED_FORECAST_DIR defaults to an empty placeholder dir so `make up` never depends on the file existing;
-      # the Makefile points it at ../Dataset/forecast/out when that directory is present.
-      - ${GLAZED_FORECAST_DIR:-./no-forecast}:/forecast:ro
+      - ../data/clean:/data:ro                                   # glazed.duckdb + Parquet tables (make data)
+      - ../vendor/dataset-road2tech:/raw:ro                      # raw CSVs (git submodule)
+      # Holdout forecast. A missing forecast.parquet makes the backend fall back to its weekday baseline.
+      - ${GLAZED_FORECAST_DIR:-../data/forecast/out}:/forecast:ro
     ports:
-      - "${GLAZED_BACKEND_PORT:-8100}:8080"
+      - "${GLAZED_BIND_ADDR:-127.0.0.1}:${GLAZED_BACKEND_PORT:-8100}:8080"
 
   core:
     <<: *core
@@ -91,7 +92,7 @@ services:
       retries: 12
       start_period: 30s
     ports:
-      - "${GLAZED_CORE_HOST_PORT:-8001}:8000"
+      - "${GLAZED_BIND_ADDR:-127.0.0.1}:${GLAZED_CORE_HOST_PORT:-8001}:8000"
 
   core-peer-worker:
     <<: *core
@@ -104,39 +105,57 @@ services:
       core:
         condition: service_healthy   # the core serve process creates and migrates the databases first
 
-  # Public web (PWA build + /api proxy) behind the Coolify Traefik proxy, with HTTPS and basic auth.
+  # Public web (PWA build + /api proxy) behind an existing Traefik proxy, with HTTPS and basic auth.
+  # No Traefik on this server: add `-f infra/docker-compose.local.yml` (publishes the web on GLAZED_WEB_PORT).
   # Dev alternative: `npm run dev` in frontend/ (http://localhost:5173).
   web:
     build:
       context: ..
       dockerfile: infra/web/Dockerfile
+      args:
+        VITE_DEFAULT_SIM_TODAY: ${VITE_DEFAULT_SIM_TODAY:-}   # build-time: date the demo clock opens on (default 2026-07-19)
     container_name: glazed-web
     restart: unless-stopped
     depends_on:
       - backend
     networks:
       - default
-      - coolify
+      - traefik
     labels:
       - traefik.enable=true
-      - traefik.docker.network=coolify
-      - traefik.http.routers.glazed-web-http.rule=Host(`${GLAZED_PUBLIC_HOST:-glazed.farone.cloud}`)
-      - traefik.http.routers.glazed-web-http.entrypoints=http
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik}
+      - traefik.http.routers.glazed-web-http.rule=Host(`${GLAZED_PUBLIC_HOST:-glazed.localhost}`)
+      - traefik.http.routers.glazed-web-http.entrypoints=${TRAEFIK_ENTRYPOINT_HTTP:-http}
       - traefik.http.routers.glazed-web-http.middlewares=glazed-web-https-redirect
       - traefik.http.middlewares.glazed-web-https-redirect.redirectscheme.scheme=https
-      - traefik.http.routers.glazed-web.rule=Host(`${GLAZED_PUBLIC_HOST:-glazed.farone.cloud}`)
-      - traefik.http.routers.glazed-web.entrypoints=https
+      - traefik.http.routers.glazed-web.rule=Host(`${GLAZED_PUBLIC_HOST:-glazed.localhost}`)
+      - traefik.http.routers.glazed-web.entrypoints=${TRAEFIK_ENTRYPOINT_HTTPS:-https}
       - traefik.http.routers.glazed-web.tls=true
-      - traefik.http.routers.glazed-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.glazed-web.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
       # GLAZED_WEB_GATE=glazed-web-open drops the basic auth (public demo; the app login still applies)
       - traefik.http.routers.glazed-web.middlewares=${GLAZED_WEB_GATE:-glazed-web-auth}
       - traefik.http.middlewares.glazed-web-open.headers.contentTypeNosniff=true
-      - traefik.http.middlewares.glazed-web-auth.basicauth.users=${GLAZED_WEB_BASICAUTH:?set GLAZED_WEB_BASICAUTH in .env}
+      - traefik.http.middlewares.glazed-web-auth.basicauth.users=${GLAZED_WEB_BASICAUTH:-}
       - traefik.http.services.glazed-web.loadbalancer.server.port=80
+
+  # One-shot data build (ETL -> DuckDB -> forecast): `make data`. Not started by `make up` (profile "tools").
+  data-build:
+    profiles: ["tools"]
+    build:
+      context: ../data
+    mem_limit: ${DATA_BUILD_MEM:-6g}
+    volumes:
+      - ../data:/work/data
+      - ../vendor/dataset-road2tech:/raw:ro
+    environment:
+      RAW: /raw
 
 volumes:
   glazed_pgdata:
 
 networks:
-  coolify:
+  # The Traefik proxy's Docker network. Must already exist on the host (`docker network ls`); name it in TRAEFIK_NETWORK.
+  # Unused (and therefore not required) when infra/docker-compose.local.yml is applied.
+  traefik:
     external: true
+    name: ${TRAEFIK_NETWORK:-traefik}

@@ -1,4 +1,4 @@
-"""Baseline experiences parsed from Dataset/analisis_estado.md section 3 (promo evaluations)."""
+"""Baseline experiences parsed from data/docs/analisis_estado.md section 3 (promo evaluations)."""
 from __future__ import annotations
 
 import re

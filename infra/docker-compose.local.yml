@@ -1,0 +1,11 @@
+# No-Traefik option: publish the web container on a host port and drop the proxy labels and network.
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.local.yml --env-file .env up -d --build
+# (`make up LOCAL=1` does the same.) The app is then at http://localhost:${GLAZED_WEB_PORT:-8080}.
+# There is no HTTPS or basic auth in this mode: put your own reverse proxy in front of it for a public server.
+services:
+  web:
+    labels: !reset []
+    networks: !override
+      - default
+    ports:
+      - "${GLAZED_WEB_PORT:-8080}:80"

@@ -11,7 +11,7 @@ from glazed_backend.adapters.driven.backboard_memory import BackboardMemory
 from glazed_backend.adapters.driven.memory import InMemoryAssistants
 from glazed_backend.application.seed import parse_promo_baseline
 
-DEFAULT_MD = os.path.join(os.path.dirname(__file__), "../../../Dataset/analisis_estado.md")
+DEFAULT_MD = os.path.join(os.path.dirname(__file__), "../../data/docs/analisis_estado.md")
 
 
 def main() -> int:

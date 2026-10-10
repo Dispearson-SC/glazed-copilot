@@ -5,7 +5,7 @@ import pytest
 
 from glazed_backend.domain import FutureDate, NotFound
 
-PATH = os.environ.get("GLAZED_DUCKDB_PATH", "/home/ubuntu/projects/Softek-HackSaltillo/Dataset/clean/glazed.duckdb")
+PATH = os.environ.get("GLAZED_DUCKDB_PATH", os.path.join(os.path.dirname(__file__), "../../../data/clean/glazed.duckdb"))
 pytestmark = [pytest.mark.integration,
               pytest.mark.skipif(not os.path.exists(PATH), reason="DuckDB dataset not available")]
 
@@ -231,7 +231,7 @@ def test_calendar_effect_uses_only_history_up_to_as_of(m):
     assert ns and all(0 < n <= cutoff for n in ns.values())  # June break days are in the future: never counted
 
 
-RAW = os.environ.get("GLAZED_RAW_PATH", "/home/ubuntu/projects/Softek-HackSaltillo/Dataset/raw")
+RAW = os.environ.get("GLAZED_RAW_PATH", os.path.join(os.path.dirname(__file__), "../../../vendor/dataset-road2tech"))
 
 
 @pytest.mark.skipif(not os.path.exists(os.path.join(RAW, "sales_daily.csv")), reason="raw layer not available")

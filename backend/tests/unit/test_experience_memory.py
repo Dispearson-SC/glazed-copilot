@@ -170,7 +170,7 @@ def test_parse_promo_baseline_reads_only_section_3_rows():
 
 
 def test_parse_real_baseline_has_13_rows():
-    p = "/home/ubuntu/projects/Softek-HackSaltillo/Dataset/analisis_estado.md"
+    p = os.path.join(os.path.dirname(__file__), "../../../data/docs/analisis_estado.md")
     if not os.path.exists(p):
         pytest.skip("baseline not available")
     assert len(parse_promo_baseline(open(p, encoding="utf-8").read())) == 13

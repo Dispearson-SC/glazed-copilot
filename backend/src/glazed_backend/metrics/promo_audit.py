@@ -1,6 +1,6 @@
 """Alert 7: audit a proposed promotion against what similar promotions did, versus the PR013 noise floor.
 
-`PromoRef` rows come from the Datos baseline (`Dataset/analisis_estado.md` section 3: chain-wide difference-in-
+`PromoRef` rows come from the Datos baseline (`data/docs/analisis_estado.md` section 3: chain-wide difference-in-
 differences uplift and margin effect with an assumed cost [S]), joined to the `promotions` table. PR013 never ran,
 so its drift in Bakery is the placebo: the method's noise is about +-10 points. Nothing here does I/O."""
 from __future__ import annotations
@@ -15,7 +15,7 @@ from .types import Config
 NOISE_FLOOR_PCT = 10.0  # +-10 points, placebo PR013
 SIMILAR_DISCOUNT_POINTS = 5.0
 
-# promo_id -> (uplift %, chain-wide net margin effect USD, confidence). Source: Dataset/analisis_estado.md section 3.
+# promo_id -> (uplift %, chain-wide net margin effect USD, confidence). Source: data/docs/analisis_estado.md section 3.
 BASELINE: dict[str, tuple[float, float, str]] = {
     "PR001": (15.0, -6000.0, "low"), "PR002": (-11.0, -103000.0, "medium"), "PR003": (1.5, -4000.0, "medium"),
     "PR004": (25.0, 7000.0, "medium"), "PR005": (1.0, -30000.0, "medium"), "PR006": (11.0, -9000.0, "medium"),
@@ -23,7 +23,7 @@ BASELINE: dict[str, tuple[float, float, str]] = {
     "PR010": (8.0, -12000.0, "medium"), "PR011": (-4.0, -20000.0, "low"), "PR012": (16.0, 4000.0, "medium"),
     "PR013": (14.0, 0.0, "placebo"),
 }
-SOURCE = "Dataset/analisis_estado.md section 3 (chain-wide DiD, margin with assumed cost)"
+SOURCE = "data/docs/analisis_estado.md section 3 (chain-wide DiD, margin with assumed cost)"
 
 
 @dataclass(frozen=True)
