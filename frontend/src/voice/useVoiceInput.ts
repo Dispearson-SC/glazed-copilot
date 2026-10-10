@@ -45,8 +45,8 @@ const isDenied = (e: unknown) => e instanceof Error && (e.name === "NotAllowedEr
 
 interface Opts {
   config: VoiceConfigState;
-  /** Final text of a hold. */
-  onTranscript: (text: string) => void;
+  /** Final text of a hold. `suspect`: the backend doubts the language, so the text must be reviewed before sending. */
+  onTranscript: (text: string, opts?: { suspect?: boolean }) => void;
   /** User-facing notices (toast). */
   onNotice: (message: string) => void;
   /** Runs synchronously inside the pointerdown gesture (audio unlock). */
@@ -120,9 +120,9 @@ export function useVoiceInput({ config: cfg, onTranscript, onNotice, onPress }: 
     setState("idle");
   }, [release]);
 
-  const deliver = (text: string) => {
+  const deliver = (text: string, suspect = false) => {
     const clean = text.trim();
-    if (clean) cb.current.onTranscript(clean);
+    if (clean) cb.current.onTranscript(clean, suspect ? { suspect: true } : undefined);
     else cb.current.onNotice(MSG_NO_SPEECH);
   };
 
@@ -250,11 +250,11 @@ export function useVoiceInput({ config: cfg, onTranscript, onNotice, onPress }: 
       const name = type.includes("mp4") ? "voice.m4a" : type.includes("ogg") ? "voice.ogg" : "voice.webm";
       api
         .transcribe(blob, name)
-        .then(({ text }) => {
+        .then(({ text, language_suspect }) => {
           if (s.token !== token) return;
           setSeconds(0);
           setState("idle");
-          deliver(text ?? "");
+          deliver(text ?? "", language_suspect === true);
         })
         .catch((e: Error) => {
           if (s.token !== token) return;

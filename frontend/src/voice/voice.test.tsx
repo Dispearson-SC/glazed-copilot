@@ -153,6 +153,33 @@ describe("push-to-talk (backend STT)", () => {
     expect(trackStop).toHaveBeenCalled();
   });
 
+  it("language_suspect puts the text in the composer, does not send, and a later send is a voice turn", async () => {
+    const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "hola buenos dias", language_suspect: true })) });
+    const chat = chatOf();
+    await ready(api, chat);
+    await hold();
+    const box = screen.getByLabelText("Mensaje para el copiloto") as HTMLInputElement;
+    await waitFor(() => expect(box.value).toBe("hola buenos dias"));
+    expect(chat.send).not.toHaveBeenCalled();
+    expect(await screen.findByText("Revisa el texto antes de enviarlo")).toBeInTheDocument();
+    expect(box).toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
+    expect(chat.send).toHaveBeenCalledWith("hola buenos dias", { voice: true });
+  });
+
+  it("language_suspect: clearing the composer drops the voice flag", async () => {
+    const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "hola", language_suspect: true })) });
+    const chat = chatOf();
+    await ready(api, chat);
+    await hold();
+    const box = screen.getByLabelText("Mensaje para el copiloto") as HTMLInputElement;
+    await waitFor(() => expect(box.value).toBe("hola"));
+    fireEvent.change(box, { target: { value: "" } });
+    fireEvent.change(box, { target: { value: "otro mensaje" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
+    expect(chat.send).toHaveBeenCalledWith("otro mensaje", undefined);
+  });
+
   it("prefers audio/mp4 over webm (the provider rejects webm)", async () => {
     FakeRecorder.isTypeSupported.mockImplementation((m) => m === "audio/mp4" || m === "audio/webm;codecs=opus");
     const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "hola" })) });

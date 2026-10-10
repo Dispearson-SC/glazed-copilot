@@ -146,7 +146,7 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
       const form = new FormData();
       form.append("audio", audio, filename);
       form.append("language", language);
-      return request<{ text: string }>("/voice/transcribe", { method: "POST", body: form });
+      return request<{ text: string; language_suspect?: boolean }>("/voice/transcribe", { method: "POST", body: form });
     },
     /** Text to speech: the backend answers audio/mpeg. */
     speak: async (text: string): Promise<Blob> =>
