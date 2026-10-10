@@ -68,6 +68,12 @@ export interface Execution {
 
 export type TurnStatus = "pending" | "done" | "failed" | "waiting_approval";
 
+export interface ReplyMeta {
+  source: "fast" | "agents";
+  template?: string;
+  elapsed_ms: number;
+}
+
 export interface Turn {
   turn_id: string;
   status: TurnStatus;
@@ -76,6 +82,7 @@ export interface Turn {
   still_running?: boolean;
   sanitized?: boolean;
   sanitized_fragments?: string[];
+  reply_meta?: ReplyMeta | null;
 }
 
 export type TraceKind = "message" | "tool_call" | "tool_result" | "escalation";

@@ -1,0 +1,145 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useApi } from "./ApiContext";
+import { ApiError } from "./api";
+import { buildHistory, type ChatMessage } from "./chatHistory";
+import { sanitizeReply } from "./sanitize";
+import type { Proposal } from "./types";
+
+export type ChatStatus = "idle" | "working" | "waiting_approval";
+
+export interface UseChatOptions {
+  storeId?: string;
+  /** Lazy start: nothing is fetched until true. */
+  enabled?: boolean;
+  pollMs?: number;
+  /** How long a 404 on a fresh turn is treated as "still queued". */
+  notFoundGraceMs?: number;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export function useChat(caseId: string, opts: UseChatOptions = {}) {
+  const { storeId = "", enabled = true, pollMs = 2500, notFoundGraceMs = 30_000 } = opts;
+  const api = useApi();
+  const [history, setHistory] = useState<ChatMessage[]>([]);
+  const [local, setLocal] = useState<ChatMessage[]>([]);
+  const [status, setStatus] = useState<ChatStatus>("idle");
+  const [stillRunning, setStillRunning] = useState(false);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [decisionError, setDecisionError] = useState<Error | null>(null);
+  const run = useRef(0); // bumped to cancel any in-flight polling loop
+  const seq = useRef(0);
+  const lastText = useRef("");
+
+  const refreshProposals = useCallback(async () => {
+    if (!caseId) return;
+    try {
+      const all = await api.listProposals({ case_id: caseId, status: "pending" });
+      setProposals(all.filter((p) => p.status === "pending"));
+    } catch {
+      /* keep the last list; the next refresh retries */
+    }
+  }, [api, caseId]);
+
+  useEffect(() => {
+    run.current++;
+    setHistory([]);
+    setLocal([]);
+    setStatus("idle");
+    setStillRunning(false);
+    setProposals([]);
+    if (!enabled || !caseId) return;
+    let alive = true;
+    api.getTrace(storeId, caseId).then((ev) => alive && setHistory(buildHistory(ev))).catch(() => {});
+    void refreshProposals();
+    return () => {
+      alive = false;
+      run.current++;
+    };
+  }, [api, caseId, storeId, enabled, refreshProposals]);
+
+  const addLocal = (m: Omit<ChatMessage, "id">) => setLocal((l) => [...l, { ...m, id: `l-${++seq.current}` }]);
+
+  const pollTurn = useCallback(
+    async (turnId: string, text: string, token: number) => {
+      const startedAt = Date.now();
+      const fail = (msg: string) => {
+        addLocal({ role: "error", text: msg, retryText: text });
+        setStatus("idle");
+        setStillRunning(false);
+      };
+      while (run.current === token) {
+        try {
+          const t = await api.getTurn(caseId, turnId);
+          if (run.current !== token) return;
+          if (t.status === "pending") {
+            setStillRunning(Boolean(t.still_running));
+          } else {
+            setStillRunning(false);
+            if (t.status === "failed") return fail(t.error || "El copiloto no pudo responder.");
+            if (t.reply) addLocal({ role: "assistant", text: sanitizeReply(t.reply), turnId, meta: t.reply_meta });
+            setStatus(t.status === "waiting_approval" ? "waiting_approval" : "idle");
+            await refreshProposals();
+            return;
+          }
+        } catch (e) {
+          const queued = e instanceof ApiError && e.status === 404 && Date.now() - startedAt < notFoundGraceMs;
+          if (!queued) return run.current === token ? fail((e as Error).message) : undefined;
+        }
+        await sleep(pollMs);
+      }
+    },
+    [api, caseId, pollMs, notFoundGraceMs, refreshProposals],
+  );
+
+  const submit = useCallback(
+    async (text: string, isRetry: boolean) => {
+      const clean = text.trim();
+      if (!clean || !caseId) return;
+      const token = ++run.current;
+      lastText.current = clean;
+      setLocal((l) => l.filter((m) => m.role !== "error"));
+      if (!isRetry) addLocal({ role: "user", text: clean });
+      setStatus("working");
+      setStillRunning(false);
+      try {
+        const { turn_id } = await api.sendMessage(caseId, clean);
+        await pollTurn(turn_id, clean, token);
+      } catch (e) {
+        if (run.current !== token) return;
+        addLocal({ role: "error", text: (e as Error).message, retryText: clean });
+        setStatus("idle");
+      }
+    },
+    [api, caseId, pollTurn],
+  );
+
+  const send = useCallback((text: string) => submit(text, false), [submit]);
+  const retry = useCallback(() => submit(lastText.current, true), [submit]);
+
+  const decide = useCallback(
+    async (proposalId: string, approved: boolean, reason?: string) => {
+      setDecisionError(null);
+      const idempotencyKey = crypto.randomUUID(); // once per click
+      try {
+        await api.decide(proposalId, approved ? { approved } : { approved, reason }, { idempotencyKey });
+      } catch (e) {
+        // 409: already decided elsewhere; the refresh below reconciles the list.
+        if (!(e instanceof ApiError && e.status === 409)) setDecisionError(e as Error);
+      }
+      await refreshProposals();
+    },
+    [api, refreshProposals],
+  );
+
+  return {
+    messages: [...history, ...local],
+    status,
+    stillRunning,
+    proposals,
+    decisionError,
+    send,
+    retry,
+    decide,
+  };
+}
