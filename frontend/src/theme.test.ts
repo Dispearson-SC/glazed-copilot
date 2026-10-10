@@ -11,7 +11,8 @@ describe("Artisanal Roast theme", () => {
     expect(colors.surface).toBe("#fff8f4");
     expect(colors["on-tertiary-container"]).toBe("#cb9564");
     const fonts = tailwind.theme?.extend?.fontFamily as Record<string, string[]>;
-    expect(fonts["headline-sm"][0]).toBe("Poppins");
+    for (const k of ["display-hero", "display-hero-mobile", "headline-lg", "headline-md", "headline-sm"]) expect(fonts[k][0]).toBe("Playfair Display");
+    for (const k of ["metric-value", "metric-value-sm", "body-lg", "body-md", "label-md", "label-sm"]) expect(fonts[k][0]).toBe("Plus Jakarta Sans");
     expect(fonts["body-md"][0]).toBe("Plus Jakarta Sans");
   });
 
@@ -19,7 +20,7 @@ describe("Artisanal Roast theme", () => {
     const html = readFileSync("index.html", "utf8");
     expect(html).toContain("Material+Symbols+Outlined");
     expect(html).toContain("Plus+Jakarta+Sans");
-    expect(html).toContain("Poppins");
+    expect(html).toContain("Playfair+Display");
     expect(html).toContain('content="#4b3025"');
   });
 
@@ -45,12 +46,21 @@ describe("legacy css layer", () => {
 });
 
 describe("design parity", () => {
-  it("loads the same fonts as the design source (plus the body font its tailwind config names)", () => {
+  it("loads Playfair Display (DESIGN.md display/headline), Plus Jakarta Sans and Material Symbols", () => {
     const html = readFileSync("index.html", "utf8");
-    expect(html).toContain("family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900");
-    expect(html).toContain("family=Poppins:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,200;1,300;1,400;1,500;1,600");
+    expect(html).toContain("family=Playfair+Display:wght@500;600;700");
+    expect(html).toContain("family=Plus+Jakarta+Sans:wght@400;500;600;700");
     expect(html).toContain("family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200");
-    expect(html).toContain("Plus+Jakarta+Sans");
+    expect(html).not.toContain("Poppins");
     expect(html).toContain('name="apple-mobile-web-app-capable"');
+  });
+
+  it("types display and headline roles as in DESIGN.md", () => {
+    const sizes = tailwind.theme?.extend?.fontSize as Record<string, [string, { lineHeight: string; fontWeight: string }]>;
+    expect(sizes["display-hero"][0]).toBe("40px");
+    expect(sizes["display-hero-mobile"][1].fontWeight).toBe("600");
+    expect(sizes["headline-lg"][0]).toBe("28px");
+    expect(sizes["headline-md"][1].fontWeight).toBe("500");
+    expect(sizes["headline-sm"][0]).toBe("18px");
   });
 });
