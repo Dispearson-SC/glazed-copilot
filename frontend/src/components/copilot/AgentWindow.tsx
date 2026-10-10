@@ -48,6 +48,12 @@ function agentsLine(a: AgentsStatusResponse | null): string {
   return `Listo · ${n} ${n === 1 ? "agente conectado" : "agentes conectados"}`;
 }
 
+/** 'Pensando con N agentes…' while a turn runs. */
+function thinkingLine(a: AgentsStatusResponse | null): string {
+  const n = a?.connected ? a.agents.filter((x) => x.status !== "down").length : 0;
+  return n === 0 ? "Pensando…" : `Pensando con ${n} ${n === 1 ? "agente" : "agentes"}…`;
+}
+
 /** Fetches the backend analysis of the issue once and hands it to the card. */
 function AnalysisLoader({ caseId, item, mode, open, busy, onApprove, onReject }: { caseId: string; item: DecisionItem; mode: AnalysisRef["mode"]; open: boolean; busy: boolean; onApprove: (i: DecisionItem) => void; onReject: (i: DecisionItem) => void }) {
   const api = useApi();
@@ -131,7 +137,7 @@ export default function AgentWindow({
         <div className="mx-auto max-w-[640px] px-4 pb-4">
           <section className="flex flex-col items-center px-2 pb-4 pt-5 text-center">
             <AgentOrb size={116} />
-            <span className="mt-2 font-label-sm text-label-sm text-on-surface-variant">{busy ? "Pensando…" : agentsLine(agents)}</span>
+            <span className="mt-2 font-label-sm text-label-sm text-on-surface-variant">{busy ? thinkingLine(agents) : agentsLine(agents)}</span>
             <h1 className="m-0 mt-2 font-headline-lg text-headline-lg tracking-tight text-primary">¿Qué decidimos hoy?</h1>
             <p className="m-0 mt-1 font-body-md text-body-md text-on-surface-variant">{pendingLine}</p>
           </section>

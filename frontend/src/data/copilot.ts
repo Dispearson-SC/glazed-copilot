@@ -1,7 +1,7 @@
 import { isUnavailable, type Api } from "../api";
 import { avgTicket, clockTime, dayMonth, longDate, shiftDate, signedPct, usd, usdWhole, weekdayDay } from "../format";
 import type {
-  AgentStatus, AlertRecord, DaySummary, DeliveriesResponse, ExpiringResponse, ForecastResponse, InventoryResponse, Issue, IssueAnalysis, Kpis, OrderPlan,
+  AgentStatus, AlertRecord, DaySummary, DeliveriesResponse, ExpiringResponse, ForecastResponse, InventoryResponse, Issue, IssueAnalysis, OrderPlan,
   Outlook, OutlookDay, MemoryRecord, PendingResponse, Range3, TurnProgress,
 } from "../types";
 
@@ -219,8 +219,6 @@ export interface DayView {
   date: string;
   expected: string;
   range: string | null;
-  /** Same-weekday average, shown when the forecast has no point for the day. */
-  baseline: string | null;
   /** "Pronóstico", "Pronóstico cerrado". */
   conf: string;
   real: string;
@@ -244,7 +242,6 @@ export interface DayViewInput {
   ayer: DaySummary | null;
   /** Day summary of as_of: only its calendar context is read, never its sales. */
   hoy: DaySummary | null;
-  kpis: Kpis | null;
   expiring: ExpiringResponse | null;
   /** GET /outlook: null/undefined = route unavailable ("Disponible pronto"); an object without the day = "Sin datos". */
   outlook?: Outlook | null;
@@ -284,7 +281,7 @@ function contextText(date: string, s: DaySummary | null): string {
 export const isPlaceholder = (v: string): boolean => ["Sin datos", SOON_TEXT, NO_FORECAST, "Pendiente"].includes(v);
 
 export function buildDayView(day: DayKey, input: DayViewInput): DayView {
-  const { asOf, forecast, ayer, hoy, kpis, expiring, outlook, metrics } = input;
+  const { asOf, forecast, ayer, hoy, expiring, outlook, metrics } = input;
   const date = day === "ayer" ? shiftDate(asOf, -1) : day === "hoy" ? asOf : shiftDate(asOf, 1);
   const point = forecast?.points.find((p) => p.date === date);
   const od: OutlookDay | undefined = day === "ayer" ? undefined : outlook?.days.find((d) => d.date === date);
@@ -293,34 +290,25 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
   const range = sales ? rangeText(sales.low, sales.high) : point ? rangeText(point.p10, point.p90) : null;
   const titles = { ayer: "Así cerró ayer", hoy: "Hoy en la sucursal", manana: "Mañana en la sucursal" } as const;
   const future = day !== "ayer";
-  const lostKpi = kpis?.lost_sales_usd;
 
   const view: DayView = {
     title: titles[day],
     date: cap(longDate(date)),
     expected: expectedValue == null ? "Sin datos" : usd(expectedValue),
     range,
-    baseline: null,
-    conf: day === "ayer" ? "Pronóstico cerrado" : "Pronóstico",
+    conf: day === "ayer" ? "Pronóstico cerrado" : `Pronóstico ${NO_DATA}`,
     real: "Pendiente",
     realNote: day === "hoy" ? "Se registra al cierre" : "Día futuro",
     realKnown: false,
-    weather: { icon: "partly_cloudy_day", tag: "pronóstico", temp: NO_FORECAST, text: NO_FORECAST, effect: null },
+    weather: { icon: "partly_cloudy_day", tag: "pronóstico", temp: NO_FORECAST, text: NO_FORECAST, effect: NO_DATA },
     traffic: { value: metrics ? NO_DATA : SOON_TEXT, caption: "visitas esperadas" },
     context: contextText(date, day === "manana" ? null : day === "hoy" ? hoy : ayer),
     orders: { label: "Pedidos esperados", value: metrics || outlook ? NO_DATA : SOON_TEXT },
     ticket: { value: metrics || outlook ? NO_DATA : SOON_TEXT },
     conversion: { value: metrics ? NO_DATA : SOON_TEXT },
     waste: { label: "Merma esperada", value: outlook ? NO_DATA : SOON_TEXT, sub: "a costo" },
-    lost: {
-      label: "Venta perdida (7 días)",
-      value: lostKpi?.mid == null ? "Sin datos" : usd(lostKpi.mid),
-      sub: `${rangeText(lostKpi?.low, lostKpi?.high) ?? "Sin datos"} · por falta de producto`,
-    },
+    lost: { label: "Venta perdida esperada", value: outlook ? NO_DATA : SOON_TEXT, sub: "por falta de producto" },
   };
-
-  const weekdayAvg = (day === "ayer" ? ayer : day === "hoy" ? hoy : null)?.vs_same_weekday_avg;
-  if (expectedValue == null && weekdayAvg) view.baseline = `Promedio mismo día (${weekdayAvg.weeks_used} sem): ${usd(weekdayAvg.baseline_net_sales)}`;
 
   if (!future) {
     const t = ayer?.totals;
@@ -335,13 +323,13 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
       tag: "observado",
       temp: wx?.temp_max_c == null || wx.temp_min_c == null ? "Sin datos" : `${Math.round(wx.temp_max_c)}° / ${Math.round(wx.temp_min_c)}°`,
       text: wx ? (rainy ? `Lluvia ${wx.precip_mm} mm` : "Sin lluvia") : "Sin datos",
-      effect: null,
+      effect: NO_DATA,
     };
-    view.traffic = { value: t?.footfall == null ? "Sin datos" : String(Math.round(t.footfall)), caption: "visitas" };
-    view.orders = { label: "Pedidos", value: t?.transactions == null ? "Sin datos" : String(t.transactions) };
+    view.traffic = { value: t?.footfall == null ? "Sin datos" : String(Math.round(t.footfall)), caption: "visitas esperadas" };
+    view.orders = { label: "Pedidos esperados", value: t?.transactions == null ? "Sin datos" : String(t.transactions) };
     view.ticket = { value: t ? avgTicket(t.net_sales, t.transactions) : "Sin datos" };
     view.conversion = { value: t?.footfall && t.transactions != null ? `${((t.transactions / t.footfall) * 100).toFixed(1)}%` : "Sin datos" };
-    view.waste = { label: "Merma real", value: "Sin datos", sub: kpis?.waste_usd == null ? "Sin datos" : `Últimos 7 días: ${usd(kpis.waste_usd)}` };
+    view.waste = { label: "Merma esperada", value: "Sin datos", sub: "a costo · real" };
     return view;
   }
 
@@ -361,7 +349,7 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
     if (waste?.mid != null) view.waste = { label: "Merma esperada", value: usd(waste.mid), sub: `a costo · ${rangeText(waste.low, waste.high) ?? "Sin datos"}` };
     const lost = od.expected_lost_sales_usd;
     if (od.weather_note) view.weather = { ...view.weather, temp: od.weather_note, text: od.weather_note };
-    if (lost?.mid != null) view.lost = { label: "Venta perdida esperada", value: usd(lost.mid), sub: `${rangeText(lost.low, lost.high) ?? "Sin datos"} · por falta de producto` };
+    if (lost && rangeText(lost.low, lost.high)) view.lost = { label: "Venta perdida esperada", value: rangeText(lost.low, lost.high)!, sub: "por falta de producto" };
   }
   const exp = expiring?.by_day?.find((d) => d.date === date)?.waste_usd;
   if ((view.waste.value === SOON_TEXT || view.waste.value === NO_DATA) && exp?.mid != null) view.waste = { label: "Merma esperada", value: usd(exp.mid), sub: `a costo · ${rangeText(exp.low, exp.high) ?? "Sin datos"}` };

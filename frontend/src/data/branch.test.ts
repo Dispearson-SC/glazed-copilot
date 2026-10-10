@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, branchKpis, hoySummary, inventoryWithStatus, metricForecasts, orderPlanA, outlookA } from "../test/copilotFixtures";
+import { ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, hoySummary, inventoryWithStatus, metricForecasts, orderPlanA, outlookA } from "../test/copilotFixtures";
 import { buildDayView, isPlaceholder, buildInventoryRows, buildScheduled } from "./copilot";
 
-const input = { asOf: "2026-07-19", forecast: branchForecast, ayer: ayerSummary, hoy: hoySummary, kpis: branchKpis, expiring: branchExpiring };
+const input = { asOf: "2026-07-19", forecast: branchForecast, ayer: ayerSummary, hoy: hoySummary, expiring: branchExpiring };
 
 describe("buildDayView", () => {
   it("Ayer: expected from the forecast, real from the day summary, compared with the same-weekday average", () => {
@@ -12,8 +12,8 @@ describe("buildDayView", () => {
       realNote: "+25% vs promedio mismo día", conf: "Pronóstico cerrado",
     });
     expect(v.weather).toMatchObject({ tag: "observado", temp: "37° / 29°", text: "Lluvia 4.6 mm", icon: "rainy" });
-    expect(v.traffic).toEqual({ value: "734", caption: "visitas" });
-    expect(v.orders).toEqual({ label: "Pedidos", value: "105" });
+    expect(v.traffic).toEqual({ value: "734", caption: "visitas esperadas" });
+    expect(v.orders).toEqual({ label: "Pedidos esperados", value: "105" });
     expect(v.ticket.value).toBe("$8.09");
     expect(v.conversion.value).toBe("14.3%");
     expect(v.context).toBe("Sábado · vacaciones escolares");
@@ -21,7 +21,7 @@ describe("buildDayView", () => {
 
   it("Hoy: expected only; real sales are never shown, whatever the day summary carries", () => {
     const v = buildDayView("hoy", input);
-    expect(v).toMatchObject({ title: "Hoy en la sucursal", expected: "$868.54", range: "$700 – $1,101", real: "Pendiente", realNote: "Se registra al cierre", conf: "Pronóstico" });
+    expect(v).toMatchObject({ title: "Hoy en la sucursal", expected: "$868.54", range: "$700 – $1,101", real: "Pendiente", realNote: "Se registra al cierre", conf: "Pronóstico Sin datos" });
     expect(JSON.stringify(v)).not.toContain("1,135");
     expect(JSON.stringify(v)).not.toContain("1135");
     expect(v.weather).toMatchObject({ tag: "pronóstico", temp: "Sin pronóstico", text: "Sin pronóstico" });
@@ -42,13 +42,14 @@ describe("buildDayView", () => {
     expect(v.range).toBeNull();
   });
 
-  it("shows the expected waste of the day from /expiring and the 7-day lost sales from /kpis", () => {
+  it("shows the expected waste of the day from /expiring; lost sales need the outlook and Ayer's waste is unknown", () => {
     const hoy = buildDayView("hoy", input);
     expect(hoy.waste).toEqual({ label: "Merma esperada", value: "Disponible pronto", sub: "a costo" });
     const manana = buildDayView("manana", input);
     expect(manana.waste).toEqual({ label: "Merma esperada", value: "$12.25", sub: "a costo · $11 – $15" });
-    expect(manana.lost).toEqual({ label: "Venta perdida (7 días)", value: "$534.62", sub: "$75 – $691 · por falta de producto" });
-    expect(buildDayView("ayer", input).waste).toEqual({ label: "Merma real", value: "Sin datos", sub: "Últimos 7 días: $1,202.09" });
+    expect(manana.lost).toEqual({ label: "Venta perdida esperada", value: "Disponible pronto", sub: "por falta de producto" });
+    expect(buildDayView("ayer", input).waste).toEqual({ label: "Merma esperada", value: "Sin datos", sub: "a costo · real" });
+    expect(buildDayView("ayer", input).lost.value).toBe("Disponible pronto");
   });
 });
 
@@ -64,7 +65,7 @@ describe("buildDayView with /outlook", () => {
     expect(v.orders.value).toBe("118");
     expect(v.ticket.value).toBe("$7.60");
     expect(v.waste).toEqual({ label: "Merma esperada", value: "$8.00", sub: "a costo · $5 – $11" });
-    expect(v.lost).toEqual({ label: "Venta perdida esperada", value: "$20.00", sub: "$10 – $30 · por falta de producto" });
+    expect(v.lost).toEqual({ label: "Venta perdida esperada", value: "$10 – $30", sub: "por falta de producto" });
     expect(v.weather.text).toBe("Sin pronóstico");
   });
   it("says 'Sin datos' for a day the outlook does not cover (the route is deployed)", () => {
@@ -90,7 +91,7 @@ describe("buildDayView with the metric forecasts (/forecast?metric=...) and the 
     expect(v.ticket.value).toBe("$9.24");
     expect(v.conversion.value).toBe("10.3%");
     expect(v.waste).toEqual({ label: "Merma esperada", value: "$0.00", sub: "a costo · $0 – $0" });
-    expect(v.lost).toEqual({ label: "Venta perdida esperada", value: "$26.05", sub: "$0 – $105 · por falta de producto" });
+    expect(v.lost).toEqual({ label: "Venta perdida esperada", value: "$0 – $105", sub: "por falta de producto" });
     expect(v.weather.text).toBe("Sin pronóstico");
   });
 
@@ -111,14 +112,6 @@ describe("buildDayView with the metric forecasts (/forecast?metric=...) and the 
   it("does not show a conversion the backend marks as not valid", () => {
     const bad = { ...metricForecasts, conversion: { ...metricForecasts.conversion, conversion_valid: false } as never };
     expect(buildDayView("manana", { ...input, metrics: bad }).conversion.value).toBe("Sin datos");
-  });
-});
-
-describe("same-weekday baseline when the forecast has no point for the day", () => {
-  it("shows the backend's same-weekday average for Ayer and Hoy instead of an empty range", () => {
-    expect(buildDayView("ayer", { ...input, forecast: null }).baseline).toBe("Promedio mismo día (7 sem): $677.87");
-    expect(buildDayView("hoy", { ...input, forecast: null }).baseline).toBe("Promedio mismo día (7 sem): $700.00");
-    expect(buildDayView("manana", { ...input, forecast: null }).baseline).toBeNull();
   });
 });
 

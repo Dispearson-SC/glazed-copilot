@@ -86,7 +86,7 @@ describe("Decisiones window", () => {
     await waitFor(() => expect(vi.mocked(api.getPending).mock.calls.length).toBeGreaterThan(calls));
     expect(screen.getByRole("button", { name: "Decisiones, 2 pendientes" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Memorias, / })).toBeNull();
-    expect(screen.getByText(/Sin decisiones resueltas hoy/)).toBeInTheDocument();
+    expect(screen.getByText("0 decisiones automáticas (N1) ya colocadas hoy")).toBeInTheDocument();
   });
 
   it("disables the card buttons while the decision is in flight and enables them again after", async () => {

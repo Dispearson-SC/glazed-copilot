@@ -42,12 +42,12 @@ describe("CapsuleNav", () => {
 });
 
 describe("CopilotTopBar", () => {
-  it("shows the brand, the branch and an accessible settings button", async () => {
+  it("shows the brand, the store code and an accessible settings button", async () => {
     const onSettings = vi.fn();
-    render(<CopilotTopBar branch="Shop-in-Shop 1" onSettings={onSettings} />);
+    render(<CopilotTopBar storeCode="S030" onSettings={onSettings} />);
     const bar = screen.getByRole("banner");
     expect(within(bar).getByText("Glazed Co.")).toBeInTheDocument();
-    expect(within(bar).getByText(/Copiloto · Shop-in-Shop 1/)).toBeInTheDocument();
+    expect(within(bar).getByText(/Copiloto · Sucursal S030/)).toBeInTheDocument();
     const btn = within(bar).getByRole("button", { name: "Ajustes del copiloto" });
     expect(btn.className).toMatch(/w-11/);
     await userEvent.click(btn);

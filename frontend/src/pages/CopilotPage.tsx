@@ -66,7 +66,7 @@ function CopilotShell() {
   );
 
   const b = branch_.data;
-  const dayView = b ? buildDayView(state.day, { asOf: simToday, forecast: b.forecast, ayer: b.ayer, hoy: b.hoy, kpis: b.kpis, expiring: b.expiring, outlook: b.outlook, metrics: b.metrics }) : null;
+  const dayView = b ? buildDayView(state.day, { asOf: simToday, forecast: b.forecast, ayer: b.ayer, hoy: b.hoy, expiring: b.expiring, outlook: b.outlook, metrics: b.metrics }) : null;
 
   const ask = (w: WarningItem) => {
     const userText = `Explícame: ${w.title}`;
@@ -79,7 +79,7 @@ function CopilotShell() {
 
   return (
     <div className="min-h-screen bg-surface font-body-md text-body-md text-on-surface">
-      <CopilotTopBar branch={branch ?? site} onSettings={() => showToast("Ajustes: disponible pronto")} />
+      <CopilotTopBar storeCode={storeId} onSettings={() => showToast("Ajustes: disponible pronto")} />
       {state.tab === "agente" && (
         <AgentWindow
           caseId={caseId}
@@ -110,6 +110,7 @@ function CopilotShell() {
       )}
       {state.tab === "sucursal" && (
         <BranchWindow
+          storeCode={storeId}
           day={state.day}
           onDay={(day) => dispatch({ type: "day", day })}
           view={dayView}
@@ -117,12 +118,12 @@ function CopilotShell() {
           inventoryFailed={Boolean(b?.failed.includes("inventory"))}
           scheduled={buildScheduled(b?.deliveries ?? null)}
           pendingBuy={visible.filter((i) => i.kind === "tech").length}
-          partial={Boolean(b?.failed.length)}
           onGoDecisiones={() => dispatch({ type: "tab", tab: "decisiones" })}
         />
       )}
       {state.tab === "memorias" && (
         <MemoriesWindow
+          storeCode={storeId}
           memories={memories}
           filter={state.memFilter}
           onFilter={(value) => dispatch({ type: "memFilter", value })}

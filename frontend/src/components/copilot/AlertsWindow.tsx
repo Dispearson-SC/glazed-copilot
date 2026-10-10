@@ -51,7 +51,7 @@ export default function AlertsWindow({
             </div>
           </div>
           <div className="flex items-center justify-between gap-2 pl-12">
-            <span className="font-label-sm text-label-sm font-normal text-outline">{w.agent ?? "Agente no informado"}</span>
+            <span className="font-label-sm text-label-sm font-normal text-outline">{w.agent ?? "Sin datos"}</span>
             <button
               type="button"
               onClick={() => onAsk(w)}

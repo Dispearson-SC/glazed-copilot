@@ -72,7 +72,7 @@ export default function DecisionsWindow({
         {techs.length === 0 && loadState === "ok" && <p className="m-0 rounded-[18px] bg-surface-container p-4 text-center text-[13px] leading-[19px] text-on-surface-variant">Todas las decisiones técnicas de hoy están resueltas.</p>}
         <p className="m-0 mt-1 flex items-center justify-center gap-1.5 font-label-sm text-label-sm font-normal text-on-surface-variant">
           <span aria-hidden="true" className="material-symbols-outlined text-[14px]">bolt</span>
-          {accepted > 0 ? `${accepted} aceptada${accepted > 1 ? "s" : ""} por ti` : "Sin decisiones resueltas hoy"}
+          0 decisiones automáticas (N1) ya colocadas hoy{accepted > 0 ? ` · ${accepted} aceptada${accepted > 1 ? "s" : ""} por ti` : ""}
         </p>
       </section>
     </main>

@@ -96,7 +96,7 @@ describe("Sucursal window", () => {
     await openSucursal(api({ getInventory: async () => inventoryWithStatus }));
     const row = (await screen.findByText("Better For You Breakfast Sandwich")).closest("div[data-row]") as HTMLElement;
     expect(within(row).getByText("Crítico")).toBeInTheDocument();
-    expect(within(row).getByText(/se agota antes de la próxima entrega/)).toBeInTheDocument();
+    expect(within(row).getByText("Crítico")).toHaveAttribute("title", expect.stringContaining("se agota antes de la próxima entrega"));
     expect(within(row).getByText("51.31 en 3 días")).toBeInTheDocument();
     expect(within(row).getByText("+40 · llega lun 20")).toBeInTheDocument();
   });

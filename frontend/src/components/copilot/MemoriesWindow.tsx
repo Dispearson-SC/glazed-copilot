@@ -30,11 +30,13 @@ export function FilterChips({ options, value, onChange }: { options: readonly (r
 
 /** Memorias window: search, category filters and what the copilot knows about the branch. */
 export default function MemoriesWindow({
+  storeCode,
   memories,
   filter,
   onFilter,
   state,
 }: {
+  storeCode: string;
   memories: Memory[];
   filter: string;
   onFilter: (f: string) => void;
@@ -45,7 +47,7 @@ export default function MemoriesWindow({
   return (
     <main className="mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 pb-28 pt-[68px]">
       <header className="flex flex-col gap-1 pt-3">
-        <span className="font-label-md text-label-md uppercase tracking-[0.05em] text-on-tertiary-container">Poco a poco</span>
+        <span className="font-label-md text-label-md uppercase tracking-[0.05em] text-on-tertiary-container">Poco a poco · {storeCode}</span>
         <h1 className="m-0 font-headline-lg text-headline-lg tracking-tight text-primary">Memorias técnicas</h1>
         <p className="m-0 font-body-md text-body-md text-on-surface-variant">Lo que el copiloto sabe de tu sucursal. Cada cifra se verifica contra el registro de decisiones.</p>
       </header>

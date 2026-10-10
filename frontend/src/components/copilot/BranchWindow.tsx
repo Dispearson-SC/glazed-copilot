@@ -22,6 +22,7 @@ function Tile({ value, label }: { value: string; label: string }) {
 
 /** Sucursal window: Ayer / Hoy / Mañana, sales, weather, KPIs, inventory and scheduled purchases. */
 export default function BranchWindow({
+  storeCode,
   day,
   onDay,
   view,
@@ -29,9 +30,9 @@ export default function BranchWindow({
   inventoryFailed,
   scheduled,
   pendingBuy,
-  partial,
   onGoDecisiones,
 }: {
+  storeCode: string;
   day: DayKey;
   onDay: (d: DayKey) => void;
   view: DayView | null;
@@ -39,7 +40,6 @@ export default function BranchWindow({
   inventoryFailed: boolean;
   scheduled: ScheduledRow[];
   pendingBuy: number;
-  partial: boolean;
   onGoDecisiones: () => void;
 }) {
   if (!view) {
@@ -53,7 +53,7 @@ export default function BranchWindow({
     <main className="mx-auto flex w-full max-w-[640px] flex-col gap-5 px-4 pb-28 pt-[68px]">
       <header className="flex flex-col gap-3 pt-3">
         <div>
-          <span className="font-label-md text-label-md uppercase tracking-[0.05em] text-on-tertiary-container">Sucursal</span>
+          <span className="font-label-md text-label-md uppercase tracking-[0.05em] text-on-tertiary-container">Sucursal {storeCode}</span>
           <h1 className="m-0 font-headline-lg text-headline-lg tracking-tight text-primary">{view.title}</h1>
           <p className="m-0 font-body-md text-body-md text-on-surface-variant">{view.date}</p>
         </div>
@@ -71,7 +71,6 @@ export default function BranchWindow({
             </button>
           ))}
         </div>
-        {partial && <p role="status" className="m-0 font-label-sm text-label-sm text-on-surface-variant">Algunos datos no cargaron; se muestran como «Sin datos».</p>}
       </header>
 
       <section className="relative overflow-hidden rounded-[20px] bg-primary-container p-6 text-white shadow-hero">
@@ -83,7 +82,7 @@ export default function BranchWindow({
           </div>
           <div>
             <span className={isPlaceholder(view.expected) ? "block text-[16px] font-medium leading-9 text-surface-variant" : "block font-headline-lg text-[30px] font-bold leading-9 tracking-tight text-surface"}>{view.expected}</span>
-            <span className="font-label-sm text-label-sm font-normal text-surface-variant">{view.range ? `Rango probable ${view.range}` : (view.baseline ?? "Rango probable: Sin datos")}</span>
+            <span className="font-label-sm text-label-sm font-normal text-surface-variant">Rango probable {view.range ?? "Sin datos"}</span>
           </div>
           <div className="h-px bg-white/[.12]" />
           <div className="flex items-center justify-between gap-2">
@@ -103,8 +102,8 @@ export default function BranchWindow({
             <span className="font-label-sm text-label-sm font-semibold text-on-surface-variant">Clima · {view.weather.tag}</span>
           </div>
           <span className={isPlaceholder(view.weather.temp) ? EMPTY : "text-[22px] font-bold leading-7 text-primary"}>{view.weather.temp}</span>
-          {!isPlaceholder(view.weather.text) && <span className="text-[12px] leading-4 text-on-surface-variant">{view.weather.text}</span>}
-          {view.weather.effect && <span className="self-start rounded-full bg-[rgba(185,133,86,.15)] px-2 py-0.5 font-label-sm text-label-sm font-semibold text-on-tertiary-fixed-variant">{view.weather.effect}</span>}
+          <span className="text-[12px] leading-4 text-on-surface-variant">{view.weather.text}</span>
+          <span className="self-start rounded-full bg-[rgba(185,133,86,.15)] px-2 py-0.5 font-label-sm text-label-sm font-semibold text-on-tertiary-fixed-variant">{view.weather.effect}</span>
         </div>
         <div className={card}>
           <div className="flex items-center gap-2">
@@ -137,8 +136,9 @@ export default function BranchWindow({
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 className="m-0 font-headline-sm text-headline-sm text-primary">Inventario y salida</h2>
-            <p className="m-0 font-label-sm text-label-sm font-normal text-on-surface-variant">Actual · salida prevista · entrega programada</p>
+            <p className="m-0 font-label-sm text-label-sm font-normal text-on-surface-variant">Actual · salida pronosticada hoy · programado</p>
           </div>
+          <span className="flex-shrink-0 rounded-full bg-surface-container px-2.5 py-0.5 font-label-sm text-label-sm font-semibold text-secondary">Proyección desde hoy</span>
         </div>
         {inventoryFailed && <p className="m-0 text-[13px] text-on-surface-variant">Sin datos de inventario</p>}
         {inventory.map((r) => (
@@ -150,7 +150,6 @@ export default function BranchWindow({
             <div className="h-1.5 overflow-hidden rounded-full bg-surface-container">
               <div className="h-full rounded-full bg-on-tertiary-container" style={{ width: `${r.fill}%` }} />
             </div>
-            {r.reason && <p className="m-0 font-label-sm text-label-sm font-normal text-on-surface-variant">{r.reason}</p>}
             <div className="grid grid-cols-3 gap-2 font-label-sm text-label-sm font-normal text-on-surface-variant">
               <span>Actual <b className="text-on-surface">{r.now}</b></span>
               <span>Salida <b className="text-on-surface">{r.out}</b></span>
