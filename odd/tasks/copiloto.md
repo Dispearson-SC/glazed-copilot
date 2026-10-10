@@ -64,36 +64,46 @@ Strict. Runner: `cd frontend && npm test -- --run`; plus `npm run build` and `np
 - Mañana weather: "Sin pronóstico", permanent. `/forecast?level=store` is live (new `calibration`, `band_method` fields; band rendered as a plain range).
 - Each not-yet-served source is one function in `src/data/copilot.ts` returning `{status:"soon"}` (UI: "Disponible pronto").
 
-## GAP LIST
-Format: design element | needed field/endpoint | current backend status | suggested contract.
+## GAP LIST (updated after Wave 14, 2026-10-10)
+Format: design element | needed field/endpoint | backend status | suggested contract.
 
+### Resolved by Wave 14 (adapters now call the real routes)
+| Design element | Route | Notes |
+|---|---|---|
+| Analyze/dialogue context in chat | `POST /cases/{id}/messages {text, context:{issue_id, option_id?, mode}}` | RESOLVED. The text is no longer prefixed. Warnings are not issues, so "Preguntar" sends plain text. |
+| Analysis card sections | `GET /cases/{id}/issues/{issue_id}/analysis` | RESOLVED (Spanish). |
+| Approvals vs technical lists | `GET /cases/{id}/decisions/pending` | RESOLVED. The client-side split is gone. |
+| Aceptar/Aprobar in one call | `POST /cases/{id}/decisions` + `Idempotency-Key` | RESOLVED. 409 = already decided, 400 = reject without reason. |
+| Order-plan line without issue | every technical item carries `issue_id`/`option_id` | RESOLVED (a null id still renders read-only). |
+| Expected visits, ticket, orders, conversion (Hoy/Mañana) | `GET /forecast?metric=footfall|transactions|avg_ticket|conversion`, `GET /outlook?days=2` | RESOLVED. Outlook weather is null: "Sin pronóstico" (permanent). |
+| Hoy/Mañana waste and lost-sales ranges | `GET /outlook?days=2` | RESOLVED. `lost_sales high` is a sum of per-SKU p90 and is rendered as the served range. |
+| Inventory pill critical/watch/ok | `inventory.items[].status`, `status_reason`, `forecast_outflow_units`, `scheduled_in_units`, `next_delivery_date` | RESOLVED. |
+| Memorias | `GET /cases/{id}/memories` | RESOLVED (`verified`, `new`). Rejection memories are created server-side; the client refetches. |
+| Alert category, agent, time | `category`, `agent_id`, `ts` on `/alerts` | RESOLVED. `automatica` fills "Automáticas" (compliance alerts, not N1 actions). |
+| "Listo · N agentes conectados" | `GET /agents/status` | RESOLVED (all agents share the Core state). |
+| "Consultando a X y Y…" | `GET turn` -> `progress[]` | RESOLVED. |
+| Capsule badges | `GET /cases/{id}/inbox-counts` -> `{approvals, technical, alerts}` | RESOLVED for Decisiones and Alertas. There is no memories count: the Memorias badge counts memories with `new: true`. |
+
+### Still missing
 | Design element | Needed field/endpoint | Backend status | Suggested contract |
 |---|---|---|---|
-| Analyze/dialogue context in chat | `context` on messages | missing (context is prefixed into the text: `chatContextText`) | `POST /cases/{id}/messages {text, context:{issue_id, option_id?, mode}}` |
-| Analysis card sections (Problema/Pros/Contras...) | per-issue analysis | missing (sections are built from issue fields, backend strings in English) | `GET /cases/{id}/issues/{issue_id}/analysis -> {problem[], recommendation[], pros[], cons[], approval[]}` in Spanish |
-| Approvals vs technical lists | pending split | partial (derived from `/issues` + `/order-plan` + `/proposals`) | `GET /cases/{id}/decisions/pending -> {approvals, technical}` |
-| Aceptar/Aprobar in one call | atomic decision | partial (2 calls: `POST /proposals`, `POST /proposals/{id}/decision`) | `POST /cases/{id}/decisions {issue_id, option_id, approved, reason?}` |
-| Order-plan line without issue | decidable option | partial (read-only card, "Disponible pronto") | every line carries `issue` + winning `option_id` |
-| Hour deadline ("Hoy antes de 14:00") | time of day in urgency | missing (date only) | `urgency.deadline_at` ISO datetime |
-| Expected visits, weather forecast (Hoy/Mañana) | `/forecast?metric=traffic|weather` | missing (Mañana: "Sin pronóstico", permanent) | `/forecast?metric=traffic -> points[{date,value,p10,p90}]` |
-| Expected orders, ticket, conversion (Hoy/Mañana) | forecast of transactions/ticket/conversion | missing | `/forecast?metric=transactions|ticket|conversion` |
-| Forecast confidence "Pronóstico 80%" | forecast confidence | partial (`calibration`, `band_method`, `metrics_to_date` null) | `calibration.coverage` as a number |
-| Expected sales Ayer / Hoy | forecast point for `as_of-1` and `as_of` | missing in the live backend at the time of the check (`/forecast` returns only `as_of+1..`; an earlier run did return past points with `actual`); UI shows "Sin datos" plus the same-weekday average from day-summary | include `as_of-1` and `as_of` points (Hoy's `actual` is never rendered) |
-| Expected sales Mañana | `/forecast?level=store` point for `as_of+1` | exists | none |
-| Hoy/Mañana orders, ticket, waste, lost sales ranges | `GET /cases/{id}/outlook?days=2` | approved, answers 404 today -> "Disponible pronto" (adapter `fetchOutlook`; shape as proposed, unverified) | `{days:[{date, net_sales{low,mid,high}, transactions, ticket, expected_waste_usd, expected_lost_sales_usd, weather:null}]}` |
-| Conversion (Hoy/Mañana) | expected conversion | missing | add `conversion{low,mid,high}` to outlook days |
-| Ayer waste (per day) | real waste of a given day | missing (only 7-day `kpis.waste_usd`) | `/kpis?date_from=&date_to=` already supports a window: expose per-day |
-| Expected waste per day | per-day waste forecast and per-day real waste | partial (`/expiring.by_day` forward; `/kpis.waste_usd` 7-day) | `/kpis?date=` or `/expiring` for a given day |
-| Inventory pill critical/follow-up/ok | status fields | missing (UI shows days of cover instead) | `inventory.items[].status: critical|watch|ok` |
-| Memorias (Proveedores/Demanda/Eventos/Preferencias) | memory store with category, source, case count | missing (only `history.decision_log` and `suppliers/performance`) | `GET /cases/{id}/memories -> [{id, category, text, source, n_cases, confidence, created_at}]` |
-| Alert severity/tone (Crítica/Seguimiento) | `severity` level on alerts | missing (all open alerts show "Seguimiento"; integrity "Datos") | `severity: critical|watch|info` |
-| Alert category, agent, time | `category`, `agent_id` on alerts | missing (`alert_type` numeric, no agent, mixed old cases) | `GET /alerts` with `category: operacion|datos|auto`, `agent_id`, `created_at` |
-| N1 automatic actions + Revertir | `GET /cases/{id}/autonomy/log`, revert | missing (N1 auto-execution does not exist; button hidden) | `GET /cases/{id}/autonomy/log`, `POST /cases/{id}/autonomy/{action_id}/revert` |
-| "6 agentes conectados" | `GET /agents/status` | missing (orb shows "Listo"/"Pensando…") | `GET /agents/status -> [{agent_id, name, state}]` |
-| "Consultando a Abastecimiento y Pasado…" | turn `progress[]` | missing (shows "Esperando respuesta…") | `GET /turns/{id}` -> `progress:[{agent, state}]` |
-| Capsule badges | `GET /cases/{id}/inbox-counts` | missing (counted from loaded lists) | `{decisiones, memorias, alertas}` |
+| Hour deadline ("Hoy antes de 14:00") | time of day in urgency | missing (date only; technical `deadline` is null once passed) | `urgency.deadline_at` ISO datetime |
 | Product photos | image URL per SKU | missing (initials thumbnail) | `products[].image_url` |
-| Spanish narrative | backend text fields (`urgency.reason`, `risk[]`, `tier_reasons[]`) are English | partial (shown as received) | return Spanish or codes |
+| Spanish narrative fields | `urgency.reason`, `risk[]`, `tier_reasons[]`, `if_act`, `if_not` on `/issues` | partial: pending/analysis/inbox are Spanish; raw `/issues`, `/alerts.issue` and integrity issues are still English | return Spanish or codes |
+| Expected sales for Ayer and Hoy | net-sales forecast points for `as_of-1` and `as_of` | missing (`/forecast` starts at `as_of+1`; the metric forecasts DO include past days) | include `as_of-1` and `as_of` in the net_sales forecast (Hoy `actual` is never rendered) |
+| Ayer waste (per day) | real waste of a given day | missing (only 7-day `kpis.waste_usd`) | `/kpis?date_from=&date_to=` per day |
+| Hoy waste and lost sales | outlook day for `as_of` | missing (`/outlook` starts at `as_of+1`) | include today in outlook |
+| Forecast confidence "Pronóstico 80%" | `calibration.coverage` as a number | partial (`calibration.factor`, `metrics_to_date` null) | `calibration.coverage` |
+| Alert severity tone (Crítica) | `severity` on alerts | missing (operación is always "Seguimiento") | `severity: critical|watch|info` |
+| Alert "Preguntar" context | alert -> issue id accepted by `context.issue_id` | unverified (alert ids are not issue ids; `issue_key` may work) | document that `issue_key` is accepted |
+| N1 automatic actions + Revertir | `GET /cases/{id}/autonomy/log`, revert | missing (no N1 auto-execution; button hidden) | `GET /cases/{id}/autonomy/log`, `POST /cases/{id}/autonomy/{action_id}/revert` |
+| Hourly activity (Main "Actividad de hoy") | hourly sales and orders of the day | missing | `GET /cases/{id}/day-summary` with `by_hour[{hour, net_sales, orders}]` |
+| Daily goal (Main "Meta diaria") | daily sales target | missing | `GET /cases/{id}/targets -> {daily_sales_goal}` |
+| Shift label and clock (Main live badge) | shift name and time | missing | `day-summary.context.shift` |
+| Report PDF and close of cash register (Main buttons) | report export and shift close | missing (buttons disabled) | `GET /cases/{id}/report.pdf`, `POST /cases/{id}/shift/close` |
+| Product category line in Main favorites | `top_skus[].category` | missing | add `category` |
+| Login credentials | auth | out of scope: access is controlled by the reverse proxy | n/a |
+
 - T7 done: 390px screenshots (device scale 2) of /login, /, /copiloto (5 windows, Sucursal Ayer/Hoy/Mañana, ⋯ menu, reject sheet) and /chat against the live backend (case fce42dd29fba, S030, 2026-07-19), plus the designs rendered statically for side-by-side comparison. Fixes from the comparison (commit below): empty values drawn small and muted, same-weekday average when the forecast has no point, Decisiones date as "Domingo 19 de julio". GREEN 288/288, build ok, tsc ok. frontend/README documents /copiloto.
   - Screenshots (/tmp/claude-1000/-home-ubuntu-projects-Softek-HackSaltillo/f51834ed-8468-4a7c-b56c-0be058b08087/scratchpad/shots/): app-login, app-main(-full), app-copiloto-{agente,decisiones,sucursal,memorias,alertas}(-full), app-copiloto-sucursal-{ayer,manana}-full, app-copiloto-decisiones-menu, app-copiloto-rejectsheet, app-chat. Design renders: /tmp/claude-1000/-home-ubuntu-projects-Softek-HackSaltillo/f51834ed-8468-4a7c-b56c-0be058b08087/scratchpad/dshots/d-*.png; side-by-sides: /tmp/claude-1000/-home-ubuntu-projects-Softek-HackSaltillo/f51834ed-8468-4a7c-b56c-0be058b08087/scratchpad/cmp/*.png.
   - Vite was started WITHOUT `VITE_API_URL` (default proxy to :8100): with `VITE_API_URL=http://localhost:8100` the browser calls the backend cross-origin and the backend sends no CORS headers (README), so every request failed.
