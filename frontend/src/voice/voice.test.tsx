@@ -78,7 +78,17 @@ class FakeRecognition {
   abort = vi.fn();
   stop = vi.fn(() => this.onend?.());
   constructor() { FakeRecognition.instances.push(this); }
-  say(text: string) { this.onresult?.({ results: [{ isFinal: true, 0: { transcript: text } }] }); }
+  results: Array<{ isFinal: boolean; 0: { transcript: string } }> = [];
+  say(text: string) { this.results.push({ isFinal: true, 0: { transcript: text } }); this.emit(); }
+  /** Replaces the trailing interim result. */
+  interim(text: string) {
+    if (this.results.length && !this.results[this.results.length - 1].isFinal) this.results.pop();
+    this.results.push({ isFinal: false, 0: { transcript: text } });
+    this.emit();
+  }
+  private emit() { this.onresult?.({ results: this.results }); }
+  /** Browser-initiated end (long pause); onend fires without stop(). */
+  drop() { this.results = []; this.onend?.(); }
 }
 
 let now = 1_000_000;
@@ -135,7 +145,7 @@ async function hold(ms = 1500) {
   fireEvent.pointerUp(m);
 }
 
-describe("push-to-talk (backend STT)", () => {
+describe("push-to-talk (MiniMax fallback, no Web Speech)", () => {
   it("hold then release transcribes and sends the text as a normal message", async () => {
     const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "¿Qué pido hoy?" })) });
     const chat = chatOf();
@@ -201,15 +211,13 @@ describe("push-to-talk (backend STT)", () => {
     FakeRecorder.reset();
   });
 
-  it("a 400 from transcribe shows a toast and keeps using the backend (no Web Speech fallback)", async () => {
-    vi.stubGlobal("SpeechRecognition", FakeRecognition);
+  it("a 400 from transcribe shows a toast and keeps using the backend", async () => {
     const api = fakeApi({ transcribe: vi.fn(async () => { throw new ApiError(400, "audio vacío"); }) });
     await ready(api);
     await hold();
     expect(await screen.findByText(/No se pudo procesar el audio/)).toBeInTheDocument();
     await hold();
     await waitFor(() => expect(FakeRecorder.instances).toHaveLength(2));
-    expect(FakeRecognition.instances).toHaveLength(0);
   });
 
   it("cancels a hold shorter than 0.5 s without calling the backend", async () => {
@@ -268,24 +276,8 @@ describe("push-to-talk (backend STT)", () => {
     const chat = chatOf();
     await ready(api, chat);
     await hold();
-    expect(await screen.findByText("No te escuché; intenta de nuevo")).toBeInTheDocument();
+    expect(await screen.findByText("No te escuché, intenta de nuevo")).toBeInTheDocument();
     expect(chat.send).not.toHaveBeenCalled();
-  });
-
-  it("uses Web Speech after a transcribe error", async () => {
-    vi.stubGlobal("SpeechRecognition", FakeRecognition);
-    const api = fakeApi({ transcribe: vi.fn(async () => { throw new ApiError(503, "cuota"); }) });
-    const chat = chatOf();
-    await ready(api, chat);
-    await hold();
-    expect(await screen.findByText(/dictado del navegador/)).toBeInTheDocument();
-    fireEvent.pointerDown(mic()!, { button: 0 });
-    await waitFor(() => expect(FakeRecognition.instances).toHaveLength(1));
-    FakeRecognition.instances[0].say("hola");
-    now += 1500;
-    fireEvent.pointerUp(mic()!);
-    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("hola", { voice: true }));
-    expect(FakeRecognition.instances[0].lang).toBe("es-MX");
   });
 
   it("stops the stream when unmounted mid-hold", async () => {
@@ -324,6 +316,155 @@ describe("Web Speech and availability", () => {
     const api = fakeApi({ getVoiceConfig: vi.fn(async () => cfg({ stt: false })) });
     await ready(api);
     await waitFor(() => expect(mic()).toBeNull());
+  });
+});
+
+describe("push-to-talk (Web Speech primary)", () => {
+  const press = async () => {
+    fireEvent.pointerDown(mic()!, { button: 0 });
+    await waitFor(() => expect(FakeRecognition.instances.length).toBeGreaterThan(0));
+    return FakeRecognition.instances[FakeRecognition.instances.length - 1];
+  };
+  beforeEach(() => { vi.stubGlobal("SpeechRecognition", FakeRecognition); });
+
+  it("starts synchronously on pointerdown, shows interim text, and sends the final text as a voice turn without calling the backend", async () => {
+    const api = fakeApi();
+    const chat = chatOf();
+    await ready(api, chat);
+    fireEvent.pointerDown(mic()!, { button: 0 });
+    expect(FakeRecognition.instances).toHaveLength(1); // no await between pointerdown and start()
+    const rec = FakeRecognition.instances[0];
+    expect(rec.start).toHaveBeenCalled();
+    expect([rec.lang, rec.continuous, rec.interimResults]).toEqual(["es-MX", true, true]);
+    expect(getUserMedia).not.toHaveBeenCalled();
+    act(() => rec.interim("qué pi"));
+    expect(screen.getByTestId("voice-preview")).toHaveTextContent("qué pi");
+    act(() => rec.say("qué pido"));
+    act(() => rec.say("hoy"));
+    expect(screen.getByTestId("voice-preview")).toHaveTextContent("qué pido hoy");
+    now += 2000;
+    fireEvent.pointerUp(mic()!);
+    expect(rec.stop).toHaveBeenCalled();
+    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("qué pido hoy", { voice: true }));
+    expect(api.transcribe).not.toHaveBeenCalled();
+    expect(FakeRecorder.instances).toHaveLength(0);
+  });
+
+  it("falls back to the last interim text when no final arrived", async () => {
+    const chat = chatOf();
+    await ready(fakeApi(), chat);
+    const rec = await press();
+    act(() => rec.interim("solo interino"));
+    now += 1500;
+    fireEvent.pointerUp(mic()!);
+    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("solo interino", { voice: true }));
+  });
+
+  it("restarts recognition when the browser ends it mid-hold and keeps the accumulated text", async () => {
+    const chat = chatOf();
+    await ready(fakeApi(), chat);
+    const rec = await press();
+    act(() => rec.say("primera parte"));
+    act(() => rec.drop());
+    expect(rec.start).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(/Escuchando/)).toBeInTheDocument();
+    act(() => rec.say("segunda parte"));
+    now += 1500;
+    fireEvent.pointerUp(mic()!);
+    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("primera parte segunda parte", { voice: true }));
+  });
+
+  it("an empty transcript is not sent and shows a toast", async () => {
+    const chat = chatOf();
+    await ready(fakeApi(), chat);
+    await press();
+    now += 1500;
+    fireEvent.pointerUp(mic()!);
+    expect(await screen.findByText("No te escuché, intenta de nuevo")).toBeInTheDocument();
+    expect(chat.send).not.toHaveBeenCalled();
+  });
+
+  it("aborts a hold shorter than 0.5 s and sends nothing", async () => {
+    const api = fakeApi();
+    const chat = chatOf();
+    await ready(api, chat);
+    const rec = await press();
+    act(() => rec.say("hola"));
+    now += 100;
+    fireEvent.pointerUp(mic()!);
+    expect(rec.abort).toHaveBeenCalled();
+    expect(chat.send).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Escuchando/)).toBeNull();
+  });
+
+  it("aborts when the pointer slides away", async () => {
+    const chat = chatOf();
+    await ready(fakeApi(), chat);
+    const rec = await press();
+    act(() => rec.say("hola"));
+    fireEvent.pointerLeave(mic()!);
+    expect(rec.abort).toHaveBeenCalled();
+    now += 2000;
+    fireEvent.pointerUp(mic()!);
+    expect(chat.send).not.toHaveBeenCalled();
+  });
+
+  it("not-allowed shows the microphone permission message", async () => {
+    const chat = chatOf();
+    await ready(fakeApi(), chat);
+    const rec = await press();
+    act(() => rec.onerror?.({ error: "not-allowed" }));
+    expect(await screen.findByText("Permite el micrófono para hablar con el copiloto")).toBeInTheDocument();
+    expect(screen.queryByText(/Escuchando/)).toBeNull();
+    expect(chat.send).not.toHaveBeenCalled();
+  });
+
+  it("no-speech is treated as empty", async () => {
+    const chat = chatOf();
+    await ready(fakeApi(), chat);
+    const rec = await press();
+    now += 1500;
+    fireEvent.pointerUp(mic()!);
+    act(() => rec.onerror?.({ error: "no-speech" }));
+    expect(await screen.findByText("No te escuché, intenta de nuevo")).toBeInTheDocument();
+    expect(chat.send).not.toHaveBeenCalled();
+  });
+
+  it.each(["network", "service-not-allowed"])("error '%s' asks to hold again and later holds use MiniMax", async (error) => {
+    const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "desde minimax" })) });
+    const chat = chatOf();
+    await ready(api, chat);
+    const rec = await press();
+    act(() => rec.onerror?.({ error }));
+    expect(await screen.findByText(/mantén presionado de nuevo/)).toBeInTheDocument();
+    expect(chat.send).not.toHaveBeenCalled();
+    await hold();
+    await waitFor(() => expect(chat.send).toHaveBeenCalledWith("desde minimax", { voice: true }));
+    expect(FakeRecognition.instances).toHaveLength(1);
+    expect(FakeRecorder.instances).toHaveLength(1);
+    expect(api.transcribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("language_suspect still reviews before sending on the MiniMax fallback", async () => {
+    const api = fakeApi({ transcribe: vi.fn(async () => ({ text: "hola buenos dias", language_suspect: true })) });
+    const chat = chatOf();
+    await ready(api, chat);
+    const rec = await press();
+    act(() => rec.onerror?.({ error: "network" }));
+    await hold();
+    const box = screen.getByLabelText("Mensaje para el copiloto") as HTMLInputElement;
+    await waitFor(() => expect(box.value).toBe("hola buenos dias"));
+    expect(chat.send).not.toHaveBeenCalled();
+  });
+
+  it("stays on Web Speech after a 'network' error when there is no backend to fall back to", async () => {
+    const api = fakeApi({ getVoiceConfig: vi.fn(async () => cfg({ stt: false })) });
+    await ready(api);
+    const rec = await press();
+    act(() => rec.onerror?.({ error: "network" }));
+    await screen.findByText(/dictado del navegador/);
+    await press();
+    expect(FakeRecognition.instances).toHaveLength(2);
   });
 });
 
