@@ -41,7 +41,7 @@ class ListCases:
 
 
 class ArchiveCase:
-    """Mark a test case (and every case it opened or forked) as archived: it keeps its own data but leaves every
+    """Mark a test case (and every case it forked; never the shared issue cases it opened) as archived: it keeps its own data but leaves every
     cross-case view. Idempotent."""
 
     def __init__(self, cases: CaseRepository) -> None:
@@ -54,7 +54,8 @@ class ArchiveCase:
         while frontier:
             parent = frontier.pop()
             for c in everyone:
-                if c.parent_case_id == parent and c.case_id not in family:
+                # issue cases are shared store-wide (one per issue key): archiving a test case must not hide alerts
+                if c.parent_case_id == parent and c.case_id not in family and not c.issue_key:
                     family.add(c.case_id)
                     frontier.append(c.case_id)
         for c in everyone:

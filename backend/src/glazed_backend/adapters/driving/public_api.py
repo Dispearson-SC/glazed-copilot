@@ -223,6 +223,12 @@ def build_public_router(c: Any) -> APIRouter:
             st = AlertState(state) if state else None
         except ValueError:
             raise DomainError(f"unknown alert state {state!r}") from None
+        if store_id and not c.alerts.list(store_id, None):
+            # alerts used to appear only after an advance: seed them from the store's latest live case on first read
+            live = [k for k in c.cases.list(store_id) if not k.archived and not k.issue_key]
+            if live:
+                latest = max(live, key=lambda k: k.created_at)
+                uc.AdvanceSimClock(c.cases, c.alerts, c.metrics).detect(latest.case_id)
         return names.tag([alert_view(a) for a in uc.ListAlerts(c.alerts, c.cases).execute(store_id, st)])
 
     @r.patch("/alerts/{alert_id}")

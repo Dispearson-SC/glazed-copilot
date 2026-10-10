@@ -33,7 +33,8 @@ def test_archive_flags_the_case_and_it_is_idempotent():
     assert client.post("/api/v1/cases/nope/archive").status_code == 404
 
 
-def test_archiving_a_case_archives_the_cases_it_opened_and_hides_their_alerts():
+def test_archiving_a_case_keeps_the_shared_issue_cases_and_their_alerts():
+    """Issue cases are one per issue key, shared by the whole store: archiving a test case must not hide alerts."""
     client, cid = env(stockout_issue("A"))
     client.post(f"/api/v1/cases/{cid}/advance", json={"days": 0})
     alerts = client.get("/api/v1/alerts").json()
@@ -41,8 +42,8 @@ def test_archiving_a_case_archives_the_cases_it_opened_and_hides_their_alerts():
     child = alerts[0]["case_id"]
     assert child != cid and client.get(f"/api/v1/cases/{child}").json()["parent_case_id"] == cid
     archive(client, cid)
-    assert client.get(f"/api/v1/cases/{child}").json()["archived"] is True
-    assert client.get("/api/v1/alerts").json() == []
+    assert client.get(f"/api/v1/cases/{child}").json()["archived"] is False
+    assert len(client.get("/api/v1/alerts").json()) == 1
 
 
 def test_decision_log_other_case_skips_archived_cases_but_keeps_the_own_one():
