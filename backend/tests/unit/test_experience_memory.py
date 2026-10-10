@@ -111,7 +111,7 @@ def test_one_assistant_per_store_created_lazily_and_persisted():
     m.remember("S030", Experience("t2", "decision", "S030", "d2"))
     m.recall("S030", "q", 3)
     m.remember("S001", Experience("t3", "decision", "S001"))
-    assert c.assistants == 2 and repo.get("S030") == "a-glazed-S030"
+    assert c.assistants == 2 and repo.get("S030") == "a-Glazed · S030"
     assert c.added[0][2]["decision_id"] == "d1" and c.searched[0][2] == 3
 
 
@@ -174,3 +174,20 @@ def test_parse_real_baseline_has_13_rows():
     if not os.path.exists(p):
         pytest.skip("baseline not available")
     assert len(parse_promo_baseline(open(p, encoding="utf-8").read())) == 13
+
+
+def test_assistant_is_named_after_the_store_display_name_and_renamed_when_known():
+    c, repo = FakeBB(), InMemoryAssistants()
+    c.renamed = []
+
+    async def update_assistant(assistant_id, name=None, **kw):
+        c.renamed.append((assistant_id, name))
+    c.update_assistant = update_assistant
+    m = BackboardMemory("k", repo, client_factory=lambda: c, sleep=lambda s: None,
+                        display_name=lambda sid: "Bayfront Municipal Airport · Gate Area West")
+    m.remember("S030", Experience("t1", "decision", "S030"))
+    assert repo.get("S030") == "a-Glazed · Bayfront Municipal Airport · Gate Area West"
+    repo.set("S001", "old-id")
+    assert m.rename("S001") == "Glazed · Bayfront Municipal Airport · Gate Area West"
+    assert c.renamed == [("old-id", "Glazed · Bayfront Municipal Airport · Gate Area West")]
+    assert m.rename("S777") is None  # no assistant yet: nothing to rename

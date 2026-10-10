@@ -89,18 +89,19 @@ def build_container(env: dict[str, str] | None = None) -> Container:
     cors = cors_origins_from_env(env)
     key = env.get("BACKBOARD_API_KEY", "")
     from ..driven.backboard_memory import BackboardMemory
+    from .store_names import StoreNames
     if env.get("GLAZED_STORAGE", "memory") == "postgres":
         from ..driven.postgres import PostgresStore
         store = PostgresStore(env["GLAZED_DATABASE_URL"])
         store.migrate()
         return Container(metrics, core, store.cases, store.alerts, store.proposals, store.executions,
                          store.backtests, store.trace, SystemClock(),
-                         BackboardMemory(key, store.assistants), "postgres",
+                         BackboardMemory(key, store.assistants, display_name=StoreNames(metrics).of), "postgres",
                          "configured" if core_url else "missing", cors,
                          float(env.get("GLAZED_TURN_TIMEOUT_S", "120")))
     return Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
                      InMemoryBacktests(), InMemoryTrace(), SystemClock(),
-                     BackboardMemory(key, InMemoryAssistants()), "memory",
+                     BackboardMemory(key, InMemoryAssistants(), display_name=StoreNames(metrics).of), "memory",
                      "configured" if core_url else "missing", cors,
                          float(env.get("GLAZED_TURN_TIMEOUT_S", "120")))
 

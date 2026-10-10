@@ -19,8 +19,10 @@ BACKOFF = (0.5, 1.0, 2.0)
 
 class BackboardMemory:
     def __init__(self, api_key: str, assistants: Any, client_factory: Callable[[], Any] | None = None,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] = time.sleep,
+                 display_name: Callable[[str], str] | None = None) -> None:
         self.api_key, self.assistants, self._sleep = api_key, assistants, sleep
+        self._display = display_name or (lambda store_id: store_id)
         self._factory = client_factory or self._default_client
 
     def _default_client(self) -> Any:
@@ -32,12 +34,28 @@ class BackboardMemory:
         if known:
             return known
         created = await client.create_assistant(
-            name=f"glazed-{store_id}",
+            name=self._assistant_name(store_id),
             description=f"Experience memory for store {store_id}",
             system_prompt="Stores decision and outcome experiences for one Glazed store. Not a source of numbers.")
         aid = str(created.assistant_id)
         self.assistants.set(store_id, aid)
         return aid
+
+    def _assistant_name(self, store_id: str) -> str:
+        return f"Glazed · {self._display(store_id)}"
+
+    def rename(self, store_id: str) -> str | None:
+        """Give an existing store assistant its display-name label. None when it has no assistant yet."""
+        aid = self.assistants.get(store_id)
+        if not aid:
+            return None
+        name = self._assistant_name(store_id)
+
+        async def op(client: Any) -> None:
+            await client.update_assistant(aid, name=name)
+
+        self._run(op)
+        return name
 
     def _run(self, op: Callable[[Any], Any]) -> Any:
         if not self.api_key:

@@ -29,13 +29,19 @@ def main() -> int:
         store = PostgresStore(os.environ["GLAZED_DATABASE_URL"])
         store.migrate()
         assistants = store.assistants
-    mem = BackboardMemory(key, assistants)
+    display = lambda sid: sid  # noqa: E731
+    if os.environ.get("GLAZED_DUCKDB_PATH"):
+        from glazed_backend.adapters.driven.duckdb_metrics import DuckDBMetrics
+        from glazed_backend.adapters.driving.store_names import StoreNames
+        display = StoreNames(DuckDBMetrics(os.environ["GLAZED_DUCKDB_PATH"])).of
+    mem = BackboardMemory(key, assistants, display_name=display)
     text = open(a.md, encoding="utf-8").read()
     for sid in a.stores.split(","):
         exps = parse_promo_baseline(text, sid)
         for e in exps:
             mem.remember(sid, e)
-        print(f"{sid}: seeded {len(exps)} experiences")
+        renamed = mem.rename(sid)
+        print(f"{sid}: seeded {len(exps)} experiences; assistant: {renamed}")
     return 0
 
 
