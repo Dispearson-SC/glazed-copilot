@@ -1,4 +1,4 @@
-import type { TransferOptionsResponse, NoteBody, NoteResult, AdvanceResult, AgentsStatusResponse, AlertRecord, Case, CaseDecisionBody, CaseDecisionResult, InboxCounts, IssueAnalysis, MemoryRecord, MessageContext, PendingResponse, CaseMode, DaySummary, DeliveriesResponse, ExpiringResponse, InventoryResponse, Outlook, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, TraceEvent, Turn, TurnRecord } from "./types";
+import type { VoiceConfig, TransferOptionsResponse, NoteBody, NoteResult, AdvanceResult, AgentsStatusResponse, AlertRecord, Case, CaseDecisionBody, CaseDecisionResult, InboxCounts, IssueAnalysis, MemoryRecord, MessageContext, PendingResponse, CaseMode, DaySummary, DeliveriesResponse, ExpiringResponse, InventoryResponse, Outlook, Execution, ForecastResponse, Issue, OrderPlan, Proposal, Store, TraceEvent, Turn, TurnRecord } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -50,9 +50,11 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
   const base = baseUrl.replace(/\/$/, "");
   let onUnauthorized: (() => void) | null = null;
 
-  async function request<T>(path: string, init: RequestInit = {}, query?: Query): Promise<T> {
+  /** Fetches and maps failures to ApiError; the caller decides how to read the body. */
+  async function fetchOk(path: string, init: RequestInit = {}, query?: Query): Promise<Response> {
     const headers: Record<string, string> = { Accept: "application/json" };
-    if (init.body !== undefined) headers["Content-Type"] = "application/json";
+    // FormData sets its own multipart Content-Type (with the boundary).
+    if (init.body !== undefined && !(init.body instanceof FormData)) headers["Content-Type"] = "application/json";
     Object.assign(headers, init.headers as Record<string, string> | undefined);
     let res: Response;
     try {
@@ -71,7 +73,11 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
       if (res.status === 401 && !isPublicPath(path)) onUnauthorized?.();
       throw new ApiError(res.status, detail);
     }
-    return (await res.json()) as T;
+    return res;
+  }
+
+  async function request<T>(path: string, init: RequestInit = {}, query?: Query): Promise<T> {
+    return (await (await fetchOk(path, init, query)).json()) as T;
   }
 
   const send = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
@@ -134,6 +140,17 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
     getInboxCounts: (caseId: string) => request<InboxCounts>(`/cases/${caseId}/inbox-counts`),
     getForecast: (caseId: string, q: { sku?: string; from?: string; to?: string; level?: "sku" | "store"; metric?: string } = {}) =>
       request<ForecastResponse>(`/cases/${caseId}/forecast`, {}, q),
+    getVoiceConfig: () => request<VoiceConfig>("/voice/config"),
+    /** Speech to text: multipart `audio` (webm/opus or mp4). */
+    transcribe: (audio: Blob, filename = "voice.webm", language = "es") => {
+      const form = new FormData();
+      form.append("audio", audio, filename);
+      form.append("language", language);
+      return request<{ text: string }>("/voice/transcribe", { method: "POST", body: form });
+    },
+    /** Text to speech: the backend answers audio/mpeg. */
+    speak: async (text: string): Promise<Blob> =>
+      (await fetchOk("/voice/speak", { ...send("POST", { text }), headers: { Accept: "audio/mpeg" } })).blob(),
     /** Trace events: only the chat history fallback reads them. */
     getTrace: (storeId: string, caseId: string) =>
       request<TraceEvent[]>("/trace", {}, { store_id: storeId, case_id: caseId }),

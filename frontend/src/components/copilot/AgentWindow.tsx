@@ -8,6 +8,10 @@ import type { Choice } from "../../useDecide";
 import type { ChatMessage } from "../../chatHistory";
 import type { AgentsStatusResponse } from "../../types";
 import type { useChat } from "../../useChat";
+import MicButton, { formatClock } from "../../voice/MicButton";
+import { useVoiceConfig } from "../../voice/useVoiceConfig";
+import { useVoiceInput } from "../../voice/useVoiceInput";
+import { useVoiceOutput } from "../../voice/useVoiceOutput";
 import AgentOrb from "./AgentOrb";
 import AnalysisCard from "./AnalysisCard";
 import { ChatSkeleton } from "./Skeleton";
@@ -29,15 +33,22 @@ function UserBubble({ m }: { m: ChatMessage }) {
   );
 }
 
-function AssistantBubble({ m }: { m: ChatMessage }) {
+function AssistantBubble({ m, canSpeak = false, playing = false, onSpeak }: { m: ChatMessage; canSpeak?: boolean; playing?: boolean; onSpeak?: (m: ChatMessage) => void }) {
   const time = clockTime(m.ts);
   return (
     <div className="flex justify-start gap-2">
-      <div className="mt-1 flex-shrink-0"><AgentOrb size={28} /></div>
+      <div className="mt-1 flex-shrink-0"><AgentOrb size={28} speaking={playing} /></div>
       <div className="min-w-0 max-w-[85%] rounded-[16px_16px_16px_6px] border border-surface-container-high bg-white px-4 py-2.5">
         <div className="text-on-surface"><Markdown text={m.text} /></div>
         {m.truncated && <p className="m-0 font-label-sm text-label-sm text-on-surface-variant">…(recortado)</p>}
-        <p className="m-0 mt-1 font-label-sm text-label-sm text-on-surface-variant">Orquestador{time ? ` · ${time}` : ""}</p>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <p className="m-0 font-label-sm text-label-sm text-on-surface-variant">Orquestador{time ? ` · ${time}` : ""}</p>
+          {canSpeak && (
+            <button type="button" onClick={() => onSpeak?.(m)} aria-label="Escuchar respuesta" aria-pressed={playing} className="-my-2 -mr-2 flex h-11 w-11 items-center justify-center rounded-full p-0 text-on-surface-variant">
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">{playing ? "stop_circle" : "volume_up"}</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -121,12 +132,34 @@ export default function AgentWindow({
     if (el) el.scrollTop = el.scrollHeight;
   }, [count, chat.status]);
 
-  const send = (text: string) => {
+  const voiceCfg = useVoiceConfig();
+  const out = useVoiceOutput(voiceCfg.config);
+  /** Set when the message came from the mic: the next agent reply is read aloud. */
+  const voiceTurn = useRef<{ afterId: string | undefined } | null>(null);
+  const lastId = chat.messages[chat.messages.length - 1]?.id;
+  useEffect(() => {
+    const t = voiceTurn.current;
+    const last = chat.messages[chat.messages.length - 1];
+    if (!t || !last || last.id === t.afterId) return;
+    if (last.role === "assistant") {
+      voiceTurn.current = null;
+      void out.speak(last.text, last.id);
+    } else if (last.role === "error") voiceTurn.current = null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastId]);
+
+  const send = (text: string, voice = false) => {
     const clean = text.trim();
-    if (!clean || busy) return;
+    if (!clean) return;
+    if (busy) {
+      if (voice) showToast("El copiloto sigue trabajando; intenta de nuevo en un momento");
+      return;
+    }
+    voiceTurn.current = voice ? { afterId: lastId } : null;
     const ctx = state.ctx;
     void chat.send(clean, ctx?.issueId ? { context: { issue_id: ctx.issueId, ...(ctx.optionId ? { option_id: ctx.optionId } : {}), mode: "dialogo" } } : undefined);
   };
+  const input = useVoiceInput({ config: voiceCfg, onTranscript: (t) => send(t, true), onNotice: showToast, onPress: out.unlock });
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!draft.trim()) return;
@@ -147,8 +180,12 @@ export default function AgentWindow({
       <div ref={scroller} className="fixed inset-x-0 bottom-[204px] top-[calc(var(--copilot-header-h,104px)_+_12px)] overflow-y-auto">
         <div className="mx-auto max-w-[640px] px-4 pb-4">
           <section className="flex flex-col items-center px-2 pb-4 pt-5 text-center">
-            <AgentOrb size={116} />
-            <span className="mt-2 font-label-sm text-label-sm text-on-surface-variant">{busy ? thinkingLine(agents) : agentsLine(agents)}</span>
+            {out.speaking ? (
+              <button type="button" onClick={out.stop} aria-label="Detener lectura" className="m-0 border-0 bg-transparent p-0"><AgentOrb size={116} speaking={!out.preparing} /></button>
+            ) : (
+              <AgentOrb size={116} />
+            )}
+            <span className="mt-2 font-label-sm text-label-sm text-on-surface-variant">{out.preparing ? "Preparando voz…" : out.speaking ? "Hablando… toca para detener" : busy ? thinkingLine(agents) : agentsLine(agents)}</span>
             <h1 className="m-0 mt-2 font-headline-lg text-headline-lg tracking-tight text-primary">¿Qué decidimos hoy?</h1>
             <p className="m-0 mt-1 font-body-md text-body-md text-on-surface-variant">{pendingLine}</p>
           </section>
@@ -171,7 +208,7 @@ export default function AgentWindow({
               <div key={m.id} className="contents">
                 {renderCards(i)}
                 {m.role === "user" && <UserBubble m={m} />}
-                {m.role === "assistant" && <AssistantBubble m={m} />}
+                {m.role === "assistant" && <AssistantBubble m={m} canSpeak={out.available} playing={out.playingId === m.id} onSpeak={(x) => void out.speak(x.text, x.id)} />}
                 {m.role === "error" && (
                   <div role="alert" className="max-w-[90%] rounded-[14px] bg-error-container px-4 py-2.5 text-on-error-container">
                     <p className="m-0 font-body-md text-body-md">{m.text}</p>
@@ -194,15 +231,20 @@ export default function AgentWindow({
       </div>
 
       <div className="fixed inset-x-4 bottom-[92px] z-30 mx-auto flex max-w-[608px] flex-col gap-2">
+        {input.state !== "idle" ? (
+          <div role="status" className="flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-surface-container px-3.5 py-2 text-[13px] leading-[18px] text-secondary">
+            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-secondary motion-safe:animate-pulse" />
+            {input.state === "listening" ? `Escuchando… ${formatClock(input.seconds)}` : "Transcribiendo…"}
+          </div>
+        ) : (
         <div className="flex gap-2 overflow-x-auto">
           {COPILOT_SUGGESTIONS.map((c) => (
             <button key={c} type="button" onClick={() => send(c)} className="min-h-[44px] flex-shrink-0 rounded-full bg-surface-container px-3.5 py-2 text-[13px] leading-[18px] text-secondary">{c}</button>
           ))}
         </div>
+        )}
         <form onSubmit={submit} className="m-0 flex items-center gap-2 rounded-full border border-surface-container-high bg-white p-1.5 shadow-card">
-          <button type="button" onClick={() => showToast("Voz: disponible pronto")} aria-label="Hablar con el copiloto" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-surface-container p-0 text-secondary">
-            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">mic</span>
-          </button>
+          {input.available && <MicButton state={input.state} bind={input.bind} />}
           <input
             type="text"
             value={draft}

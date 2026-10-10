@@ -63,6 +63,9 @@ export function fakeApi(over: Partial<Record<keyof Api, unknown>> = {}): Api {
     addNote: vi.fn(async () => ({ saved: true, memory_id: "note-x" })),
     getAgentsStatus: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
     getInboxCounts: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getVoiceConfig: vi.fn(async () => ({ enabled: true, stt: true, tts: true, voice_id: "v", max_seconds: 60 })),
+    transcribe: vi.fn(async () => ({ text: "" })),
+    speak: vi.fn(async () => new Blob(["x"], { type: "audio/mpeg" })),
     listTurns: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
   };
   return { ...base, ...over } as unknown as Api;
