@@ -347,3 +347,32 @@ export interface ForecastResponse {
   metrics_to_date: ForecastMetrics;
   projected?: boolean;
 }
+
+// ---- Manager-day: decisions timeline (Wave 11) ----
+// The route answers a flat, ts-ordered list of rows (proposal -> decision -> execution -> outcome).
+export type DecisionKind = "proposal" | "decision" | "execution" | "outcome" | "skip_order";
+
+export interface DecisionOutcome {
+  observed: { net_usd?: number; waste_usd?: number; lost_sales_usd?: number } & Record<string, unknown>;
+  simulated: { net_usd_mid: number; net_usd_low?: number | null; net_usd_high?: number | null; label?: string } & Record<string, unknown>;
+  label: string;
+  score?: { within_expected_range?: boolean; error_vs_mid_usd?: number; diagnosis?: string };
+}
+
+export interface DecisionRow {
+  decision_id: string;
+  ts: string;
+  kind: DecisionKind;
+  issue_id: string;
+  action_type: string;
+  sku?: string;
+  supplier?: string;
+  qty?: number;
+  deadline?: string;
+  status: string;
+  reason?: string;
+  reason_category?: string;
+  /** Outcome rows: the end of the measured horizon. */
+  as_of?: string;
+  outcome?: DecisionOutcome;
+}

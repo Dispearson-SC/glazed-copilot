@@ -56,6 +56,7 @@ export function fakeApi(over: Partial<Record<keyof Api, unknown>> = {}): Api {
     getCompliance: vi.fn(async () => []),
     inject: vi.fn(async () => ({})),
     getForecast: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getDecisions: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
     proposeOption: vi.fn(async () => ({ ...proposalA, proposal_id: "p9", issue_id: issueA.issue_id })),
   };
   return { ...base, ...over } as unknown as Api;

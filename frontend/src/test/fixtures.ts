@@ -171,3 +171,19 @@ export const forecastA: ForecastResponse = {
   ],
   metrics_to_date: { wape: 0.123, bias: -0.021, coverage_p10_p90: 0.8, wape_baseline: 0.2, n_days: 28 },
 };
+
+import type { DecisionRow } from "../types";
+export const decisionsA: DecisionRow[] = [
+  { decision_id: "p1", ts: "2026-02-20T08:00:00Z", kind: "proposal", status: "proposed", issue_id: "i1", action_type: "place_order", sku: "DONUT-GLZ", supplier: "SUP1", qty: 48, deadline: "2026-02-21" },
+  { decision_id: "p1", ts: "2026-02-20T09:00:00Z", kind: "decision", status: "approved", issue_id: "i1", action_type: "place_order", sku: "DONUT-GLZ", reason: "Va la promo" },
+  { decision_id: "p1", ts: "2026-02-20T09:00:01Z", kind: "execution", status: "executed", issue_id: "i1", action_type: "place_order", sku: "DONUT-GLZ" },
+  { decision_id: "p1", ts: "2026-02-28T00:00:00Z", kind: "outcome", status: "measured", as_of: "2026-02-27", issue_id: "i1", action_type: "place_order", sku: "DONUT-GLZ",
+    outcome: { observed: { net_usd: 55 }, simulated: { net_usd_mid: 80, net_usd_low: 20, net_usd_high: 160, label: "backtest" }, label: "backtest",
+      score: { within_expected_range: true, error_vs_mid_usd: -25, diagnosis: "within_range" } } },
+  { decision_id: "p2", ts: "2026-02-25T08:00:00Z", kind: "proposal", status: "proposed", issue_id: "i2", action_type: "skip_order", sku: "MUFFIN" },
+  { decision_id: "p2", ts: "2026-02-25T08:30:00Z", kind: "skip_order", status: "approved", issue_id: "i2", action_type: "skip_order", sku: "MUFFIN" },
+  { decision_id: "p3", ts: "2026-02-26T08:00:00Z", kind: "proposal", status: "proposed", issue_id: "i3", action_type: "run_promo" },
+  { decision_id: "p3", ts: "2026-02-26T08:10:00Z", kind: "decision", status: "rejected", issue_id: "i3", action_type: "run_promo", reason: "Sin presupuesto" },
+  { decision_id: "p4", ts: "2026-03-05T08:00:00Z", kind: "outcome", status: "measured", as_of: "2026-03-04", issue_id: "i4", action_type: "place_order",
+    outcome: { observed: { net_usd: 999 }, simulated: { net_usd_mid: 10 }, label: "backtest" } },
+];

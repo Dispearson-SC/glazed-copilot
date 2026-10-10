@@ -1,4 +1,4 @@
-import type { AdvanceResult, Alert, Briefing, Case, CaseMode, ComplianceRecord, DaySummary, Execution, ForecastResponse, InjectBody, Kpis, OrderPlan, Proposal, Store, TraceEvent, Turn } from "./types";
+import type { AdvanceResult, Alert, Briefing, Case, CaseMode, ComplianceRecord, DaySummary, DecisionRow, Execution, ForecastResponse, InjectBody, Kpis, OrderPlan, Proposal, Store, TraceEvent, Turn } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -78,6 +78,8 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
     /** Wave 11 route; may answer 404/501 until deployed. */
     getForecast: (caseId: string, q: { sku?: string; from?: string; to?: string; level?: "sku" | "store" } = {}) =>
       request<ForecastResponse>(`/cases/${caseId}/forecast`, {}, q),
+    getDecisions: (caseId: string, q: { from?: string; to?: string } = {}) =>
+      request<DecisionRow[]>(`/cases/${caseId}/decisions`, {}, q),
     advance: (caseId: string, days = 1) => request<AdvanceResult>(`/cases/${caseId}/advance`, send("POST", { days })),
     // REQUIRED backend routes (not in the public API yet).
     getOrderPlan: (caseId: string) => request<OrderPlan>(`/cases/${caseId}/order-plan`),

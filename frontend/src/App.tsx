@@ -6,13 +6,14 @@ import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import BottomNav from "./shell/BottomNav";
 import TopBar from "./shell/TopBar";
+import DecisionsPage from "./pages/DecisionsPage";
 import PurchasesPage from "./pages/PurchasesPage";
 import SimControl from "./SimControl";
 import { useSession } from "./SessionContext";
 import TracePage from "./pages/TracePage";
 import { useStores } from "./components";
 
-function StoreRedirect({ to }: { to: "trace" | "purchases" }) {
+function StoreRedirect({ to }: { to: "trace" | "purchases" | "decisions" }) {
   const { storeId } = useStores();
   const session = useSession();
   const id = session.storeId || storeId;
@@ -31,6 +32,8 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/purchases" element={<StoreRedirect to="purchases" />} />
           <Route path="/stores/:storeId/purchases" element={<PurchasesPage />} />
+          <Route path="/decisions" element={<StoreRedirect to="decisions" />} />
+          <Route path="/stores/:storeId/decisions" element={<DecisionsPage />} />
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/cases" element={<CasesPage />} />
           <Route path="/chat" element={<ChatPage />} />
