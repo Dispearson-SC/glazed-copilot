@@ -223,6 +223,62 @@ describe("chat design parity", () => {
     await userEvent.type(within(panel).getByLabelText("Escribe un mensaje"), "hola");
     await userEvent.click(within(panel).getByRole("button", { name: "Enviar mensaje" }));
     const reply = await within(panel).findByText("listo");
-    expect(reply.closest("div")!.className).toContain("rounded-[14px]");
+    expect(reply.closest("[class*='rounded-[14px]']")).not.toBeNull();
+  });
+});
+
+describe("assistant markdown", () => {
+  const reply = [
+    "## Pedidos de hoy",
+    "",
+    "Esto es **importante** y esto _no_.",
+    "",
+    "- uno",
+    "- dos",
+    "",
+    "| SKU | Cant. |",
+    "|---|---|",
+    "| SKU-1 | 10 |",
+    "| SKU-2 | 20 |",
+    "",
+    "<script>window.__pwned = true</script><b>html crudo</b>",
+  ].join("\n");
+  const ask = async (text: string) => {
+    open("/chat", fakeApi({ getTurn: vi.fn(async () => ({ turn_id: "t1", status: "done", reply: text })) }));
+    await userEvent.type(await screen.findByLabelText("Escribe un mensaje"), "pide");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
+  };
+
+  it("renders bold, headings, lists and GFM tables, with the table scrolling inside the bubble", async () => {
+    await ask(reply);
+    expect(await screen.findByRole("heading", { name: "Pedidos de hoy" })).toBeInTheDocument();
+    expect(screen.getByText("importante").tagName).toBe("STRONG");
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    const table = screen.getByRole("table");
+    expect(within(table).getAllByRole("columnheader").map((c) => c.textContent)).toEqual(["SKU", "Cant."]);
+    expect(within(table).getByRole("cell", { name: "SKU-2" })).toBeInTheDocument();
+    expect(table.parentElement!.className).toContain("overflow-x-auto");
+    expect(screen.queryByText(/\*\*|\|---\|/)).toBeNull();
+  });
+
+  it("never renders raw HTML from a reply", async () => {
+    await ask(reply);
+    await screen.findByRole("table");
+    expect(document.querySelector("script")).toBeNull();
+    expect(document.querySelector("b")).toBeNull();
+    expect((window as unknown as { __pwned?: boolean }).__pwned).toBeUndefined();
+  });
+
+  it("strips think markup before rendering", async () => {
+    await ask("<think>secreto interno</think>Hola **equipo**");
+    expect((await screen.findByText("equipo")).tagName).toBe("STRONG");
+    expect(screen.queryByText(/secreto interno/)).toBeNull();
+  });
+
+  it("keeps the user's own text literal", async () => {
+    open("/chat");
+    await userEvent.type(await screen.findByLabelText("Escribe un mensaje"), "pide **x**");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
+    expect(await screen.findByText("pide **x**")).toBeInTheDocument();
   });
 });

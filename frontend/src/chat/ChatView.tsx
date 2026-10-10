@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { ChatMessage } from "../chatHistory";
+import Markdown from "./Markdown";
 import type { Proposal } from "../types";
 import type { useChat } from "../useChat";
 
@@ -51,8 +52,8 @@ function Bubble({ m, compact, onRetry }: { m: ChatMessage; compact: boolean; onR
       <div className={`${compact ? "w-6 h-6" : "w-7 h-7"} rounded-full bg-surface-container flex items-center justify-center text-secondary flex-shrink-0 mt-1`}>
         <span aria-hidden="true" className={`material-symbols-outlined ${compact ? "text-[14px]" : "text-[16px]"}`}>smart_toy</span>
       </div>
-      <div className={`max-w-[85%] ${radius} rounded-bl-[6px] bg-surface border border-surface-container ${pad}`}>
-        <p className="font-body-md text-body-md text-on-surface whitespace-pre-wrap">{m.text}</p>
+      <div className={`min-w-0 max-w-[85%] ${radius} rounded-bl-[6px] bg-surface border border-surface-container ${pad}`}>
+        <div className="text-on-surface"><Markdown text={m.text} /></div>
         {m.truncated && (
           <p className="font-label-sm text-label-sm text-on-surface-variant">…(recortado)</p>
         )}
