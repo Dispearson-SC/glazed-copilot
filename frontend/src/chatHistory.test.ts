@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildHistory } from "./chatHistory";
+import { buildHistory, buildTurnHistory } from "./chatHistory";
 import { ev } from "./test/helpers";
 
 describe("buildHistory", () => {
@@ -79,5 +79,28 @@ describe("buildHistory", () => {
       ]);
       expect(h.map((m) => m.text)).toEqual(["hola", "Listo"]);
     });
+  });
+});
+
+describe("buildTurnHistory", () => {
+  const turn = (over = {}) => ({ turn_id: "t1", ts: "2026-03-01T10:00:00Z", user_text: "¿Qué pido?", reply: "Pide 40", status: "done" as const, ...over });
+
+  it("turns each stored turn into a user bubble and an assistant bubble with its turn id", () => {
+    const h = buildTurnHistory([turn(), turn({ turn_id: "t2", ts: "2026-03-01T09:00:00Z", user_text: "hola", reply: "buenas" })]);
+    expect(h.map((m) => [m.role, m.text])).toEqual([["user", "hola"], ["assistant", "buenas"], ["user", "¿Qué pido?"], ["assistant", "Pide 40"]]);
+    expect(h[1]).toMatchObject({ turnId: "t2" });
+  });
+
+  it("sanitizes thinking markup and keeps reply_meta", () => {
+    const [, a] = buildTurnHistory([turn({ reply: "<think>x</think>Listo", reply_meta: { source: "fast", elapsed_ms: 900 } })]);
+    expect(a.text).toBe("Listo");
+    expect(a.meta).toEqual({ source: "fast", elapsed_ms: 900 });
+  });
+
+  it("shows a failed turn as an error that can be retried, and skips turns still running", () => {
+    const h = buildTurnHistory([turn({ status: "failed", reply: null, error: "Core caído" }), turn({ turn_id: "t3", ts: "2026-03-01T11:00:00Z", status: "pending", reply: null, still_running: true })]);
+    expect(h[1]).toMatchObject({ role: "error", text: "Core caído", retryText: "¿Qué pido?" });
+    expect(h.filter((m) => m.role === "assistant")).toHaveLength(0);
+    expect(h.filter((m) => m.role === "user")).toHaveLength(2);
   });
 });

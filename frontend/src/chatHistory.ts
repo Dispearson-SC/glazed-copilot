@@ -1,6 +1,7 @@
+import { sanitizeReply } from "./sanitize";
 import { parseTraceMessage } from "./parseTraceMessage";
 import { sortByTs } from "./trace";
-import type { ReplyMeta, TraceEvent } from "./types";
+import type { ReplyMeta, TraceEvent, TurnRecord } from "./types";
 
 export interface ChatMessage {
   id: string;
@@ -61,5 +62,19 @@ export function buildHistory(events: TraceEvent[]): ChatMessage[] {
       ...(steps.length ? { steps } : {}),
     });
   });
+  return out;
+}
+
+/** Rebuilds the conversation from the stored turns (full replies, ordered by ts). Turns still in flight show only the question. */
+export function buildTurnHistory(turns: TurnRecord[]): ChatMessage[] {
+  const out: ChatMessage[] = [];
+  for (const t of [...turns].sort((a, b) => a.ts.localeCompare(b.ts))) {
+    out.push({ id: `s-${t.turn_id}-u`, role: "user", text: t.user_text });
+    if (t.status === "failed") {
+      out.push({ id: `s-${t.turn_id}-e`, role: "error", text: t.error || "El copiloto no pudo responder.", retryText: t.user_text });
+    } else if (t.reply) {
+      out.push({ id: `s-${t.turn_id}-a`, role: "assistant", text: sanitizeReply(t.reply), turnId: t.turn_id, meta: t.reply_meta });
+    }
+  }
   return out;
 }

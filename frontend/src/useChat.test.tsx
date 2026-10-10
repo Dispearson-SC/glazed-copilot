@@ -25,6 +25,28 @@ describe("useChat", () => {
     expect(api.getTrace).toHaveBeenCalledWith("S030", "c1");
   });
 
+  it("loads the history from the stored turns when the route exists, without reading the trace", async () => {
+    const api = fakeApi({
+      listTurns: vi.fn(async () => [{ turn_id: "t9", ts: "2026-03-01T10:00:00Z", user_text: "hola", reply: "buenas", status: "done" }]),
+      getTrace: vi.fn(async () => []),
+    });
+    const { result } = setup(api);
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+    expect(result.current.messages[1]).toMatchObject({ role: "assistant", text: "buenas", turnId: "t9" });
+    expect(api.listTurns).toHaveBeenCalledWith("c1");
+    expect(api.getTrace).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the trace parser when the turns route answers 404", async () => {
+    const api = fakeApi({
+      listTurns: vi.fn(async () => { throw new ApiError(404, "nf"); }),
+      getTrace: vi.fn(async () => [ev("2026-03-01T10:00:00Z", "manager", "orchestrator", "message", { text: "hola" })]),
+    });
+    const { result } = setup(api);
+    await waitFor(() => expect(result.current.messages).toHaveLength(1));
+    expect(api.getTrace).toHaveBeenCalledWith("S030", "c1");
+  });
+
   it("tolerates a 404 right after the POST, then shows the reply", async () => {
     const getTurn = vi
       .fn()

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApi } from "./ApiContext";
 import { ApiError } from "./api";
-import { buildHistory, type ChatMessage } from "./chatHistory";
+import { buildHistory, buildTurnHistory, type ChatMessage } from "./chatHistory";
 import { sanitizeReply } from "./sanitize";
 import type { Proposal } from "./types";
 
@@ -50,7 +50,13 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
     setProposals([]);
     if (!enabled || !caseId) return;
     let alive = true;
-    api.getTrace(storeId, caseId).then((ev) => alive && setHistory(buildHistory(ev))).catch(() => {});
+    // Stored turns carry the full replies; the trace parser is the fallback while the route is missing.
+    api
+      .listTurns(caseId)
+      .then((turns) => alive && setHistory(buildTurnHistory(turns)))
+      .catch(() =>
+        api.getTrace(storeId, caseId).then((ev) => alive && setHistory(buildHistory(ev))).catch(() => {}),
+      );
     void refreshProposals();
     return () => {
       alive = false;
@@ -115,7 +121,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
   );
 
   const send = useCallback((text: string) => submit(text, false), [submit]);
-  const retry = useCallback(() => submit(lastText.current, true), [submit]);
+  const retry = useCallback((text?: string) => submit(text ?? lastText.current, true), [submit]);
 
   const decide = useCallback(
     async (proposalId: string, approved: boolean, reason?: string) => {

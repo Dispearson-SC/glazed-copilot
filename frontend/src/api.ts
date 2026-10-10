@@ -1,4 +1,4 @@
-import type { AccuracyBy, AdvanceResult, ForecastAccuracy, Alert, Briefing, Case, CaseMode, ComplianceRecord, DaySummary, DecisionRow, Execution, ForecastResponse, InjectBody, Kpis, OrderPlan, Proposal, Store, TraceEvent, Turn } from "./types";
+import type { AccuracyBy, AdvanceResult, ForecastAccuracy, Alert, Briefing, Case, CaseMode, ComplianceRecord, DaySummary, DecisionRow, Execution, ForecastResponse, InjectBody, Kpis, OrderPlan, Proposal, Store, TraceEvent, Turn, TurnRecord } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -60,6 +60,8 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = (...a) => fet
       request<Case>(`/cases/${caseId}/fork`, send("POST", b)),
     sendMessage: (caseId: string, text: string) =>
       request<{ turn_id: string }>(`/cases/${caseId}/messages`, send("POST", { text })),
+    /** Wave 11 route; may answer 404/501 until deployed. */
+    listTurns: (caseId: string) => request<TurnRecord[]>(`/cases/${caseId}/turns`),
     getTurn: (caseId: string, turnId: string) => request<Turn>(`/cases/${caseId}/turns/${turnId}`),
     listAlerts: (query: { store_id?: string; state?: string }) => request<Alert[]>("/alerts", {}, query),
     setAlertState: (alertId: string, state: string) =>

@@ -140,7 +140,7 @@ export default function ChatView({ chat, traceBase, compact = false }: { chat: C
         className={`flex flex-col gap-space-sm ${compact ? "p-space-md overflow-y-auto" : "bg-surface-container-lowest rounded-[18px] p-space-md shadow-sm shadow-primary/5 border border-surface-container min-h-[320px]"}`}
       >
         {chat.messages.map((m) => (
-          <Bubble key={m.id} m={m} traceBase={traceBase} onRetry={() => void chat.retry()} />
+          <Bubble key={m.id} m={m} traceBase={traceBase} onRetry={() => void chat.retry(m.retryText)} />
         ))}
         {chat.proposals.map((p) => <ProposalCard key={p.proposal_id} p={p} onDecide={chat.decide} />)}
         {chat.decisionError && <div role="alert" className="error">{chat.decisionError.message}</div>}

@@ -395,3 +395,16 @@ export interface DecisionRow {
   as_of?: string;
   outcome?: DecisionOutcome;
 }
+
+// ---- Manager-day: stored conversation (Wave 11 GET /cases/{id}/turns) ----
+export interface TurnRecord {
+  turn_id: string;
+  ts: string;
+  user_text: string;
+  /** Full stored final reply; null while the turn is in flight. */
+  reply: string | null;
+  status: TurnStatus;
+  error?: string | null;
+  still_running?: boolean;
+  reply_meta?: ReplyMeta | null;
+}
