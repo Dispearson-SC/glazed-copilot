@@ -147,7 +147,17 @@ export function buildPendingItems(pending: PendingResponse | null, simToday: str
       cost: t.cost_usd?.mid ? usd(t.cost_usd.mid) : "", why: t.why, chips: t.impact_chips ?? [], warn: t.warning ?? "",
     };
   });
-  return [...techs, ...approvals];
+  // The same issue can come back as an approval and as a technical line (or merged under several kinds): one card per issue_id,
+  // and the approval wins because it asks for the manager's opinion.
+  const approvalIds = new Set(approvals.map((a) => a.id));
+  const seen = new Set<string>();
+  const uniqueTechs = techs.filter((t) => {
+    if (approvalIds.has(t.id) || seen.has(t.id)) return false;
+    seen.add(t.id);
+    return true;
+  });
+  const uniqueApprovals = approvals.filter((a, i) => approvals.findIndex((x) => x.id === a.id) === i);
+  return [...uniqueTechs, ...uniqueApprovals];
 }
 
 /** "Consultando a A y B…" from the turn progress; null when nobody is being consulted. */
@@ -498,7 +508,23 @@ export interface WarningItem {
   revertible: boolean;
 }
 
+/** Spanish names for issue kinds, used when the backend sends no kind_label_es. Raw kinds are never shown. */
+const KIND_LABELS_ES: Record<string, string> = {
+  stockout_risk: "Riesgo de desabasto",
+  overstock_waste: "Sobreinventario y merma",
+  calendar_uplift: "Efecto de calendario",
+  compliance_deviation: "Acción aprobada sin ejecutar",
+  orphan_sku: "Ventas sin producto en el catálogo",
+  sku_key_mismatch: "Claves de producto que no coinciden",
+};
+export const kindLabelEs = (kind: string | null | undefined, label?: string | null): string => label || (kind ? KIND_LABELS_ES[kind] : undefined) || "Advertencia";
+
 function alertCopy(a: AlertRecord): { icon: string; title: string; body: string } {
+  const copy = alertCopyBase(a);
+  return { ...copy, title: a.title_es || copy.title };
+}
+
+function alertCopyBase(a: AlertRecord): { icon: string; title: string; body: string } {
   const i = a.issue ?? {};
   const sev = a.severity_usd != null ? usd(a.severity_usd) : null;
   switch (i.kind) {
@@ -509,7 +535,7 @@ function alertCopy(a: AlertRecord): { icon: string; title: string; body: string 
     case "compliance_deviation":
       return { icon: "rule", title: "Acción aprobada sin ejecutar", body: "Una decisión aprobada no se ejecutó. Revisa qué pasó." };
     default:
-      return { icon: "warning", title: i.kind ?? "Advertencia", body: sev ? `Impacto estimado de ${sev}.` : "Sin datos" };
+      return { icon: "warning", title: kindLabelEs(i.kind, a.kind_label_es), body: sev ? `Impacto estimado de ${sev}.` : "Sin datos" };
   }
 }
 
@@ -534,7 +560,7 @@ export function buildWarnings(input: { alerts: AlertRecord[]; integrity: Issue[]
     }));
   const data = input.integrity.map((i): WarningItem => ({
     id: i.issue_id, cat: "datos", tone: "info", toneLabel: "Datos", icon: "sensors",
-    title: INTEGRITY_TITLES[i.kind] ?? i.kind, body: i.exposure_usd != null ? `Exposición de ${usd(i.exposure_usd)}.` : "Sin datos",
+    title: INTEGRITY_TITLES[i.kind] ?? kindLabelEs(i.kind), body: i.exposure_usd != null ? `Exposición de ${usd(i.exposure_usd)}.` : "Sin datos",
     agent: null, time: i.as_of ? dayMonth(i.as_of) : "", revertible: false,
   }));
   return [...ops, ...data];
