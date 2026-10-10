@@ -18,7 +18,7 @@ _THINK_BLOCK = re.compile(rf"<\s*({_TAG})\s*>.*?<\s*/\s*\1\s*>", re.I | re.S)
 _CLOSE_TAG = re.compile(rf"<\s*/\s*{_TAG}\s*>", re.I)
 _OPEN_TAG = re.compile(rf"<\s*{_TAG}\s*>", re.I)
 
-_GARBLE = re.compile(r"\w*([^\W\d_])\1{4,}\w*", re.I)
+_GARBLE = re.compile(r"\w*([^\W\d_])\1{3,}\w*", re.I)
 _GLUE = re.compile(r"\b([a-záéíóúñ]{2,})([A-Z][a-záéíóúñ]+)\b")
 _ENGLISH = frozenset("help the and with for you can will this that please sure here just also".split())
 _CODE = re.compile(r"(`[^`\n]*`|https?://\S+|\S+@\S+)")
@@ -126,6 +126,69 @@ def _fix_glue(text: str, hits: list[str]) -> str:
     return "".join(p if i % 2 else _glue(p, hits) for i, p in enumerate(parts))
 
 
+# --- foreign tokens leaked by the model inside Spanish prose (conservative: lowercase, curated, outside code) ---
+_VERB_FORMS = ("tengas tienes tiene puedes puede quieres quiere necesitas necesita sabes sabe haces hace debes debe "
+               "aplicas aplica pides pide buscas busca prefieres prefiere sirve sirven revisas revisa ordenas ordena "
+               "compras compra vendes vende ves vas ve").split()
+_GLUED = re.compile(rf"\b({'|'.join(sorted(_VERB_FORMS, key=len, reverse=True))})([a-z]{{3,}})\b")
+_NON_SPANISH_TAIL = re.compile(r"[kw]|[^aeiouáéíóú\W\d_]{3}")  # k/w or three consonants in a row
+_LEAK_DROP = re.compile(r"\b(?:seriously|actually|basically|really|literally|honestly)\b[ ]?")
+_LEAK_MAP = (
+    (re.compile(r"\bpergunt(?=[a-záéíóúñ]*\b)"), "pregunt"),
+    (re.compile(r"\brelies\b"), "depende"),
+    (re.compile(r"\bhowever\b"), "sin embargo"),
+    (re.compile(r"\btherefore\b"), "por lo tanto"),
+    (re.compile(r"\bvocê\b"), "usted"),
+    (re.compile(r"\bnão\b"), "no"),
+    (re.compile(r"\bobrigad[oa]\b"), "gracias"),
+    (re.compile(r"\bplease\b"), "por favor"),
+    (re.compile(r"\bsirvin\b"), "sirven"),
+)
+_LEAK_HELP = re.compile(r"\bhelp\b[ ]?")
+# 1-2 consonant-only capitalised fragment right before a lowercase Spanish verb ("Md aplicas")
+_STRAY = re.compile(rf"(?<![\w.])(?P<frag>[B-DF-HJ-NP-TV-Z][b-df-hj-np-tv-z])[ ]+(?=(?:{'|'.join(_VERB_FORMS)})\b)")
+
+
+def _fix_foreign_tokens(segment: str, hits: list[str]) -> str:
+    def glued(m: re.Match[str]) -> str:
+        if not _NON_SPANISH_TAIL.search(m.group(2)):
+            return m.group(0)
+        hits.append(m.group(0))
+        return m.group(1)
+
+    def stray(m: re.Match[str]) -> str:
+        frag = m.group("frag")
+        before = segment[:m.start()].rstrip()
+        prev = re.search(r"(\S+)$", before)
+        if prev and re.search(r"[A-Z0-9]", prev.group(1)):  # product / SKU context: when unsure, keep it
+            return m.group(0)
+        hits.append(frag)
+        return ""
+
+    def drop(m: re.Match[str]) -> str:
+        hits.append(m.group(0).strip())
+        return ""
+
+    def mapped(pattern: re.Pattern[str], repl: str):
+        def fix(m: re.Match[str]) -> str:
+            hits.append(m.group(0))
+            return repl
+        return fix
+
+    segment = _STRAY.sub(stray, segment)
+    segment = _GLUED.sub(glued, segment)
+    segment = _LEAK_DROP.sub(drop, segment)
+    segment = _LEAK_HELP.sub(drop, segment)
+    for pattern, repl in _LEAK_MAP:
+        segment = pattern.sub(mapped(pattern, repl), segment)
+    return segment
+
+
+def _fix_foreign(text: str, hits: list[str]) -> str:
+    parts = _CODE.split(text)
+    return "".join(p if i % 2 else _fix_foreign_tokens(p, hits) for i, p in enumerate(parts))
+
+
 def _tidy(text: str) -> str:
     text = re.sub(r"\(\s*\)", "", text)
     text = re.sub(r"(?<=\S)[ ]{2,}", " ", text)
@@ -149,6 +212,9 @@ def clean_reply(text: str) -> ReplyCleaning:
     removed += garbage
     glued: list[str] = []
     text = _fix_glue(text, glued)
+    leaks: list[str] = []
+    text = _fix_foreign(text, leaks)
+    removed += leaks
     if text != original:  # untouched replies come back byte-identical
         text = _tidy(text)
     reasons, score = [], 0
@@ -160,6 +226,9 @@ def clean_reply(text: str) -> ReplyCleaning:
     if len(glued) >= 2 or (glued and garbage):
         reasons.append("glue")
         score += 1
+    if len(leaks) >= 2:
+        reasons.append("foreign_tokens")
+        score += 2 if len(leaks) >= 4 else 1
     if len(foreign) >= 3:
         reasons.append("foreign_script")
         score += 1

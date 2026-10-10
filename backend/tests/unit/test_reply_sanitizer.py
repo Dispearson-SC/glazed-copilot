@@ -98,3 +98,51 @@ def test_known_field_keys_in_backticks_become_plain_spanish():
 def test_leftover_backticked_snake_case_keys_are_dropped_keeping_numeric_values():
     assert sanitize_reply("Vale `foo_bar: 12.5` y `baz_qux: hola` ok `x` y `S030`")[0] == "Vale 12.5 y ok `x` y `S030`"
     assert sanitize_reply("el `weird_key` aparece")[0] == "el aparece"
+
+
+# --- foreign / glued tokens leaked inside Spanish prose ---
+import pytest
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ("Si no, tengasalski sobrante en bodega.", "Si no, tengas sobrante en bodega."),
+    ("Md aplicas rebajas al producto.", "aplicas rebajas al producto."),
+    ("Si te interesa seriously el traslado, avísame.", "Si te interesa el traslado, avísame."),
+    ("Merece la pena perguntarlo a la sucursal.", "Merece la pena preguntarlo a la sucursal."),
+    ("Mira cómo sirvin las ventas.", "Mira cómo sirven las ventas."),
+    ("Ahora puedeHelp con el pedido.", "Ahora puede con el pedido."),
+    ("Es probable que relies de la demanda.", "Es probable que depende de la demanda."),
+    ("Todo bien, presenteDDDD y listo.", "Todo bien,  y listo.".replace("  ", " ")),
+    ("Es caro, however hay stock; therefore pide.", "Es caro, sin embargo hay stock; por lo tanto pide."),
+    ("Dile que não hay, obrigado.", "Dile que no hay, gracias."),
+    ("Dile a você que please espere.", "Dile a usted que por favor espere."),
+])
+def test_foreign_tokens_are_dropped_or_mapped(raw, expected):
+    assert clean_reply(raw).text == expected
+
+
+@pytest.mark.parametrize("text", [
+    "Md Choc Stout C.B. tiene 12 cajas.",
+    "El Md Choc Stout aplica rebajas.",
+    "SKU-AAA1 y 4500 unidades, tienes 3.5% de merma.",
+    "Help Wanted Ale: 24 botellas; Seriously Good IPA: 6.",
+    "Tienes que revisar si puedes pedir más; tengamos cuidado, sirven bien.",
+    "Si no tienes stock, pregunta; no hay problema, ya lo sabes.",
+    "Se aplica la regla y Es útil: puedes ordenar hoy.",
+    "Tengas lo que tengas, la cerveza real sale bien.",
+])
+def test_legit_spanish_and_product_names_are_untouched(text):
+    out = clean_reply(text)
+    assert out.text == text and not out.removed and out.score == 0
+
+
+def test_many_foreign_tokens_raise_contamination_but_one_does_not():
+    assert not clean_reply("Si te interesa seriously el traslado.").contaminated
+    out = clean_reply("Md aplicas rebajas, tengasalski sobrante, perguntarlo, seriously no relies de eso.")
+    assert "foreign_tokens" in out.reasons and out.contaminated
+    assert out.text == "aplicas rebajas, tengas sobrante, preguntarlo, no depende de eso."
+
+
+def test_foreign_fixes_skip_code_and_urls():
+    text = "Usa `seriously` y https://x.io/please/help para ver."
+    assert clean_reply(text).text == text
