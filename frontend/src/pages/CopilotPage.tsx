@@ -36,7 +36,7 @@ function CopilotShell() {
   const branch_ = useBranchData(caseId, simToday, state.tab === "sucursal", session.refreshKey);
   const warningsData = useWarningsData(storeId, caseId, session.refreshKey);
   const memoryData = useMemoryData(caseId, state.tab === "memorias", session.refreshKey);
-  const decide = useDecide(caseId, data.refresh);
+  const { decide } = useDecide(caseId, data.refresh);
   const [site, branch] = splitStoreName(active ? storeLabel(active) : "Sucursal");
 
   // Every decision seen this session stays available to the chat cards even after it is decided.
