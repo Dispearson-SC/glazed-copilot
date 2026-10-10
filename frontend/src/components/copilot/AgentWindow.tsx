@@ -4,6 +4,7 @@ import Markdown from "../../chat/Markdown";
 import { consultingText, fetchIssueAnalysis, type AnalysisRef, type AnalysisState, type DecisionItem } from "../../data/copilot";
 import { clockTime } from "../../format";
 import { useCopilot } from "../../state/copilotStore";
+import type { Choice } from "../../useDecide";
 import type { ChatMessage } from "../../chatHistory";
 import type { AgentsStatusResponse } from "../../types";
 import type { useChat } from "../../useChat";
@@ -57,7 +58,7 @@ function thinkingLine(a: AgentsStatusResponse | null): string {
 }
 
 /** Fetches the backend analysis of the issue once and hands it to the card. */
-function AnalysisLoader({ caseId, item, mode, open, busy, onApprove, onReject }: { caseId: string; item: DecisionItem; mode: AnalysisRef["mode"]; open: boolean; busy: boolean; onApprove: (i: DecisionItem) => void; onReject: (i: DecisionItem) => void }) {
+function AnalysisLoader({ caseId, item, mode, open, busy, onApprove, onReject, onChoose }: { caseId: string; item: DecisionItem; mode: AnalysisRef["mode"]; open: boolean; busy: boolean; onApprove: (i: DecisionItem) => void; onReject: (i: DecisionItem) => void; onChoose?: (i: DecisionItem, c: Choice) => void }) {
   const api = useApi();
   const [analysis, setAnalysis] = useState<AnalysisState>({ status: "loading" });
   useEffect(() => {
@@ -71,7 +72,7 @@ function AnalysisLoader({ caseId, item, mode, open, busy, onApprove, onReject }:
       alive = false;
     };
   }, [api, caseId, item.issueId]);
-  return <AnalysisCard item={item} analysis={analysis} mode={mode} open={open} busy={busy} onApprove={onApprove} onReject={onReject} extra={item.isTransfer ? <TransferOptions caseId={caseId} sku={item.sku} issueId={item.issueId} /> : undefined} />;
+  return <AnalysisCard item={item} analysis={analysis} mode={mode} open={open} busy={busy} onApprove={onApprove} onReject={onReject} onChoose={onChoose} extra={item.isTransfer ? <TransferOptions caseId={caseId} sku={item.sku} issueId={item.issueId} /> : undefined} />;
 }
 
 /** Agente window: the existing chat (useChat) in the copilot look, with the pinned context and the analysis cards. */
@@ -87,6 +88,7 @@ export default function AgentWindow({
   pendingLine,
   onApprove,
   onReject,
+  onChoose,
 }: {
   caseId: string;
   storeId?: string;
@@ -103,6 +105,8 @@ export default function AgentWindow({
   pendingLine: string;
   onApprove: (item: DecisionItem) => void;
   onReject: (item: DecisionItem) => void;
+  /** Approve an alternative option of the issue (from the analysis card). */
+  onChoose?: (item: DecisionItem, choice: Choice) => void;
 }) {
   const { state, dispatch, showToast } = useCopilot();
   const [draft, setDraft] = useState("");
@@ -135,7 +139,7 @@ export default function AgentWindow({
     cardsAt(at).map((a) => {
       const item = items.find((i) => i.id === a.itemId);
       if (!item) return null;
-      return <AnalysisLoader key={a.id} caseId={caseId} item={item} mode={a.mode} open={pendingIds.has(item.id)} busy={busyId === item.id} onApprove={onApprove} onReject={onReject} />;
+      return <AnalysisLoader key={a.id} caseId={caseId} item={item} mode={a.mode} open={pendingIds.has(item.id)} busy={busyId === item.id} onApprove={onApprove} onReject={onReject} onChoose={onChoose} />;
     });
 
   return (

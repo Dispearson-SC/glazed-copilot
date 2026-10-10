@@ -67,6 +67,15 @@ export interface AnalysisSection {
   /** Hex color of the section title. */
   color: string;
   items: string[];
+  /** Alternatives of the dialogue; the card renders these (with a choose button when it has an option_id) instead of `items`. */
+  alternatives?: AnalysisAlternative[];
+}
+
+export interface AnalysisAlternative {
+  /** "" when the backend gave no option_id: shown as text only. */
+  optionId: string;
+  label: string;
+  lines: string[];
 }
 
 export interface DecisionItem {
@@ -260,16 +269,17 @@ export function analysisSections(mode: "analizar" | "dialogo", a: IssueAnalysis)
       sec("Contras", "remove_circle", "#82746f", a.cons),
       ...(a.requires_approval ? [sec("Requiere tu aprobación", "how_to_reg", "#4b3025", [`${tierLabel(a.tier)}: la decisión es tuya.`])] : []),
     ];
-  const alts = a.dialog.alternatives.flatMap((x) => {
+  const alternatives: AnalysisAlternative[] = a.dialog.alternatives.map((x) => {
     const promo = promoView(x);
     const name = promo ? promo.primary : x.label;
-    return [x.net_usd_mid == null ? name : `${name} (efecto neto ${usd(x.net_usd_mid)})`, ...(promo ? promoLines(promo) : [])];
+    return { optionId: x.option_id || "", label: x.label, lines: [x.net_usd_mid == null ? name : `${name} (efecto neto ${usd(x.net_usd_mid)})`, ...(promo ? promoLines(promo) : [])] };
   });
+  const alts = alternatives.flatMap((x) => x.lines);
   return [
     sec("Por qué", "help", "#7a5649", [a.dialog.why]),
     sec("Si aceptas", "check_circle", "#cb9564", [a.dialog.if_accept]),
     sec("Si no actúas", "block", "#82746f", [a.dialog.if_not_act]),
-    sec("Alternativas", "alt_route", "#331b11", alts.length ? alts : ["Sin alternativas propuestas por el sistema."]),
+    { ...sec("Alternativas", "alt_route", "#331b11", alts.length ? alts : ["Sin alternativas propuestas por el sistema."]), alternatives },
   ];
 }
 
