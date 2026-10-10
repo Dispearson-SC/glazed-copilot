@@ -14,7 +14,9 @@ def approval_item(issue: dict[str, Any]) -> dict[str, Any] | None:
         return None
     return {k: a[k] for k in ("issue_id", "title", "tier", "deadline", "impact_usd", "confidence", "problem",
                               "recommendation", "requires_approval")} | {"kind": issue.get("kind"), "sku": issue.get("sku"),
-                                                                        "product_name": issue.get("product_name")}
+                                                                        "product_name": issue.get("product_name"),
+                                                                        "kinds": issue.get("kinds") or [issue.get("kind")],
+                                                                        "merged_issue_ids": issue.get("merged_issue_ids") or []}
 
 
 def technical_from_issue(issue: dict[str, Any]) -> dict[str, Any] | None:
@@ -25,7 +27,8 @@ def technical_from_issue(issue: dict[str, Any]) -> dict[str, Any] | None:
     best = pick_best(issue["options"])
     p = best.get("params") or {}
     return {"issue_id": issue["issue_id"], "option_id": best["option_id"], "sku": issue.get("sku"),
-            "product_name": issue.get("product_name"), "supplier_id": issue.get("supplier_id"),
+            "action_type": best["action_type"], "kinds": issue.get("kinds") or [issue.get("kind")],
+            "merged_issue_ids": issue.get("merged_issue_ids") or [], "product_name": issue.get("product_name"), "supplier_id": issue.get("supplier_id"),
             "supplier_name": issue.get("supplier_name"), "qty": p.get("qty"), "expected_delivery": None,
             "cost_usd": {"low": best.get("cost_usd") or 0.0, "mid": best.get("cost_usd") or 0.0, "high": best.get("cost_usd") or 0.0},
             "why": a["dialog"]["why"], "impact_chips": [f"Efecto neto esperado {usd(best.get('net_usd_mid'))}"],

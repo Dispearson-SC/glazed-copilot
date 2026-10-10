@@ -23,7 +23,9 @@ def find_issue(alerts: Any, metrics: Any, served: dict, case: Case, issue_id: st
         alert = alerts.get_by_issue_key(issue_id)
         issue = alert.issue if alert is not None and alert.store_id == case.store_id else None
     if issue is None or not issue.get("options"):
-        issue = next((i for i in metrics.issues(case.store_id, case.sim_today, 1000) if i.get("issue_id") == issue_id), None)
+        pool = metrics.issues(case.store_id, case.sim_today, 10_000)
+        issue = next((i for i in pool if i.get("issue_id") == issue_id), None) or \
+            next((i for i in pool if issue_id in (i.get("merged_issue_ids") or [])), None)  # merged into another issue
     return issue
 
 
@@ -76,6 +78,31 @@ class IssueAnalysis:
                 "store_display_name": self.names.of(case.store_id), "source": ANALYSIS_SOURCE, **build_analysis(issue)}
 
 
+def _dedupe_by_sku_action(approvals: list[dict[str, Any]], technical: list[dict[str, Any]]) -> tuple[list, list]:
+    """The same SKU never shows in approvals and technical with the same action: the technical / order-plan item stays
+    and links the issue (`linked_issue_ids`); a technical-from-issue duplicate of a plan line is folded into the line."""
+    def act(x: dict[str, Any]) -> str:
+        return (x.get("recommendation") or {}).get("action_type") or x.get("action_type") or "place_order"
+
+    first: dict[tuple, dict[str, Any]] = {}
+    kept_tech = []
+    for t in technical:
+        key = (t.get("sku"), act(t))
+        if t.get("sku") and key in first:
+            first[key].setdefault("linked_issue_ids", []).append(t["issue_id"])
+            continue
+        first.setdefault(key, t)
+        kept_tech.append(t)
+    kept = []
+    for a in approvals:
+        t = first.get((a.get("sku"), act(a)))
+        if a.get("sku") and t is not None:
+            t.setdefault("linked_issue_ids", []).append(a["issue_id"])
+            continue
+        kept.append(a)
+    return kept, kept_tech
+
+
 class PendingDecisions:
     """The manager inbox of one case: approvals (N2/N3) and technical items, minus what was already decided here."""
 
@@ -87,6 +114,10 @@ class PendingDecisions:
     def items(self, case: Case) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         from ..metrics.pending import approval_item, technical_from_issue, technical_from_line
         decided = {p.issue_id for p in self.proposals.list(case_id=case.case_id) if p.status in ("approved", "rejected")}
+
+        def done(issue: dict[str, Any]) -> bool:  # deciding the primary resolves the merged ones (and the reverse)
+            return issue["issue_id"] in decided or any(m in decided for m in issue.get("merged_issue_ids") or [])
+
         plan = self.metrics.order_plan(case.store_id, case.sim_today)
         technical, in_plan = [], set()
         for line in plan.get("lines", []):
@@ -94,13 +125,13 @@ class PendingDecisions:
             if issue:
                 self.served[(case.case_id, issue["issue_id"])] = issue
                 in_plan.add(issue["issue_id"])
-                if issue["issue_id"] in decided:
+                if done(issue):
                     continue
             technical.append(technical_from_line(line, issue))
         approvals = []
         for issue in self.metrics.issues(case.store_id, case.sim_today, 10_000):
             iid = issue["issue_id"]
-            if issue.get("category") == "integrity" or iid in decided or iid in in_plan:
+            if issue.get("category") == "integrity" or done(issue) or iid in in_plan:
                 continue
             self.served[(case.case_id, iid)] = issue
             item = approval_item(issue)
@@ -110,6 +141,7 @@ class PendingDecisions:
             tech = technical_from_issue(issue)
             if tech is not None:
                 technical.append(tech)
+        approvals, technical = _dedupe_by_sku_action(approvals, technical)
         approvals.sort(key=lambda a: (-a["impact_usd"]["mid"], a["issue_id"]))
         return approvals, technical
 

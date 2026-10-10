@@ -17,7 +17,7 @@ import duckdb
 from ...domain import FutureDate, NotFound
 from ...metrics.backtest import backtest_sku
 from ...metrics.integrity import integrity_issues, scan_sales
-from ...metrics.issues import detect_issues
+from ...metrics.issues import detect_issues, merge_same_action
 from ...metrics.replay import calibrate
 from ...metrics.losses import lost_sales_window
 from ...metrics.confidence import line_confidence, realized_add_net, realized_reduce_net
@@ -194,6 +194,7 @@ class DuckDBMetrics:
                                               self._calibration(store_id, as_of), limit=10_000)
             self._issues[key] += self._promo_issues(store_id, as_of, ref) + self._calendar_issues(store_id, as_of, ref) \
                 + self._integrity_issues(store_id, as_of, ref)
+            self._issues[key] = merge_same_action(self._issues[key])
             self._issues[key].sort(key=lambda i: (-i["severity_usd"], i["issue_id"]))
             name = next((x.get("display_name") or x["name"] for x in self.stores() if x["store_id"] == store_id), store_id)
             for iss in self._issues[key]:

@@ -140,3 +140,52 @@ def _late_issues(snap: StoreSnapshot, store_id: str, as_of: date, ref: date, cfg
                           ["Late-order arrival is modelled as 1/2/3 days from today (assumption)."], opts, rec,
                           supplier_id=sup, supplier_name=snap.supplier_names.get(sup)))
     return out
+
+
+def _recommended(issue: dict) -> dict | None:
+    return next((o for o in issue.get("options") or [] if o.get("option_id") == issue.get("recommended_option_id")), None)
+
+
+def _action_signature(issue: dict) -> tuple | None:
+    """store + SKU + recommended action_type + the params that define the action; None when nothing is recommended."""
+    rec = _recommended(issue)
+    if rec is None or rec.get("action_type") == "do_nothing" or not issue.get("sku"):
+        return None
+    p = rec.get("params") or {}
+    return (issue.get("store_id"), issue["sku"], rec["action_type"], p.get("supplier_id"), p.get("plan_qty", p.get("qty")))
+
+
+def _rank(issue: dict) -> tuple:
+    c = (_recommended(issue) or {}).get("confidence") or {}
+    return (1 if (c.get("n_backtest") or 0) > 0 else 0, float(c.get("score") or 0.0), float(issue.get("severity_usd") or 0.0),
+            issue["issue_id"])
+
+
+def merge_same_action(issues: list[dict]) -> list[dict]:
+    """One item per (store, SKU, recommended action): two detectors firing on the same root cause become one issue.
+    The primary is the calibrated / higher-confidence one and keeps its issue_id; evidence and caveats are unioned."""
+    groups: dict[tuple, list[dict]] = {}
+    for i in issues:
+        sig = _action_signature(i)
+        if sig is not None:
+            groups.setdefault(sig, []).append(i)
+    drop: set[str] = set()
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        members.sort(key=_rank, reverse=True)
+        primary, rest = members[0], members[1:]
+        seen = {(e.get("metric"), e.get("period")) for e in primary["evidence"]}
+        for m in rest:
+            primary["evidence"] += [e for e in m["evidence"] if (e.get("metric"), e.get("period")) not in seen
+                                    and not seen.add((e.get("metric"), e.get("period")))]
+            primary["data_caveats"] += [c for c in m["data_caveats"] if c not in primary["data_caveats"]]
+            drop.add(m["issue_id"])
+        primary["kinds"] = [primary["kind"], *[m["kind"] for m in rest if m["kind"] != primary["kind"]]]
+        primary["merged_issue_ids"] = [m["issue_id"] for m in rest]
+        primary["severity_usd"] = max(float(m.get("severity_usd") or 0.0) for m in members)
+    out = [i for i in issues if i["issue_id"] not in drop]
+    for i in out:
+        i.setdefault("kinds", [i.get("kind")])
+        i.setdefault("merged_issue_ids", [])
+    return out
