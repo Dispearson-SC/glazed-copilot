@@ -187,6 +187,9 @@ class AdvanceSimClock:
         for issue in self.metrics.issues(case.store_id, case.sim_today, self.limit):
             key = issue["issue_id"]
             alert = self.alerts.get_by_issue_key(key)
+            if alert is not None and "options" not in alert.issue:  # raised before issues carried options
+                alert.issue, alert.severity_usd = issue, float(issue.get("severity_usd", alert.severity_usd))
+                self.alerts.update(alert)
             if alert is None:
                 opened = self.cases.get_by_issue_key(key)
                 if opened is None:

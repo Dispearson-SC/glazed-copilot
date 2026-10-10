@@ -354,3 +354,14 @@ def test_internal_payloads_carry_store_display_name(env):
     client.post(f"/api/v1/cases/{c['case_id']}/advance", json={"days": 1})
     issues = client.get("/internal/v1/issues", headers=h).json()
     assert issues and issues[0]["store_display_name"] == NAME
+
+
+def test_advance_upgrades_a_legacy_alert_that_has_no_options(env):
+    client, c = env
+    case = mkcase(client)
+    legacy = {k: v for k, v in ISSUE.items() if k != "options"}
+    from glazed_backend.domain import Alert
+    c.alerts.add(Alert.new(2, "S030", case["case_id"], 50.0, legacy, ISSUE["issue_id"], date(2026, 3, 10)))
+    client.post(f"/api/v1/cases/{case['case_id']}/advance", json={"days": 1})
+    alert = client.get("/api/v1/alerts", params={"store_id": "S030"}).json()[0]
+    assert [o["option_id"] for o in alert["issue"]["options"]] == ["opt-place", "opt-none"]
