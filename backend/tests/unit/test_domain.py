@@ -48,7 +48,7 @@ def test_alert_can_be_postponed_from_any_open_state():
 
 def test_action_types_are_closed_list():
     assert ACTION_TYPES == {"place_order", "adjust_order_qty", "skip_order", "markdown_end_of_day",
-                            "run_promo", "transfer_stock", "shift_staff_hours", "do_nothing"}
+                            "run_promo", "transfer_stock", "shift_staff_hours", "data_fix_task", "do_nothing"}
 
 
 def test_proposal_rejects_unknown_action_and_tier():

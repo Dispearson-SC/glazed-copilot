@@ -85,8 +85,14 @@ def build_internal_router(c: Any) -> APIRouter:
         return names.tag(uc.GetDaySummary(c.cases, c.metrics).execute(case.case_id, date), case.store_id)
 
     @r.get("/issues")
-    def issues(case: Ctx, limit: int = 5):
-        found = names.tag(c.metrics.issues(case.store_id, case.sim_today, max(1, min(limit, 20))), case.store_id)
+    def issues(case: Ctx, limit: int = 5, kind: str | None = None, category: str | None = None):
+        """kind / category=integrity filter before the limit (the Auditor asks for integrity issues only)."""
+        if kind or category:
+            pool = [i for i in c.metrics.issues(case.store_id, case.sim_today, 10_000)
+                    if (not kind or i.get("kind") == kind) and (not category or i.get("category") == category)]
+            found = names.tag(pool[:max(1, min(limit, 20))], case.store_id)
+        else:
+            found = names.tag(c.metrics.issues(case.store_id, case.sim_today, max(1, min(limit, 20))), case.store_id)
         for issue in found:
             c.served[(case.case_id, issue["issue_id"])] = issue
         return found

@@ -46,11 +46,13 @@ services:
       GLAZED_STORAGE: postgres
       GLAZED_DATABASE_URL: postgresql://glazed_app:glazed_dev@db:5432/glazed_app
       GLAZED_DUCKDB_PATH: /data/glazed.duckdb
+      GLAZED_RAW_PATH: /raw
       GLAZED_CORE_URL: http://core:8000
       GLAZED_CORS_ORIGINS: ${GLAZED_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       BACKBOARD_API_KEY: ${BACKBOARD_API_KEY:-}
     volumes:
       - ../../Dataset/clean:/data:ro
+      - ../../Dataset/raw:/raw:ro
     ports:
       - "${GLAZED_BACKEND_PORT:-8100}:8080"
 

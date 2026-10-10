@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import copy
 import math
+import os
 import threading
 from datetime import date, timedelta
 from typing import Any
@@ -15,6 +16,7 @@ import duckdb
 
 from ...domain import FutureDate, NotFound
 from ...metrics.backtest import backtest_sku
+from ...metrics.integrity import integrity_issues, scan_sales
 from ...metrics.issues import detect_issues
 from ...metrics.replay import calibrate
 from ...metrics.losses import lost_sales_window
@@ -44,8 +46,11 @@ def _f(x: Any, nd: int = 2) -> float | None:
 
 
 class DuckDBMetrics:
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, raw_dir: str | None = None) -> None:
         self._con = duckdb.connect(path, read_only=True)
+        self._raw_dir = raw_dir if raw_dir and os.path.exists(os.path.join(raw_dir, "sales_daily.csv")) else None
+        self._raw_rows: list[tuple] | None = None
+        self._raw_master: dict[str, str] = {}
         self._lock = threading.Lock()
         self._snaps: dict[tuple[str, date], StoreSnapshot] = {}
         self._calib: dict[tuple[str, date], Any] = {}
@@ -179,7 +184,8 @@ class DuckDBMetrics:
             ref = self._ref_date(store_id, as_of)
             self._issues[key] = detect_issues(self._snapshot(store_id, as_of), store_id, as_of, ref, self.config,
                                               self._calibration(store_id, as_of), limit=10_000)
-            self._issues[key] += self._promo_issues(store_id, as_of, ref) + self._calendar_issues(store_id, as_of, ref)
+            self._issues[key] += self._promo_issues(store_id, as_of, ref) + self._calendar_issues(store_id, as_of, ref) \
+                + self._integrity_issues(store_id, as_of, ref)
             self._issues[key].sort(key=lambda i: (-i["severity_usd"], i["issue_id"]))
             name = next((x.get("display_name") or x["name"] for x in self.stores() if x["store_id"] == store_id), store_id)
             for iss in self._issues[key]:
@@ -221,6 +227,43 @@ class DuckDBMetrics:
                                                               "discount_pct": r.discount_pct, "start": r.start.isoformat()},
                                        audit, n_stores, self.config))
         return out
+
+    def _raw_unmatched(self) -> list[tuple]:
+        """(store, raw sku, date, net_sales) for raw sales whose SKU is not in the raw master, read once."""
+        if self._raw_rows is None:
+            raw = duckdb.connect()
+            sales, prods = os.path.join(self._raw_dir, "sales_daily.csv"), os.path.join(self._raw_dir, "products.csv")
+            self._raw_master = {r[0]: r[1] for r in raw.execute(
+                f"SELECT sku, product_name FROM read_csv_auto('{prods}', all_varchar=true)").fetchall()}
+            self._raw_rows = raw.execute(
+                f"SELECT store_id, sku, try_cast(date AS DATE), coalesce(try_cast(net_sales AS DOUBLE), 0)"
+                f" FROM read_csv_auto('{sales}', all_varchar=true) WHERE sku NOT IN"
+                f" (SELECT sku FROM read_csv_auto('{prods}', all_varchar=true))").fetchall()
+            raw.close()
+        return self._raw_rows
+
+    def _integrity_issues(self, store_id: str, as_of: date, ref: date) -> list[dict[str, Any]]:
+        """Alert 9 from the raw layer when mounted (dollars, cut at as_of); otherwise only the dq_log orphan count."""
+        if self._raw_dir is None:
+            dq = self._q("SELECT affected_rows FROM dq_log WHERE rule_id='SD03'")
+            if not dq or not dq[0][0]:
+                return []
+            out = integrity_issues(store_id, as_of, ref, [], [{"sku": "SKU-7xxxxx", "rows": int(dq[0][0]), "net_sales": 0.0,
+                                                               "days": 0, "by_store": {}}], self.config)
+            for i in out:
+                i["data_caveats"].append("Dollar amounts and the SKU key mismatch need the raw layer (not mounted); "
+                                         "only the dq_log row count (rule SD03) is available.")
+            return out
+        per: dict[tuple[str, str], list[Any]] = {}
+        for st, sku, d, net in self._raw_unmatched():
+            if d is not None and d <= as_of:
+                a = per.setdefault((st, sku), [0, 0.0, set()])
+                a[0] += 1
+                a[1] += net
+                a[2].add(d)
+        mism, orphans = scan_sales([(st, sku, n, round(v, 2), len(days)) for (st, sku), (n, v, days) in per.items()],
+                                   self._raw_master)
+        return integrity_issues(store_id, as_of, ref, mism, orphans, self.config)
 
     def _format_days(self, store_id: str) -> tuple[list[dict[str, Any]], str]:
         """Daily units, sales and cost per store x department for every store of this store's format (all dates;

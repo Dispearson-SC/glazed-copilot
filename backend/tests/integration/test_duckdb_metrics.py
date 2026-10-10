@@ -221,3 +221,30 @@ def test_calendar_effect_uses_only_history_up_to_as_of(m):
     ns = {e["department"]: e["n"] for e in a["options"][0]["params"]["effects"]}
     cutoff = m._q("SELECT count(*) FROM calendar WHERE is_school_break AND NOT is_holiday AND date<=?", [date(2026, 5, 29)])[0][0]
     assert ns and all(0 < n <= cutoff for n in ns.values())  # June break days are in the future: never counted
+
+
+RAW = os.environ.get("GLAZED_RAW_PATH", "/home/ubuntu/projects/Softek-HackSaltillo/Dataset/raw")
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(RAW, "sales_daily.csv")), reason="raw layer not available")
+def test_integrity_issues_report_the_sku_key_mismatch_and_the_real_orphans_from_raw():
+    from glazed_backend.adapters.driven.duckdb_metrics import DuckDBMetrics
+    mr = DuckDBMetrics(PATH, raw_dir=RAW)
+    all_found = [i for i in mr.issues(S, date(2026, 9, 30), limit=10_000) if i.get("integrity")]
+    assert [i["kind"] for i in all_found] == ["orphan_sku", "sku_key_mismatch"]  # small variants are summarised
+    found = {i["kind"]: i for i in all_found}
+    ev = {e["metric"]: e["value"] for e in found["sku_key_mismatch"]["evidence"]}
+    assert found["sku_key_mismatch"]["sku"] == "SKU-100040" and 400_000 < ev["recoverable_sales_chain_usd"] < 420_000
+    assert ev["master_key"] == "SKU100040"
+    ov = {e["metric"]: e["value"] for e in found["orphan_sku"]["evidence"]}
+    assert ov["orphan_rows"] == 400 and 18_000 < ov["orphan_sales_chain_usd"] < 20_000
+    early = {i["kind"]: i for i in mr.issues(S, date(2026, 3, 1), limit=10_000) if i.get("integrity")}
+    assert {e["metric"]: e["value"] for e in early["sku_key_mismatch"]["evidence"]}["recoverable_sales_chain_usd"] < ev["recoverable_sales_chain_usd"]
+    assert ev["recoverable_sales_store_usd"] > 0 and found["sku_key_mismatch"]["exposure_usd"] == ev["recoverable_sales_chain_usd"]
+
+
+def test_without_the_raw_layer_orphans_come_from_the_dq_log_only(m):
+    found = [i for i in m.issues(S, AS_OF, limit=10_000) if i.get("integrity")]
+    assert [i["kind"] for i in found] == ["orphan_sku"]
+    assert {e["metric"]: e["value"] for e in found[0]["evidence"]}["orphan_rows"] == 400
+    assert any("raw layer" in c for c in found[0]["data_caveats"])

@@ -376,3 +376,14 @@ def test_internal_promo_audit_uses_the_case_store_and_date(env):
     assert ("promo_audit", "S030", date(2026, 3, 10), "bakery", 15.0) in c.metrics.calls
     assert client.post("/internal/v1/promos/audit", headers={"X-Glazed-Case": case["case_id"]},
                        json={"department": "bakery"}).status_code == 422
+
+
+def test_internal_issues_can_be_filtered_by_kind_or_integrity_category(env):
+    client, c = env
+    case = mkcase(client, sim_today="2026-03-11")
+    c.metrics.issues_by_date[date(2026, 3, 11)] = [ISSUE, {**ISSUE, "issue_id": "S030|sku_key_mismatch|X", "kind": "sku_key_mismatch",
+                                                          "category": "integrity", "integrity": True}]
+    h = {"X-Glazed-Case": case["case_id"]}
+    assert len(client.get("/internal/v1/issues", headers=h).json()) == 2
+    assert [i["kind"] for i in client.get("/internal/v1/issues", headers=h, params={"kind": "sku_key_mismatch"}).json()] == ["sku_key_mismatch"]
+    assert [i["kind"] for i in client.get("/internal/v1/issues", headers=h, params={"category": "integrity"}).json()] == ["sku_key_mismatch"]
