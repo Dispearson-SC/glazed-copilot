@@ -256,3 +256,4 @@ class Experience:
     decision_id: str | None = None
     created_at: datetime = field(default_factory=utcnow)
     score: float | None = None
+    ref: str | None = None  # id to re-verify the memory with (a promo id such as PR002)

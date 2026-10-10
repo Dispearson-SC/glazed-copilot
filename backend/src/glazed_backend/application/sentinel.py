@@ -62,6 +62,38 @@ class CheckCompliance:
             raise NotFound(f"decision {decision_id!r} not found")
         return self.check(p, case.sim_today)
 
+    def decision_log(self, case_id: str) -> list[dict[str, Any]]:
+        """Decisions of this case plus, for a live case, earlier live decisions of the same store (scope "store").
+        Sandbox and backtest cases never leak, and decisions dated after this case's clock are not shown."""
+        from . import _case
+        case = _case(self.cases, case_id)
+        events = self.events(case.store_id)
+        own = {p.proposal_id: "case" for p in self.proposals.list(case_id=case.case_id)}
+        scoped = dict(own)
+        if case.mode == "live":
+            live = {c.case_id for c in self.cases.list(case.store_id) if c.mode == "live" and c.sim_today <= case.sim_today}
+            for p in self.proposals.list(store_id=case.store_id):
+                if p.case_id in live and p.proposal_id not in scoped:
+                    scoped[p.proposal_id] = "store"
+        out = []
+        for p in sorted(self.proposals.list(store_id=case.store_id), key=lambda x: x.created_at):
+            if p.proposal_id not in scoped:
+                continue
+            res = self.check(p, case.sim_today, events)
+            parts = p.issue_id.split("|")
+            out.append({"decision_id": p.proposal_id, "scope": scoped[p.proposal_id], "case_id": p.case_id,
+                        "issue_id": p.issue_id, "kind": parts[1] if len(parts) > 2 else None,
+                        "sku": p.params.get("sku"), "action_type": p.action_type, "tier": p.tier, "status": p.status,
+                        "rationale": p.rationale, "reason": p.reason, "agent_id": p.agent_id,
+                        "decided_as_of": p.params.get("decision_as_of"), "created_at": p.created_at.isoformat(),
+                        "executions": [{"status": x.status, "source": x.source, "detail": x.detail,
+                                        "executed_at": x.executed_at.isoformat()} for x in self.executions.list(p.case_id)
+                                       if x.proposal_id == p.proposal_id],
+                        "outcome": None if not res["observed"] else
+                        {"diagnosis": res["diagnosis"], "label": "backtest", "observed_net_usd": res["observed"]["net_usd"],
+                         "simulated_net_usd": (res["simulated"] or {}).get("net_usd_mid"), "explanation": res["explanation"]}})
+        return out
+
     def deviations(self, case_id: str) -> list[dict[str, Any]]:
         """Approved decisions of this store (same mode) that were not executed or missed their simulated range."""
         from . import _case

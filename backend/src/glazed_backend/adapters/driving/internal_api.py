@@ -125,7 +125,8 @@ def build_internal_router(c: Any) -> APIRouter:
 
     @r.get("/history")
     def history(case: Ctx):
-        return c.metrics.history(case.store_id, case.sim_today)
+        chk = sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace)
+        return {**c.metrics.history(case.store_id, case.sim_today), "decision_log": chk.decision_log(case.case_id)}
 
     @r.get("/experiences")
     def experiences(case: Ctx, response: Response, query: str = "", limit: int = 5):
@@ -133,8 +134,13 @@ def build_internal_router(c: Any) -> APIRouter:
             case.store_id, query, max(1, min(limit, 20)))
         if warning:
             response.headers["X-Glazed-Warning"] = warning.replace("\n", " ")[:200]
-        return [{"text": e.text, "decision_id": e.decision_id, "kind": e.kind,
-                 "created_at": e.created_at.isoformat(), "score": e.score} for e in found]
+        def verify(e: Any) -> dict[str, str] | None:
+            """How the Past agent re-checks a memory before citing a number from it."""
+            if e.ref and e.ref.startswith("PR"):
+                return {"tool": "evaluate_promo", "promo_id": e.ref}
+            return {"tool": "history", "decision_id": e.decision_id} if e.decision_id else None
+        return [{"text": e.text, "decision_id": e.decision_id, "ref": e.ref, "kind": e.kind,
+                 "created_at": e.created_at.isoformat(), "score": e.score, "verify": verify(e)} for e in found]
 
     @r.post("/proposals", status_code=201)
     def post_proposal(case: Ctx, b: ProposalBody, x_glazed_agent: Annotated[str | None, Header()] = None):

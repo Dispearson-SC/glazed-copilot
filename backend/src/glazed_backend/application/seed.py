@@ -22,6 +22,6 @@ def parse_promo_baseline(markdown: str, store_id: str = "baseline") -> list[Expe
         pid = promo.split()[0]
         text = (f"[{store_id} · promo_evaluation · {pid} · baseline] {promo} ({kind}): expected uplift {expected}%, "
                 f"measured uplift {uplift.replace('*', '')} (+-28d, in parentheses +-14d), discount cost {cost}, "
-                f"net margin effect {net.replace('*', '')}. {_NOTE}")
-        out.append(Experience(text, "promo_evaluation", store_id))
+                f"net margin effect {net.replace('*', '')}. {_NOTE} ref={pid}")
+        out.append(Experience(text, "promo_evaluation", store_id, ref=pid))
     return out

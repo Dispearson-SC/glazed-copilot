@@ -390,3 +390,18 @@ def test_internal_issues_can_be_filtered_by_kind_or_integrity_category(env):
     assert len(client.get("/internal/v1/issues", headers=h).json()) == 2
     assert [i["kind"] for i in client.get("/internal/v1/issues", headers=h, params={"kind": "sku_key_mismatch"}).json()] == ["sku_key_mismatch"]
     assert [i["kind"] for i in client.get("/internal/v1/issues", headers=h, params={"category": "integrity"}).json()] == ["sku_key_mismatch"]
+
+
+def test_experiences_expose_ref_and_how_to_re_verify_it(env):
+    from glazed_backend.domain import Experience
+
+    class Mem:
+        def recall(self, store_id, query, limit=5):
+            return [Experience("[S030 · promo_evaluation · PR002] ... ref=PR002", "promo_evaluation", store_id, None, ref="PR002"),
+                    Experience("[S030] rejected decision_id=d9", "decision", store_id, "d9")]
+    client, c = env
+    c.memory = Mem()
+    case = mkcase(client)
+    got = client.get("/internal/v1/experiences", headers={"X-Glazed-Case": case["case_id"]}, params={"query": "bakery"}).json()
+    assert got[0]["ref"] == "PR002" and got[0]["verify"] == {"tool": "evaluate_promo", "promo_id": "PR002"}
+    assert got[1]["decision_id"] == "d9" and got[1]["verify"] == {"tool": "history", "decision_id": "d9"}

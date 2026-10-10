@@ -191,3 +191,20 @@ def test_assistant_is_named_after_the_store_display_name_and_renamed_when_known(
     assert m.rename("S001") == "Glazed · Bayfront Municipal Airport · Gate Area West"
     assert c.renamed == [("old-id", "Glazed · Bayfront Municipal Airport · Gate Area West")]
     assert m.rename("S777") is None  # no assistant yet: nothing to rename
+
+
+def test_seeded_promo_experiences_carry_the_promo_id_as_ref_in_text_and_field():
+    exps = parse_promo_baseline(MD)
+    assert exps[0].ref == "PR002" and exps[0].text.endswith("ref=PR002") and exps[0].decision_id is None
+
+
+def test_ref_roundtrips_through_backboard_metadata():
+    c = FakeBB()
+    m = bb(c)
+    m.remember("S030", Experience("t", "promo_evaluation", "S030", None, ref="PR009"))
+    assert c.added[0][2]["ref"] == "PR009" and "decision_id" not in c.added[0][2]
+
+    class WithRef(FakeBB):
+        async def search_memories(self, assistant_id, query, limit=5):
+            return {"memories": [{"content": "x", "metadata": {"kind": "promo_evaluation", "ref": "PR009"}}]}
+    assert bb(WithRef()).recall("S030", "q")[0].ref == "PR009"

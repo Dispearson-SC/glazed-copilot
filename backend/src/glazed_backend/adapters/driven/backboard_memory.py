@@ -78,6 +78,8 @@ class BackboardMemory:
         meta = {"store_id": store_id, "kind": experience.kind, "created_at": experience.created_at.isoformat()}
         if experience.decision_id:
             meta["decision_id"] = experience.decision_id
+        if experience.ref:
+            meta["ref"] = experience.ref
 
         async def op(client: Any) -> None:
             aid = await self._assistant_id(client, store_id)
@@ -100,5 +102,5 @@ class BackboardMemory:
             except ValueError:
                 created = utcnow()
             out.append(Experience(m.get("content", ""), meta.get("kind", "memory"), store_id,
-                                  meta.get("decision_id"), created, m.get("score")))
+                                  meta.get("decision_id"), created, m.get("score"), meta.get("ref")))
         return out
