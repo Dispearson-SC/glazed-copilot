@@ -86,21 +86,24 @@ export default function StoreSwitcher({ children, className = "" }: { children: 
           <div
             role="dialog"
             aria-label="Elegir sucursal"
-            className="absolute inset-x-4 top-[calc(4rem+env(safe-area-inset-top))] mx-auto flex max-h-[70vh] max-w-[480px] flex-col rounded-[20px] border border-partition/60 bg-elevation p-3 shadow-card"
+            className="absolute inset-x-4 top-[calc(4rem+env(safe-area-inset-top))] mx-auto flex max-h-[85dvh] max-w-[480px] flex-col rounded-[20px] border border-partition/60 bg-elevation p-3 shadow-card"
           >
-            <h2 className="mb-2 px-1 font-headline-sm text-headline-sm text-primary" style={{ fontFamily: "Inter, 'Playfair Display', serif" }}>
+            <h2 className="mb-1 px-1 font-headline-sm text-headline-sm text-primary" style={{ fontFamily: "Inter, 'Playfair Display', serif" }}>
               Sucursales
             </h2>
-            <input
-              type="search"
-              role="searchbox"
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar sucursal"
-              aria-label="Buscar sucursal"
-              className="mb-2 h-11 w-full rounded-[14px] border border-partition/60 bg-white px-3 font-body-md text-body-md"
-            />
+            <div className="relative mx-1 my-2">
+              <span aria-hidden="true" className="material-symbols-outlined pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[22px] text-on-surface-variant">search</span>
+              <input
+                type="search"
+                role="searchbox"
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar sucursal"
+                aria-label="Buscar sucursal"
+                className="box-border min-h-[48px] w-full rounded-[14px] border border-partition/60 bg-white py-2 pl-12 pr-4 font-body-md text-[16px]"
+              />
+            </div>
             <ul className="m-0 flex-1 list-none space-y-1 overflow-y-auto p-0">
               {shown.length === 0 && <li className="px-2 py-3 font-body-md text-body-md text-on-surface-variant">Sin resultados</li>}
               {shown.map((s) => {
