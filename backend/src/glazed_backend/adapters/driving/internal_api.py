@@ -216,12 +216,12 @@ def build_internal_router(c: Any) -> APIRouter:
 
     @r.get("/compliance")
     def compliance(case: Ctx, decision_id: str | None = None):
-        chk = sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace)
+        chk = sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace, c.outcomes)
         return jsonable_encoder(chk.one(case.case_id, decision_id) if decision_id else chk.for_case(case.case_id))
 
     @r.get("/history")
     def history(case: Ctx, weeks: int | None = None):
-        chk = sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace)
+        chk = sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace, c.outcomes)
         return uc_manager.case_history(c.metrics, chk, case, weeks)
 
     @r.get("/experiences")

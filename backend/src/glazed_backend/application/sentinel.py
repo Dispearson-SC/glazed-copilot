@@ -20,8 +20,36 @@ class CheckCompliance:
     """Executed / not_executed / partial from the executions table, simulated vs observed outcome (backtest, only
     once sim_today passed the horizon) and the diagnosis of section 15.3."""
 
-    def __init__(self, cases, proposals, executions, metrics, trace) -> None:
+    def __init__(self, cases, proposals, executions, metrics, trace, outcomes=None) -> None:
         self.cases, self.proposals, self.executions, self.metrics, self.trace = cases, proposals, executions, metrics, trace
+        self.outcomes = outcomes
+
+    def measure(self, proposal: Any, sim_today: date, events: list[dict[str, Any]] | None = None,
+                res: dict[str, Any] | None = None) -> dict[str, Any] | None:
+        """Outcome of an approved, executed decision measured on data <= sim_today: complete once the horizon passed,
+        partial from one day after the decision. None when nothing can be measured yet (or for this action type)."""
+        from ..metrics.outcomes import build_outcome
+        res = res if res is not None else self.check(proposal, sim_today, events)
+        h = res.get("horizon")
+        if not res["applicable"] or res["execution_status"] != "executed" or not h or not res["simulated"]:
+            return None
+        if (sim_today - date.fromisoformat(h["decision_date"])).days < 1:
+            return None
+        obs, complete = (res["observed"], True) if h["passed"] else (None, False)
+        if obs is None:
+            obs, complete = self.metrics.observed_outcome(proposal.store_id, sim_today, proposal.action_type, proposal.params,
+                                                          partial=True), False
+        if not obs:
+            return None
+        return build_outcome(_decision(proposal), h, res["simulated"], obs, sim_today, complete, res["diagnosis"])
+
+    def measured(self, proposal: Any, case: Any, events: list[dict[str, Any]] | None = None,
+                 res: dict[str, Any] | None = None) -> dict[str, Any] | None:
+        """The outcome as this case may see it: a stored final one measured on or before the case date, else computed."""
+        stored = self.outcomes.get(proposal.proposal_id) if self.outcomes is not None else None
+        if stored is not None and stored.complete and stored.measured_as_of <= case.sim_today:
+            return stored.payload
+        return self.measure(proposal, case.sim_today, events, res)
 
     def events(self, store_id: str) -> list[dict[str, Any]]:
         out = []
@@ -96,6 +124,12 @@ class CheckCompliance:
             if p.proposal_id not in scoped:
                 continue
             res = self.check(p, case.sim_today, events)
+            got = self.measured(p, case, events, res) if p.status == "approved" else None
+            extra = {} if got is None else {k: v for k, v in {
+                "verdict": got["verdict"], "complete": got["complete"], "measured_as_of": got["measured_as_of"],
+                "waste_usd": got["observed"].get("waste_usd"), "lost_sales_usd": got["observed"].get("lost_sales_usd"),
+                "censored": got["observed"].get("censored"), "sold_vs_forecast": got["sold_vs_forecast"],
+                "summary": got["summary"]}.items()}
             parts = p.issue_id.split("|")
             out.append({"decision_id": p.proposal_id, "scope": scoped[p.proposal_id], "same_case": p.case_id == case.case_id,
                         "case_id": p.case_id,
@@ -106,9 +140,11 @@ class CheckCompliance:
                         "executions": [{"status": x.status, "source": x.source, "detail": x.detail,
                                         "executed_at": x.executed_at.isoformat()} for x in self.executions.list(p.case_id)
                                        if x.proposal_id == p.proposal_id],
-                        "outcome": None if not res["observed"] else
-                        {"diagnosis": res["diagnosis"], "label": "backtest", "observed_net_usd": res["observed"]["net_usd"],
-                         "simulated_net_usd": (res["simulated"] or {}).get("net_usd_mid"), "explanation": res["explanation"]}})
+                        "outcome": None if not res["observed"] and got is None else
+                        {"diagnosis": res["diagnosis"], "label": "backtest",
+                         "observed_net_usd": (got or res)["observed"]["net_usd"],
+                         "simulated_net_usd": (res["simulated"] or {}).get("net_usd_mid"), "explanation": res["explanation"],
+                         **extra}})
         return out
 
     def deviations(self, case_id: str) -> list[dict[str, Any]]:

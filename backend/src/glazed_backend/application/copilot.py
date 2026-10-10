@@ -213,7 +213,10 @@ class ListMemories:
             outcome = m.memory_id.startswith("out-")
             rows.append(self._row(m.memory_id, m.category, m.text, "outcome" if outcome else "rejection_reason", outcome, day,
                                   m.created_at, (m.action_type, m.sku if outcome else (m.reason_category or "otro")), m.case_id))
+        own_outcomes = {r["text"] for r in rows if r["source"] == "outcome"}
         for e in self._experiences(store):
+            if e.kind == "outcome" and e.text in own_outcomes:
+                continue  # the same fact as the verified outcome memory
             if not experience_visible(case, e, self.proposals, owners):
                 continue
             local = props.get(e.decision_id or "")

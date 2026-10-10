@@ -407,8 +407,9 @@ class AdvanceSimClock:
     too: an approved decision that was not executed, or missed its simulated range, raises a compliance alert."""
 
     def __init__(self, cases: CaseRepository, alerts: AlertRepository, metrics: MetricsPort, limit: int = 5,
-                 compliance: Any = None) -> None:
+                 compliance: Any = None, measure: Any = None) -> None:
         self.cases, self.alerts, self.metrics, self.limit, self.compliance = cases, alerts, metrics, limit, compliance
+        self.measure = measure  # MeasureOutcomes: closes the loop for approved decisions as the clock advances
 
     def execute(self, case_id: str, days: int = 1, to: date | None = None) -> dict[str, Any]:
         case = _case(self.cases, case_id)
@@ -417,7 +418,8 @@ class AdvanceSimClock:
             raise DomainError("the simulated clock cannot go backwards")
         case.sim_today = target
         self.cases.update(case)
-        return {"case_id": case.case_id, "sim_today": target, "alerts": self.detect(case_id)}
+        return {"case_id": case.case_id, "sim_today": target, "alerts": self.detect(case_id),
+                "outcomes": self.measure.execute(case) if self.measure is not None else []}
 
     def detect(self, case_id: str) -> list[Alert]:
         case = _case(self.cases, case_id)

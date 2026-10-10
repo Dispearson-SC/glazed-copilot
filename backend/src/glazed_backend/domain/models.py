@@ -308,6 +308,18 @@ class Experience:
 
 
 @dataclass
+class Outcome:
+    """The measured result of an approved decision (one per decision, replaced while it is still partial)."""
+    decision_id: str
+    case_id: str
+    store_id: str
+    measured_as_of: date  # the simulated day it was measured on
+    complete: bool
+    payload: dict[str, Any]
+    created_at: datetime = field(default_factory=utcnow)
+
+
+@dataclass
 class DecisionMemory:
     """What the manager told us when rejecting a proposal (a stated preference): kept per store, written by code from
     the decision, never by an agent's free text. `category` is one of MEMORY_CATEGORIES."""

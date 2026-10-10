@@ -8,7 +8,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from ... import application as uc
-from ...application import copilot as uc_copilot, decisions as uc_decisions, forecast as uc_forecast, manager as uc_manager, sentinel
+from ...application import copilot as uc_copilot, decisions as uc_decisions, outcomes as uc_outcomes, forecast as uc_forecast, manager as uc_manager, sentinel
 from ...domain import AlertState, DomainError, NotFound
 from ...domain.models import alert_agent, alert_category
 from .store_names import StoreNames
@@ -115,7 +115,7 @@ def build_public_router(c: Any) -> APIRouter:
     agents = uc_copilot.AgentsStatus(lambda: c.core, c.clock)
 
     def checker() -> sentinel.CheckCompliance:
-        return sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace)
+        return sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace, c.outcomes)
 
     def case_of(case_id: str) -> Any:
         return uc._case(c.cases, case_id)
@@ -183,9 +183,12 @@ def build_public_router(c: Any) -> APIRouter:
     @r.post("/cases/{case_id}/advance")
     def advance(case_id: str, b: AdvanceBody | None = None):
         b = b or AdvanceBody()
-        res = uc.AdvanceSimClock(c.cases, c.alerts, c.metrics, compliance=checker()).execute(case_id, b.days, b.to)
+        chk = checker()
+        measure = uc_outcomes.MeasureOutcomes(c.proposals, chk, c.outcomes, c.decision_memories, c.memory, c.clock)
+        res = uc.AdvanceSimClock(c.cases, c.alerts, c.metrics, compliance=chk, measure=measure).execute(case_id, b.days, b.to)
         c.briefings.refresh_async(uc.ResumeCase(c.cases).execute(case_id))
-        return {"sim_today": res["sim_today"], "new_alerts": names.tag([alert_view(a) for a in res["alerts"]])}
+        return {"sim_today": res["sim_today"], "new_alerts": names.tag([alert_view(a) for a in res["alerts"]]),
+                "outcomes": res["outcomes"]}
 
     @r.get("/cases/{case_id}/briefing")
     def briefing(case_id: str):

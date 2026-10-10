@@ -9,9 +9,9 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from ...domain import Alert, AlertState, BacktestRun, Case, DecisionMemory, Execution, Proposal, TraceEvent, TurnRecord
+from ...domain import Alert, AlertState, BacktestRun, Case, DecisionMemory, Execution, Outcome, Proposal, TraceEvent, TurnRecord
 
-_TABLES = ("decision_memories", "turns", "store_assistants", "trace_events", "backtests", "executions", "proposals", "alerts", "cases")
+_TABLES = ("outcomes", "decision_memories", "turns", "store_assistants", "trace_events", "backtests", "executions", "proposals", "alerts", "cases")
 
 
 class PostgresStore:
@@ -27,6 +27,7 @@ class PostgresStore:
         self.assistants = _Assistants(self)
         self.turns = _Turns(self)
         self.memories = _DecisionMemories(self)
+        self.outcomes = _Outcomes(self)
 
     def migrate(self) -> None:
         files = sorted(f for f in resources.files("glazed_backend.migrations").iterdir() if f.name.endswith(".sql"))
@@ -238,3 +239,23 @@ class _DecisionMemories(_Repo):
     def list(self, store_id: str) -> list[DecisionMemory]:
         return [self._row(r) for r in self.s.q(  # type: ignore[misc]
             "SELECT * FROM glazed.decision_memories WHERE store_id=%s ORDER BY created_at", (store_id,))]
+
+
+class _Outcomes(_Repo):
+    def add(self, o: Outcome) -> None:
+        self.s.q("INSERT INTO glazed.outcomes (decision_id, case_id, store_id, measured_as_of, complete, payload, created_at)"
+                 " VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (decision_id) DO UPDATE SET measured_as_of=EXCLUDED.measured_as_of,"
+                 " complete=EXCLUDED.complete, payload=EXCLUDED.payload",
+                 [o.decision_id, o.case_id, o.store_id, o.measured_as_of, o.complete, Jsonb(o.payload), o.created_at])
+
+    @staticmethod
+    def _row(r: dict | None) -> Outcome | None:
+        return Outcome(r["decision_id"], r["case_id"], r["store_id"], r["measured_as_of"], r["complete"], r["payload"],
+                       r["created_at"]) if r else None
+
+    def get(self, decision_id: str) -> Outcome | None:
+        return self._row(self._one("SELECT * FROM glazed.outcomes WHERE decision_id=%s", (decision_id,)))
+
+    def list(self, case_id: str | None = None) -> list[Outcome]:
+        return [self._row(r) for r in self.s.q(  # type: ignore[misc]
+            "SELECT * FROM glazed.outcomes WHERE (%s::text IS NULL OR case_id=%s) ORDER BY created_at", (case_id, case_id))]

@@ -593,7 +593,8 @@ class DuckDBMetrics:
                                            "delivery_days": sorted(parse_delivery_days(r["delivery_days"]))} for r in sups]}
 
     # -- Sentinel ----------------------------------------------------------------
-    def observed_outcome(self, store_id: str, as_of: date, action_type: str, params: dict[str, Any]) -> dict[str, Any] | None:
+    def observed_outcome(self, store_id: str, as_of: date, action_type: str, params: dict[str, Any],
+                         partial: bool = False) -> dict[str, Any] | None:
         sku, d0 = params.get("sku"), params.get("decision_as_of")
         if not sku or not d0 or action_type not in ("place_order", "adjust_order_qty", "skip_order"):
             return None
@@ -601,7 +602,7 @@ class DuckDBMetrics:
         snap = self._snapshot(store_id, as_of)
         prod, rows = snap.products.get(sku), snap.rows.get(sku, [])
         win = [r for r in rows if d0 < r.date <= d0 + timedelta(days=HORIZON_DAYS) and r.date <= as_of]
-        if prod is None or len(win) < HORIZON_DAYS:
+        if prod is None or len(win) < (1 if partial else HORIZON_DAYS):
             return None
         qty = float(params.get("qty") or 0)
         if params.get("typical_qty") is not None:  # a reduction against the usual order
@@ -614,8 +615,15 @@ class DuckDBMetrics:
                 "waste_usd": round(sum(r.expired for r in win) * prod.unit_cost, 2),  # realized, this SKU, this window
                 "lost_sales_usd": round(lost["mid"], 2),  # realized (mid estimate), this SKU, this window
                 "censored": any(r.stockout_hours > 0 for r in win),  # a stockout hid part of the demand
-                "units_sold": sum(r.sold for r in win), "units_expired": sum(r.expired for r in win),
+                "units_sold": sum(r.sold for r in win), "units_forecast": self._forecast_units(snap, sku, d0, win),
+                "units_expired": sum(r.expired for r in win),
                 "method": "replay of the calibration rule on the decision window"}
+
+    @staticmethod
+    def _forecast_units(snap: StoreSnapshot, sku: str, d0: date, win: list[DayRow]) -> float | None:
+        """Units the weekday model, fed only with data up to the decision day, expected to sell over the window."""
+        state = snap.state_at(sku, d0)
+        return None if state is None else round(sum(state.daily_mean(r.date) for r in win), 1)
 
     # -- Backtest ----------------------------------------------------------------
     def backtest_day(self, store_id: str, day: date, policy: str) -> dict[str, Any]:

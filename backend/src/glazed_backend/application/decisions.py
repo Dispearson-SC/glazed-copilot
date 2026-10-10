@@ -59,16 +59,14 @@ class ListDecisions:
                                           "reason": x.detail or None}))
                     last = max(last, x.executed_at)
             if p.status == "approved":
-                res = self.checker.check(p, case.sim_today, events)
-                if res["observed"] and res["simulated"]:
-                    end = date.fromisoformat(res["horizon"]["ends"])
+                got = self.checker.measured(p, case, events)
+                if got is not None:
+                    end = date.fromisoformat(got["horizon_ends"] if got["complete"] else got["measured_as_of"])
                     ts = max(datetime.combine(end, time.min, tzinfo=timezone.utc), last + timedelta(milliseconds=1))
-                    obs = res["observed"]
-                    rows.append(_compact({**base, "ts": ts, "kind": "outcome", "status": "measured",
-                                          "as_of": end.isoformat(), "outcome": {
-                                              "observed": {k: obs.get(k) for k in ("net_usd", "waste_usd", "lost_sales_usd",
-                                                                                  "censored", "window") if obs.get(k) is not None},
-                                              "simulated": res["simulated"], "label": "backtest", "score": _score(res)}}))
+                    keep = ("observed", "simulated", "label", "score", "verdict", "verdict_code", "complete", "measured_as_of",
+                            "window_days", "sold_vs_forecast", "summary")
+                    rows.append(_compact({**base, "ts": ts, "kind": "outcome", "status": "measured" if got["complete"] else "measuring",
+                                          "as_of": end.isoformat(), "outcome": {k: got[k] for k in keep if k in got}}))
         rows.sort(key=lambda r: r["ts"])
         rows = [r for r in rows if (date_from is None or r["ts"].date() >= date_from)
                 and (date_to is None or r["ts"].date() <= date_to)]

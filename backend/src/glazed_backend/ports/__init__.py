@@ -5,7 +5,7 @@ from datetime import date, datetime
 from typing import Any, Protocol
 
 from ..metrics.types import SkuSeries
-from ..domain import (Alert, AlertState, BacktestRun, Case, DecisionMemory, Execution, Experience, Proposal, TraceEvent,
+from ..domain import (Alert, AlertState, BacktestRun, Case, DecisionMemory, Execution, Experience, Outcome, Proposal, TraceEvent,
                       TurnRecord)
 
 
@@ -21,9 +21,11 @@ class MetricsPort(Protocol):
     def order_plan(self, store_id: str, as_of: date) -> dict[str, Any]: ...
     def supplier_performance(self, store_id: str, as_of: date) -> list[dict[str, Any]]: ...
     def promo_evaluation(self, store_id: str, as_of: date, promo_id: str) -> dict[str, Any]: ...
-    def observed_outcome(self, store_id: str, as_of: date, action_type: str, params: dict[str, Any]) -> dict[str, Any] | None:
+    def observed_outcome(self, store_id: str, as_of: date, action_type: str, params: dict[str, Any],
+                         partial: bool = False) -> dict[str, Any] | None:
         """Measured net of an executed decision over its horizon (replay of the calibration rule), or None when the
-        action cannot be measured or the window is incomplete at as_of."""
+        action cannot be measured or the window is incomplete at as_of. `partial` accepts a window of at least one day
+        (so far) instead of the whole horizon."""
         ...
     def promo_audit(self, store_id: str, as_of: date, department: str, discount_pct: float) -> dict[str, Any]: ...
     def history(self, store_id: str, as_of: date) -> dict[str, Any]: ...
@@ -121,6 +123,12 @@ class DecisionMemoryRepository(Protocol):
     def add(self, memory: DecisionMemory) -> None: ...  # upsert by memory_id
     def get(self, memory_id: str) -> DecisionMemory | None: ...
     def list(self, store_id: str) -> list[DecisionMemory]: ...  # ordered by created_at
+
+
+class OutcomeRepository(Protocol):
+    def add(self, outcome: Outcome) -> None: ...  # upsert by decision_id
+    def get(self, decision_id: str) -> Outcome | None: ...
+    def list(self, case_id: str | None = None) -> list[Outcome]: ...
 
 
 class TracePort(Protocol):

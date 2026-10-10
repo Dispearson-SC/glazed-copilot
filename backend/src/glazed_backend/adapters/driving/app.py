@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from ...application import TurnTracker
 from ..driven.forecast import BaselineForecast, WeekdayFlow
-from ..driven.memory import InMemoryDecisionMemories, InMemoryTurns
+from ..driven.memory import InMemoryDecisionMemories, InMemoryOutcomes, InMemoryTurns
 from ...domain import DomainError, FutureDate, InvalidTransition, NotFound, Unprocessable
 from ...domain.models import CoreError
 from .internal_api import build_internal_router
@@ -42,6 +42,7 @@ class Container:
     forecasters: list = field(default_factory=lambda: [BaselineForecast()])  # ForecastPort adapters, first admissible wins
     flow_forecaster: Any = field(default_factory=WeekdayFlow)  # FlowForecastPort
     turns: Any = field(default_factory=InMemoryTurns)  # TurnRepository: stored replies for the conversation history
+    outcomes: Any = field(default_factory=InMemoryOutcomes)  # measured outcomes of approved decisions
     decision_memories: Any = field(default_factory=InMemoryDecisionMemories)  # preferences kept from rejection reasons
 
 
@@ -120,7 +121,7 @@ def build_container(env: dict[str, str] | None = None) -> Container:
                          BackboardMemory(key, store.assistants, display_name=StoreNames(metrics).of), "postgres",
                          "configured" if core_url else "missing", cors,
                          float(env.get("GLAZED_TURN_TIMEOUT_S", "600")), classifier=classifier, warm_on_startup=True, turns=store.turns,
-                         decision_memories=store.memories, forecasters=build_forecasters(env))
+                         decision_memories=store.memories, outcomes=store.outcomes, forecasters=build_forecasters(env))
     classifier = build_classifier(env, None)
     return Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
                      InMemoryBacktests(), InMemoryTrace(), SystemClock(),

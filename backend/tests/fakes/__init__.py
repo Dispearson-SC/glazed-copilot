@@ -137,7 +137,7 @@ class FakeMetrics:
                 "recommendation": "do_nothing",
                 "similar": [{"promo_id": "PR002"}, {"promo_id": "PR005"}], "alternative": {"promo_id": "PR009"}}
 
-    def observed_outcome(self, store_id, as_of, action_type, params):
+    def observed_outcome(self, store_id, as_of, action_type, params, partial=False):
         self.calls.append(("observed_outcome", store_id, as_of, action_type))
         return self.observed
 
