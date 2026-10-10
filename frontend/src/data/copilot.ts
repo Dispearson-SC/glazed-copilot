@@ -96,6 +96,8 @@ export interface DecisionItem {
   warn: string;
   /** Spanish labels of every kind merged into this issue (approvals). */
   kinds?: string[];
+  /** A stock transfer between stores (kind transfer_opportunity / action transfer_stock). */
+  isTransfer?: boolean;
 }
 
 const TIER_NAMES: Record<string, string> = { N1: "Automática", N2: "Propuesta", N3: "Diálogo" };
@@ -115,6 +117,7 @@ const ACTION_ICONS: Record<string, string> = {
   adjust_order_qty: "tune",
   markdown_end_of_day: "sell",
   transfer: "swap_horiz",
+  transfer_stock: "swap_horiz",
 };
 
 function benefitText(r: Range3 | null | undefined): string {
@@ -139,6 +142,7 @@ export function buildPendingItems(pending: PendingResponse | null, simToday: str
     value: benefitText(a.impact_usd), conf: a.confidence.score ?? 0, confPct: confText(a.confidence.score), deadline: deadlineText(a.deadline, simToday),
     supplier: "", arrive: "", cost: "", why: a.problem, chips: [], warn: "",
     kinds: (a.kinds ?? []).map((k) => kindLabelEs(k)),
+    isTransfer: a.kind === "transfer_opportunity" || a.recommendation.action_type === "transfer_stock",
   }));
   const techs = pending.technical.map((t): DecisionItem => {
     const decidable = Boolean(t.issue_id && t.option_id);
@@ -546,6 +550,8 @@ function alertCopyBase(a: AlertRecord): { icon: string; title: string; body: str
       return { icon: "event", title: `Efecto de calendario: ${i.event?.name ?? "evento"}`, body: sev ? `Impacto estimado de ${sev} si el plan no lo refleja.` : "Sin datos" };
     case "compliance_deviation":
       return { icon: "rule", title: "Acción aprobada sin ejecutar", body: "Una decisión aprobada no se ejecutó. Revisa qué pasó." };
+    case "transfer_opportunity":
+      return { icon: "swap_horiz", title: kindLabelEs(i.kind, a.kind_label_es), body: sev ? `Trasladar stock puede ahorrar ${sev}.` : "Hay stock que se puede trasladar a otra sucursal." };
     default:
       return { icon: "warning", title: kindLabelEs(i.kind, a.kind_label_es), body: sev ? `Impacto estimado de ${sev}.` : "Sin datos" };
   }

@@ -10,6 +10,7 @@ import type { useChat } from "../../useChat";
 import AgentOrb from "./AgentOrb";
 import AnalysisCard from "./AnalysisCard";
 import { ChatSkeleton } from "./Skeleton";
+import TransferOptions from "./TransferOptions";
 import ConversationBar from "./ConversationBar";
 
 type Chat = ReturnType<typeof useChat>;
@@ -71,7 +72,7 @@ function AnalysisLoader({ caseId, item, mode, open, busy, onApprove, onReject }:
       alive = false;
     };
   }, [api, caseId, item.issueId]);
-  return <AnalysisCard item={item} analysis={analysis} mode={mode} open={open} busy={busy} onApprove={onApprove} onReject={onReject} />;
+  return <AnalysisCard item={item} analysis={analysis} mode={mode} open={open} busy={busy} onApprove={onApprove} onReject={onReject} extra={item.isTransfer ? <TransferOptions caseId={caseId} /> : undefined} />;
 }
 
 /** Agente window: the existing chat (useChat) in the copilot look, with the pinned context and the analysis cards. */

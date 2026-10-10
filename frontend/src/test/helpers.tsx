@@ -52,6 +52,7 @@ export function fakeApi(over: Partial<Record<keyof Api, unknown>> = {}): Api {
     getAnalysis: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
     recordDecision: vi.fn(async () => ({ decision_id: "pp-new", proposal_id: "pp-new", status: "approved" })),
     getMemories: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
+    getTransferOptions: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
     addNote: vi.fn(async () => ({ saved: true, memory_id: "note-x" })),
     getAgentsStatus: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),
     getInboxCounts: vi.fn(async () => { throw new ApiError(404, "Not Found"); }),

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { AnalysisSkeleton } from "./Skeleton";
 import { analysisSections, SOON_TEXT, type AnalysisState, type DecisionItem } from "../../data/copilot";
 
@@ -10,6 +11,7 @@ export default function AnalysisCard({
   busy = false,
   onApprove,
   onReject,
+  extra,
 }: {
   item: DecisionItem;
   /** The backend analysis of the issue (GET /issues/{id}/analysis). */
@@ -21,6 +23,8 @@ export default function AnalysisCard({
   busy?: boolean;
   onApprove: (item: DecisionItem) => void;
   onReject: (item: DecisionItem) => void;
+  /** Extra section under the analysis (e.g. transfer options). */
+  extra?: ReactNode;
 }) {
   const isAnalysis = mode === "analizar";
   const sections = analysis.status === "ok" ? analysisSections(mode, analysis.data) : [];
@@ -65,6 +69,7 @@ export default function AnalysisCard({
             ))}
           </div>
         ))}
+        {extra}
       </div>
       {open && (
         <div className="flex gap-2 px-4 pb-4">

@@ -542,3 +542,27 @@ export interface NoteResult {
   saved: boolean;
   memory_id: string;
 }
+
+/** GET /cases/{id}/transfers/options: stock to move between stores before it expires. */
+export interface TransferOption {
+  option_id: string;
+  sku: string;
+  product_name: string;
+  from_store: string;
+  to_store: string;
+  to_store_name: string;
+  qty: number;
+  transfer_cost_usd: number;
+  net_usd: Range3;
+  confidence: { score: number | null; calibrated: boolean };
+  expires_on: string;
+  rationale_es: string;
+}
+export interface TransferOptionsResponse {
+  as_of: string;
+  store_id: string;
+  options: TransferOption[];
+  /** Why there is nothing to move (code), with its Spanish text when the backend sends it. */
+  reason?: string;
+  reason_es?: string;
+}
