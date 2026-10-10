@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApi } from "../ApiContext";
 import { ErrorBox, useStores } from "../components";
+import { DEFAULT_SIM_TODAY } from "../config";
 import { useSession } from "../SessionContext";
 import type { Case } from "../types";
 import { storeLabel } from "../types";
+import { pickCase } from "../useCurrentCase";
 
 const field =
   "w-full rounded-full border border-surface-container bg-surface px-4 py-3 font-body-md text-body-md text-on-surface focus:outline-none focus:border-secondary focus:ring-2 focus:ring-on-tertiary-container/40";
@@ -29,7 +31,7 @@ export default function LoginPage() {
       .then((c) => {
         if (!live) return;
         setCases(c);
-        setCaseId((cur) => (c.some((x) => x.case_id === cur) ? cur : (c.find((x) => x.mode === "live") ?? c[0])?.case_id ?? ""));
+        setCaseId((cur) => (c.some((x) => x.case_id === cur) ? cur : pickCase(c, "", DEFAULT_SIM_TODAY)?.case_id ?? ""));
         setCasesError(null);
       })
       .catch((e: Error) => live && setCasesError(e));

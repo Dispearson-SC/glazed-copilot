@@ -17,6 +17,7 @@ npm run preview
 | Variable | Default | Use |
 |---|---|---|
 | `VITE_API_URL` | dev: empty (Vite proxy to `http://localhost:8100`, the host port of the backend); build: `http://localhost:8080` unless set. Use `VITE_API_URL=""` for a same-origin production build behind the reverse proxy | Backend base URL. In dev it is also the proxy target. |
+| `VITE_DEFAULT_SIM_TODAY` | `2026-07-19` (day 292 of the 2025-10-01..2026-09-30 dataset) | Default simulation date: the app opens on (and auto-creates, if missing) the live case at this date; also the default of the new-case form. |
 
 ## Pages
 

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { DEFAULT_SIM_TODAY } from "../config";
 import { Link } from "react-router-dom";
 import { useApi } from "../ApiContext";
 import { ErrorBox, StoreSelect, useStores } from "../components";
@@ -65,7 +66,7 @@ export default function CasesPage() {
   const cases = usePolling(() => (storeId ? api.listCases({ store_id: storeId }) : Promise.resolve([])), 30_000, false, [
     storeId,
   ]);
-  const [simToday, setSimToday] = useState("");
+  const [simToday, setSimToday] = useState(DEFAULT_SIM_TODAY);
   const [mode, setMode] = useState<CaseMode>("live");
   const [title, setTitle] = useState("");
   const [askCase, setAskCase] = useState("");
