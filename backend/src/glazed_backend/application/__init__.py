@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -102,6 +103,21 @@ class AskAgent:
         return turn_id
 
 
+_FOREIGN = ("\u0400-\u052f\u0530-\u058f\u0590-\u05ff\u0600-\u06ff\u0750-\u077f\u0900-\u097f\u0e00-\u0e7f"
+            "\u1100-\u11ff\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af")
+_FOREIGN_RUN = re.compile(f"[{_FOREIGN}]+(?:[ ]+[{_FOREIGN}]+)*")
+
+
+def sanitize_reply(text: str) -> tuple[str, list[str]]:
+    """Conservative clean-up of stray non-Latin tokens the model sometimes emits (CJK, Cyrillic, Arabic, ...).
+    Only whole runs of those scripts are removed; Latin, accents, digits, punctuation, symbols, markdown stay."""
+    removed = _FOREIGN_RUN.findall(text)
+    if not removed:
+        return text, []
+    clean = re.sub(r"[ ]{2,}", " ", _FOREIGN_RUN.sub("", text)).strip()
+    return clean, removed
+
+
 _LIVE_STATUSES = ("running", "waiting", "started", "pending", "queued")
 
 
@@ -137,7 +153,10 @@ class GetTurn:
         if core_status == "finished":
             out["status"] = "done"
             if text is not None:
-                out["reply"] = text
+                reply, removed = sanitize_reply(text) if isinstance(text, str) else (text, [])
+                out["reply"] = reply
+                if removed:  # auditable: what was dropped from the model's reply
+                    out["sanitized"], out["sanitized_fragments"] = True, removed
             return out
         if core_status in ("failed", "error"):
             return {**out, "status": "failed", "error": raw.get("error") or text or "Agent-Core reported a failed turn"}

@@ -393,3 +393,28 @@ def test_decide_advances_the_alert_of_its_own_case(w):
     p = SubmitProposal(w.cases, w.props).execute(c.case_id, "S030|x|k", "place_order", {"sku": "A"}, "N2", "why")
     DecideProposal(w.cases, w.props, w.execs, w.alerts).execute(p.proposal_id, True, "ok")
     assert w.alerts.get(al.alert_id).state == AlertState.EJECUTADA
+
+
+def test_sanitize_reply_strips_stray_non_latin_runs_and_reports_them():
+    from glazed_backend.application import sanitize_reply
+    clean, removed = sanitize_reply("Las ventas 螃蟹贡献 subieron, 近似 el 5% y 持有 stock.")
+    assert clean == "Las ventas subieron, el 5% y stock."
+    assert removed == ["螃蟹贡献", "近似", "持有"]
+    clean, removed = sanitize_reply("Привет мир and مرحبا ok")
+    assert clean == "and ok" and removed == ["Привет мир", "مرحبا"]
+
+
+def test_sanitize_reply_leaves_spanish_digits_and_markdown_untouched():
+    from glazed_backend.application import sanitize_reply
+    text = "**Señor** Peña: ¿cómo está? Ágil, éxito, mañana, ñandú, pingüino, ó ú í — total $1,392.15 (€20, 3.5%) `x` #1 • ok"
+    assert sanitize_reply(text) == (text, [])
+
+
+def test_get_turn_marks_a_sanitized_reply_in_the_payload(w):
+    ask, get = _turns(w)
+    c, tid = _sent_turn(w, ask, {"turn_id": "x", "status": "finished", "text": "Hay 12 螃蟹贡献 cajas  en $1,392.15"})
+    out = get.execute(c.case_id, tid)
+    assert out["reply"] == "Hay 12 cajas en $1,392.15"
+    assert out["sanitized"] is True and out["sanitized_fragments"] == ["螃蟹贡献"]
+    w.core.turns[tid] = {"turn_id": "x", "status": "finished", "text": "Todo bien"}
+    assert "sanitized" not in get.execute(c.case_id, tid)
