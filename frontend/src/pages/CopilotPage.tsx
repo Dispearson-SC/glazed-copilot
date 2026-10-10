@@ -10,7 +10,7 @@ import RejectSheet from "../components/copilot/RejectSheet";
 import Toast from "../components/copilot/Toast";
 import { isUnavailable } from "../api";
 import { useStores } from "../components";
-import { buildDayView, buildInventoryRows, buildMemories, buildScheduled, buildWarnings, chatContextText, type DecisionItem, type WarningItem } from "../data/copilot";
+import { buildDayView, buildInventoryRows, buildMemories, buildScheduled, buildWarnings, type DecisionItem, type WarningItem } from "../data/copilot";
 import { splitStoreName } from "../format";
 import { CopilotProvider, useCopilot } from "../state/copilotStore";
 import { useSession } from "../SessionContext";
@@ -51,9 +51,9 @@ function CopilotShell() {
 
   const openCard = useCallback(
     (item: DecisionItem, mode: "analizar" | "dialogo") => {
-      dispatch({ type: "analysis", itemId: item.id, title: item.title, mode, at: chat.messages.length + 1 });
+      dispatch({ type: "analysis", itemId: item.id, title: item.title, mode, at: chat.messages.length + 1, issueId: item.issueId, optionId: item.optionId });
       const userText = mode === "analizar" ? `Analiza: ${item.title}` : `Quiero dialogar sobre: ${item.title}`;
-      void chat.send(chatContextText(userText, { issueId: item.issueId, optionId: item.optionId, title: item.title, mode }), { display: userText });
+      void chat.send(userText, { context: { issue_id: item.issueId, ...(item.optionId ? { option_id: item.optionId } : {}), mode } });
     },
     [chat, dispatch],
   );
@@ -65,7 +65,7 @@ function CopilotShell() {
     const userText = `Explícame: ${w.title}`;
     dispatch({ type: "ctx", ctx: { id: w.id, title: w.title } });
     dispatch({ type: "tab", tab: "agente" });
-    void chat.send(chatContextText(userText, { issueId: w.id, title: w.title, mode: "advertencia" }), { display: userText });
+    void chat.send(userText);
   };
 
   const reject = state.rejectFor ? known.current.get(state.rejectFor) : undefined;

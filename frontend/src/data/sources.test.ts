@@ -32,13 +32,6 @@ describe("data sources the backend does not serve yet", () => {
     await expect(src.fetchOutlook(boom, "c1")).rejects.toThrow("x");
   });
 
-  it("prefixes the chat context into the text until POST /messages accepts a context field", () => {
-    expect(src.chatContextText("Analiza: Pedir pavo", { issueId: "S030|x|1", title: "Pedir pavo", mode: "analizar" })).toBe(
-      "Contexto: Pedir pavo (S030|x|1).\nAnaliza: Pedir pavo",
-    );
-    expect(src.chatContextText("hola", null)).toBe("hola");
-  });
-
   it("exposes an alert's agent as unknown until the API carries agent_id", () => {
     expect(src.alertAgent({ alert_id: "a" } as never)).toBeNull();
     expect(api).toBeDefined();

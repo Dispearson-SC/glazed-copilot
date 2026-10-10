@@ -148,8 +148,17 @@ describe("Decisiones window", () => {
     expect(await screen.findByText("Hablando de: Omitir el pedido de 12 Croiss-Ant Donuts en este ciclo")).toBeInTheDocument();
     expect(screen.getByText("Análisis")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Aprobar/ })).toBeInTheDocument();
-    await waitFor(() => expect(api.sendMessage).toHaveBeenCalledWith("c1", expect.stringContaining("Contexto: Omitir el pedido de 12 Croiss-Ant Donuts")));
+    await waitFor(() => expect(api.sendMessage).toHaveBeenCalledWith("c1", "Analiza: Omitir el pedido de 12 Croiss-Ant Donuts en este ciclo", { issue_id: "S030|overstock_waste|SKU-100502", option_id: "65ead6dcd46e", mode: "analizar" }));
     expect(screen.getByText("Analiza: Omitir el pedido de 12 Croiss-Ant Donuts en este ciclo")).toBeInTheDocument();
+  });
+
+  it("a message typed while a decision is pinned goes with that context in 'dialogo' mode", async () => {
+    const api = await openDecisiones();
+    await userEvent.click(await screen.findByRole("button", { name: "Analizar con el copiloto" }));
+    await screen.findByText(/Hablando de:/);
+    await userEvent.type(screen.getByLabelText("Mensaje para el copiloto"), "¿Y si pido menos?");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
+    await waitFor(() => expect(api.sendMessage).toHaveBeenCalledWith("c1", "¿Y si pido menos?", { issue_id: "S030|overstock_waste|SKU-100502", option_id: "65ead6dcd46e", mode: "dialogo" }));
   });
 
   it("the ⋯ menu offers 'Dialogar acerca de esta decisión' and opens the dialogue card", async () => {

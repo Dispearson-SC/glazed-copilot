@@ -38,6 +38,9 @@ export interface AnalysisRef {
 export interface CopilotContext {
   id: string;
   title: string;
+  /** Issue the chat is pinned to (sent as the message `context`); absent for warnings, which are not issues. */
+  issueId?: string;
+  optionId?: string;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -49,18 +52,6 @@ export interface CopilotContext {
 export type Source<T> = { status: "ok"; data: T } | { status: "soon" };
 const SOON = { status: "soon" } as const;
 export const SOON_TEXT = "Disponible pronto";
-
-export interface ChatContext {
-  issueId: string;
-  optionId?: string;
-  title: string;
-  mode: "analizar" | "dialogo" | "advertencia";
-}
-
-/** POST /cases/{id}/messages with `context:{issue_id, option_id?, mode}` is pending: the context travels inside the text. */
-export function chatContextText(text: string, ctx: ChatContext | null): string {
-  return ctx ? `Contexto: ${ctx.title} (${ctx.issueId}).\n${text}` : text;
-}
 
 /** /forecast?metric=traffic|weather (pending). */
 export const fetchForecastMetric = async (_api: Api, _caseId: string, _metric: string): Promise<Source<never>> => SOON;

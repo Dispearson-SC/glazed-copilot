@@ -345,3 +345,29 @@ describe("useChat send with display text", () => {
     expect(result.current.messages.find((m) => m.role === "user")?.ts).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });
+
+describe("useChat message context", () => {
+  const ctx = { issue_id: "S030|stockout_risk|SKU-1", option_id: "o1", mode: "analizar" as const };
+
+  it("sends the context as a field of POST /messages and keeps the text clean", async () => {
+    const api = fakeApi();
+    const { result } = setup(api);
+    await act(async () => { await result.current.send("Analiza: Pedir pavo", { context: ctx }); });
+    expect(api.sendMessage).toHaveBeenCalledWith("c1", "Analiza: Pedir pavo", ctx);
+  });
+
+  it("sends no third argument when there is no context", async () => {
+    const api = fakeApi();
+    const { result } = setup(api);
+    await act(async () => { await result.current.send("hola"); });
+    expect(api.sendMessage).toHaveBeenCalledWith("c1", "hola");
+  });
+
+  it("resends the same context when the user retries", async () => {
+    const api = fakeApi({ getTurn: vi.fn(async () => ({ turn_id: "t1", status: "failed", error: "se cayó" })) });
+    const { result } = setup(api);
+    await act(async () => { await result.current.send("Analiza", { context: ctx, display: "Analiza: X" }); });
+    await act(async () => { await result.current.retry(); });
+    expect(vi.mocked(api.sendMessage).mock.calls.map((c) => c[2])).toEqual([ctx, ctx]);
+  });
+});

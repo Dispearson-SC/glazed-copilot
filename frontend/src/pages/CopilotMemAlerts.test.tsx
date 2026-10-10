@@ -93,12 +93,12 @@ describe("Advertencias window", () => {
     expect(screen.getByText(/Sin acciones automáticas todavía/)).toBeInTheDocument();
   });
 
-  it("Preguntar opens the chat with the warning pinned and sends it to the assistant with context", async () => {
+  it("Preguntar opens the chat with the warning pinned and sends the plain question to the assistant (an alert is not an issue, so no issue context)", async () => {
     const a = await open(/^Alertas/);
     const card = (await screen.findByText("Exceso de inventario: 12 Croiss-Ant Donuts")).closest("article")!;
     await userEvent.click(within(card).getByRole("button", { name: /Preguntar/ }));
     expect(await screen.findByText("Hablando de: Exceso de inventario: 12 Croiss-Ant Donuts")).toBeInTheDocument();
-    await vi.waitFor(() => expect(a.sendMessage).toHaveBeenCalledWith("c1", expect.stringContaining("Contexto: Exceso de inventario: 12 Croiss-Ant Donuts")));
+    await vi.waitFor(() => expect(a.sendMessage).toHaveBeenCalledWith("c1", "Explícame: Exceso de inventario: 12 Croiss-Ant Donuts"));
     expect(screen.getByText("Explícame: Exceso de inventario: 12 Croiss-Ant Donuts")).toBeInTheDocument();
   });
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useApi } from "../../ApiContext";
 import Markdown from "../../chat/Markdown";
 import { ProposalCard, SUGGESTIONS } from "../../chat/ChatView";
-import { chatContextText, fetchIssueAnalysis, type AnalysisRef, type AnalysisState, type DecisionItem } from "../../data/copilot";
+import { fetchIssueAnalysis, type AnalysisRef, type AnalysisState, type DecisionItem } from "../../data/copilot";
 import { clockTime } from "../../format";
 import { useCopilot } from "../../state/copilotStore";
 import type { ChatMessage } from "../../chatHistory";
@@ -94,7 +94,7 @@ export default function AgentWindow({
     const clean = text.trim();
     if (!clean || busy) return;
     const ctx = state.ctx;
-    void chat.send(ctx ? chatContextText(clean, { issueId: ctx.id, title: ctx.title, mode: "dialogo" }) : clean, ctx ? { display: clean } : undefined);
+    void chat.send(clean, ctx?.issueId ? { context: { issue_id: ctx.issueId, ...(ctx.optionId ? { option_id: ctx.optionId } : {}), mode: "dialogo" } } : undefined);
   };
   const submit = (e: FormEvent) => {
     e.preventDefault();

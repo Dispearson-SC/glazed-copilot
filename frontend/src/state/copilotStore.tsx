@@ -48,7 +48,7 @@ export type CopilotAction =
   | { type: "openReject"; id: string }
   | { type: "closeReject" }
   | { type: "toast"; text: string | null }
-  | { type: "analysis"; itemId: string; title: string; mode: AnalysisRef["mode"]; at: number }
+  | { type: "analysis"; itemId: string; title: string; mode: AnalysisRef["mode"]; at: number; issueId?: string; optionId?: string }
   | { type: "handled"; id: string; accepted: boolean }
   | { type: "learned"; memory: Memory };
 
@@ -77,7 +77,7 @@ export function copilotReducer(s: CopilotState, a: CopilotAction): CopilotState 
         ...s,
         tab: "agente",
         menuFor: null,
-        ctx: { id: a.itemId, title: a.title },
+        ctx: { id: a.itemId, title: a.title, ...(a.issueId ? { issueId: a.issueId } : {}), ...(a.optionId ? { optionId: a.optionId } : {}) },
         analyses: [...s.analyses, { id: `an-${s.seq}`, itemId: a.itemId, mode: a.mode, at: a.at }],
         seq: s.seq + 1,
       };
