@@ -123,7 +123,13 @@ export default function AgentWindow({
   const { state, dispatch, showToast } = useCopilot();
   const [draft, setDraft] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
-  useEffect(() => setDraft(""), [caseId]);
+  const composer = useRef<HTMLInputElement>(null);
+  /** True while the composer holds a transcript the backend flagged as language_suspect (sent later as a voice turn). */
+  const [voiceDraft, setVoiceDraft] = useState(false);
+  useEffect(() => {
+    setDraft("");
+    setVoiceDraft(false);
+  }, [caseId]);
   const busy = chat.status === "working";
   const pendingIds = new Set(openIds ?? items.map((i) => i.id));
 
@@ -163,12 +169,20 @@ export default function AgentWindow({
     const opts = context || voice ? { ...(context ? { context } : {}), ...(voice ? { voice: true } : {}) } : undefined;
     void chat.send(clean, opts);
   };
-  const input = useVoiceInput({ config: voiceCfg, onTranscript: (t) => send(t, true), onNotice: showToast, onPress: out.unlock });
+  const input = useVoiceInput({ config: voiceCfg, onTranscript: (t, o) => {
+      if (!o?.suspect) return send(t, true);
+      setDraft(t);
+      setVoiceDraft(true);
+      composer.current?.focus();
+      showToast("Revisa el texto antes de enviarlo");
+    },
+    onNotice: showToast, onPress: out.unlock });
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!draft.trim()) return;
-    send(draft);
+    send(draft, voiceDraft);
     setDraft("");
+    setVoiceDraft(false);
   };
 
   const cardsAt = (at: number): AnalysisRef[] => state.analyses.filter((a) => Math.min(a.at, chat.messages.length) === at);
@@ -251,9 +265,13 @@ export default function AgentWindow({
         <form onSubmit={submit} className="m-0 flex items-center gap-2 rounded-full border border-surface-container-high bg-white p-1.5 shadow-card">
           {input.available && <MicButton state={input.state} bind={input.bind} />}
           <input
+            ref={composer}
             type="text"
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              if (!e.target.value.trim()) setVoiceDraft(false);
+            }}
             placeholder="Pregunta o decide algo…"
             aria-label="Mensaje para el copiloto"
             className="min-w-0 flex-1 bg-transparent p-0 font-body-md text-body-md text-on-surface outline-none"
