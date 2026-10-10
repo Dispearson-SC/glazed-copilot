@@ -439,14 +439,14 @@ export interface ExpiringItem {
   expiring_units: number;
   expiry_date: string;
   shelf_life_days: number;
-  waste_usd: Range3;
+  waste_usd: number | Range3;
   lot_age_inferred: boolean;
 }
 
 export interface ExpiringResponse {
   as_of?: string;
   items: ExpiringItem[];
-  by_day: { date: string; waste_usd: number }[];
+  by_day: { date: string; waste_usd: number | Range3 }[];
   total_waste_usd: number | Range3;
 }
 

@@ -44,6 +44,26 @@ describe("InventoryPage", () => {
     expect(screen.getByTestId("expiring-total")).toHaveTextContent("$4.00 – $16.00");
   });
 
+  it("renders a per-item expiring waste that arrives as a plain number", async () => {
+    const item = expiringA.items[0];
+    open(fakeApi({
+      getInventory: vi.fn(async () => inventoryA),
+      getExpiring: async () => ({ ...expiringA, items: [{ ...item, waste_usd: 12 }], total_waste_usd: 12 }),
+    }));
+    const e = await screen.findByTestId("expiring");
+    expect(e).toHaveTextContent("Dona glaseada");
+    expect(e).toHaveTextContent("Merma esperada $12.00");
+  });
+
+  it("renders a per-item expiring waste that arrives as a {low,mid,high} range", async () => {
+    const item = expiringA.items[0];
+    open(fakeApi({
+      getInventory: vi.fn(async () => inventoryA),
+      getExpiring: async () => ({ ...expiringA, items: [{ ...item, waste_usd: { low: 1, mid: 2, high: 3 } }] }),
+    }));
+    expect(await screen.findByTestId("expiring")).toHaveTextContent("Merma esperada $1.00 – $3.00");
+  });
+
   it("shows Disponible pronto per section, never an error, when routes are missing", async () => {
     open(fakeApi());
     await waitFor(() => expect(screen.getAllByTestId("soon")).toHaveLength(2));

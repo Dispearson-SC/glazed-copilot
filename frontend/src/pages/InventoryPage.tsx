@@ -98,7 +98,7 @@ export default function InventoryPage() {
                   <li key={`${i.sku}-${i.expiry_date}`} className="text-body-md">
                     <span className="font-bold">{i.product_name}</span> · {i.expiring_units} pzas · caduca {i.expiry_date}
                     <div className="text-label-md text-on-surface-variant">
-                      Merma esperada {rangeOrValue(i.waste_usd)}
+                      Merma esperada {rangeOrValue(asRange(i.waste_usd))}
                       {i.lot_age_inferred && " · edad del lote estimada"}
                     </div>
                   </li>
