@@ -356,3 +356,40 @@ def test_unknown_core_status_past_the_timeout_fails(w):
     w.clock._now += timedelta(seconds=121)
     out = get.execute(c.case_id, tid)
     assert out["status"] == "failed" and "timed out" in out["error"]
+
+
+def _alert_for(w, case, key, state=None):
+    from glazed_backend.domain import Alert, AlertState
+    a = Alert.new(1, case.store_id, case.case_id, 10.0, {"issue_id": key}, key, D)
+    if state:
+        a.state = state
+    w.alerts.add(a)
+    return a
+
+
+def test_decide_is_scoped_to_the_proposals_case_and_never_errors_on_a_stale_alert(w):
+    from glazed_backend.domain import AlertState
+    a_case, b_case = start(w), start(w)
+    stale = _alert_for(w, a_case, "S030|x|k", AlertState.EJECUTADA)  # another case already carried it to ejecutada
+    p = SubmitProposal(w.cases, w.props).execute(b_case.case_id, "S030|x|k", "place_order", {"sku": "A"}, "N2", "why")
+    ex = DecideProposal(w.cases, w.props, w.execs, w.alerts).execute(p.proposal_id, True, "ok")
+    assert ex.status == "executed" and w.props.get(p.proposal_id).status == "approved"
+    assert w.alerts.get(stale.alert_id).state == AlertState.EJECUTADA  # foreign alert untouched
+
+
+def test_decide_is_idempotent_for_an_alert_already_advanced_in_the_same_case(w):
+    from glazed_backend.domain import AlertState
+    c = start(w)
+    al = _alert_for(w, c, "S030|x|k", AlertState.EJECUTADA)
+    p = SubmitProposal(w.cases, w.props).execute(c.case_id, "S030|x|k", "place_order", {"sku": "A"}, "N2", "why")
+    DecideProposal(w.cases, w.props, w.execs, w.alerts).execute(p.proposal_id, True, "ok")
+    assert w.alerts.get(al.alert_id).state == AlertState.EJECUTADA
+
+
+def test_decide_advances_the_alert_of_its_own_case(w):
+    from glazed_backend.domain import AlertState
+    c = start(w)
+    al = _alert_for(w, c, "S030|x|k")
+    p = SubmitProposal(w.cases, w.props).execute(c.case_id, "S030|x|k", "place_order", {"sku": "A"}, "N2", "why")
+    DecideProposal(w.cases, w.props, w.execs, w.alerts).execute(p.proposal_id, True, "ok")
+    assert w.alerts.get(al.alert_id).state == AlertState.EJECUTADA

@@ -5,7 +5,7 @@ import json
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from ..domain import (Alert, AlertState, BacktestRun, Case, DomainError, Execution, Experience, FutureDate, NotFound,
+from ..domain import (Alert, AlertState, BacktestRun, Case, DomainError, Execution, Experience, FutureDate, InvalidTransition, NotFound,
                       Proposal, TraceEvent, alert_type_for_kind, canonical_agent_id, case_id_from_session, new_id)
 from ..ports import (AlertRepository, BacktestRepository, CaseRepository, Clock, CorePort,
                      ExecutionRepository, ExperienceMemoryPort, MetricsPort, ProposalRepository, TracePort)
@@ -317,15 +317,28 @@ class DecideProposal:
                                   "executed" if runs else "not_executed",
                                   reason if not approved else f"simulated {proposal.action_type}")
         self.executions.add(execution)
-        alert = self.alerts.get_by_issue_key(proposal.issue_id)
-        if alert is not None:
-            alert.advance_to(AlertState.DECIDIDA)
-            alert.advance(AlertState.APROBADA if approved else AlertState.RECHAZADA)
-            if approved:
-                alert.advance(AlertState.EJECUTADA)
-            self.alerts.update(alert)
+        self._advance_alert(proposal, approved)
         self._remember(proposal)
         return execution
+
+    def _advance_alert(self, proposal: Proposal, approved: bool) -> None:
+        """Alert lifecycle for a decision: scoped to the proposal's own case, idempotent, and never an error
+        (the decision is already committed, so a stale or foreign alert must not turn it into a 409)."""
+        try:
+            alert = self.alerts.get_by_issue_key(proposal.issue_id)
+            if alert is None or alert.case_id != proposal.case_id:
+                return  # issue_key is shared across cases: another case's alert is not ours to move
+            path = [AlertState.DECIDIDA, AlertState.APROBADA if approved else AlertState.RECHAZADA]
+            if approved:
+                path.append(AlertState.EJECUTADA)
+            for step in path:
+                try:
+                    alert.advance_to(step)
+                except InvalidTransition:
+                    continue  # already past this state: fine
+            self.alerts.update(alert)
+        except Exception:  # noqa: BLE001
+            pass
 
     def _remember(self, p: Proposal) -> None:
         if self.memory is None:
