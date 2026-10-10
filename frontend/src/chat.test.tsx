@@ -181,3 +181,48 @@ describe("floating chat on the dashboard", () => {
     expect(api.sendMessage).toHaveBeenCalledWith("c1", "hola");
   });
 });
+
+describe("chat design parity", () => {
+  it("full page: icon header card with a status badge and the design's conversation card", async () => {
+    open("/chat");
+    const header = await screen.findByTestId("chat-header");
+    expect(within(header).getByText("smart_toy")).toBeInTheDocument();
+    expect(within(header).getByRole("heading", { name: "Chat del turno" })).toBeInTheDocument();
+    expect(within(header).getByTestId("chat-status")).toHaveTextContent("En línea");
+    const conv = await screen.findByRole("region", { name: "Conversación" });
+    expect(conv.className).toContain("rounded-[18px]");
+    expect(conv.className).toContain("min-h-[320px]");
+  });
+
+  it("full page: status badge shows the copilot working while a turn runs", async () => {
+    const getTurn = vi.fn(async () => ({ turn_id: "t1", status: "pending" as const }));
+    open("/chat", fakeApi({ getTurn }));
+    await userEvent.type(await screen.findByLabelText("Escribe un mensaje"), "hola");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar mensaje" }));
+    expect(await screen.findByTestId("chat-status")).toHaveTextContent("Trabajando");
+  });
+
+  it("floating panel uses the compact design: two chips, small send button, link in the footer block", async () => {
+    open("/");
+    await userEvent.click(await screen.findByRole("button", { name: "Abrir chat del turno" }));
+    const panel = screen.getByRole("region", { name: "Chat flotante del turno" });
+    const chips = within(panel).getAllByRole("button").filter((b) => b.className.includes("font-label-md"));
+    expect(chips).toHaveLength(2);
+    const send = within(panel).getByRole("button", { name: "Enviar mensaje" });
+    expect(send.className).toContain("w-10 h-10");
+    const form = send.closest("form")!;
+    expect(form.className).toContain("p-1.5 pl-4");
+    expect(form.parentElement!.contains(within(panel).getByRole("link", { name: "Abrir chat completo" }))).toBe(true);
+    expect(within(panel).getByText("smart_toy", { selector: "span.text-\\[18px\\]" })).toBeInTheDocument();
+  });
+
+  it("floating bubbles use the compact radius", async () => {
+    open("/");
+    await userEvent.click(await screen.findByRole("button", { name: "Abrir chat del turno" }));
+    const panel = screen.getByRole("region", { name: "Chat flotante del turno" });
+    await userEvent.type(within(panel).getByLabelText("Escribe un mensaje"), "hola");
+    await userEvent.click(within(panel).getByRole("button", { name: "Enviar mensaje" }));
+    const reply = await within(panel).findByText("listo");
+    expect(reply.closest("div")!.className).toContain("rounded-[14px]");
+  });
+});
