@@ -43,3 +43,4 @@ Forecast is well over the ~400 line budget. Strategy: ask-on-risk. One commit pe
 
 ## Progress
 - 2026-10-10: worktree created; contracts agreed with Core.
+- 2026-10-10: T1 done, commit 24eb3d9
