@@ -32,6 +32,7 @@ function Bubble({ m, traceBase, onRetry }: { m: ChatMessage; traceBase: string; 
       <div className="flex justify-end">
         <div className="max-w-[85%] rounded-[16px] rounded-br-[6px] bg-secondary text-surface-container-lowest px-4 py-2.5">
           <p className="font-body-md text-body-md whitespace-pre-wrap">{m.text}</p>
+          {m.truncated && <p className="font-label-sm text-label-sm opacity-70">…(recortado, ver razonamiento)</p>}
         </div>
       </div>
     );
@@ -52,6 +53,17 @@ function Bubble({ m, traceBase, onRetry }: { m: ChatMessage; traceBase: string; 
       </div>
       <div className="max-w-[85%] rounded-[16px] rounded-bl-[6px] bg-surface border border-surface-container px-4 py-2.5">
         <p className="font-body-md text-body-md text-on-surface whitespace-pre-wrap">{m.text}</p>
+        {m.truncated && (
+          <p className="font-label-sm text-label-sm text-on-surface-variant">…(recortado, ver razonamiento)</p>
+        )}
+        {m.steps && m.steps.length > 0 && (
+          <details className="mt-1 font-label-sm text-label-sm text-on-surface-variant">
+            <summary className="cursor-pointer">Pasos intermedios ({m.steps.length})</summary>
+            <ul className="list-disc pl-4">
+              {m.steps.map((t, i) => <li key={i}>{t}</li>)}
+            </ul>
+          </details>
+        )}
         {m.meta && <MetaChip meta={m.meta} />}
         <Link to={href} className="font-label-sm text-label-sm text-secondary underline">Ver razonamiento</Link>
       </div>

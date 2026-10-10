@@ -76,6 +76,20 @@ describe("chat route and nav", () => {
     expect(screen.queryByText("oculto")).not.toBeInTheDocument();
   });
 
+  it("shows a truncation hint and collapsed intermediate steps for envelope history", async () => {
+    const api = fakeApi({
+      getTrace: vi.fn(async () => [
+        ev("2026-03-01T10:00:00Z", "manager", "orchestrator", "message", { text: '{"kind": "request", "parts": [{"content": "¿Qué pido?"}]}' }),
+        ev("2026-03-01T10:00:01Z", "orchestrator", "manager", "message", { text: '{"kind": "response", "parts": [{"content": "Consulto a abastecimiento…"}]}' }),
+        ev("2026-03-01T10:00:02Z", "orchestrator", "manager", "message", { text: '{"kind": "response", "parts": [{"content": "Pide 40 y además' }),
+      ]),
+    });
+    open("/chat", api);
+    expect(await screen.findByText("Pide 40 y además")).toBeInTheDocument();
+    expect(screen.getByText("…(recortado, ver razonamiento)")).toBeInTheDocument();
+    expect(screen.getByText(/pasos intermedios/i)).toBeInTheDocument();
+  });
+
   it("shows the working notice, then an error bubble with retry on failure", async () => {
     const getTurn = vi
       .fn()
