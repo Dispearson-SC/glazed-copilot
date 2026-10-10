@@ -601,3 +601,12 @@ export interface TransferOptionsResponse {
   reason?: string;
   reason_es?: string;
 }
+
+/** GET /voice/config: what the backend offers for push-to-talk. */
+export interface VoiceConfig {
+  enabled: boolean;
+  stt: boolean;
+  tts: boolean;
+  voice_id?: string;
+  max_seconds: number;
+}

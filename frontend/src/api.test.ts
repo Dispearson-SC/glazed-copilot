@@ -166,4 +166,23 @@ describe("wave 14 routes", () => {
     expect(init().headers).toMatchObject({ "Idempotency-Key": "k-9" });
     expect(JSON.parse(init().body as string)).toEqual({ issue_id: "i1", option_id: "o1", approved: false, reason: "caro" });
   });
+
+  it("transcribe posts multipart without a JSON content-type; speak returns the audio blob", async () => {
+    const f = vi.fn(async (url: string, _init?: RequestInit) =>
+      url.endsWith("/voice/speak") ? new Response("mp3", { headers: { "Content-Type": "audio/mpeg" } }) : new Response(JSON.stringify({ text: "hola" })),
+    );
+    const api = createApi("http://x:1", f as unknown as typeof fetch);
+    await expect(api.transcribe(new Blob(["a"]), "voice.webm")).resolves.toEqual({ text: "hola" });
+    const init = f.mock.calls[0][1] as unknown as RequestInit;
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.body as FormData).get("audio")).toBeInstanceOf(Blob);
+    expect((init.body as FormData).get("language")).toBe("es");
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
+    expect(init.credentials).toBe("include");
+    const blob = await api.speak("hola");
+    expect(blob.size).toBe(3);
+    const sp = f.mock.calls[1][1] as unknown as RequestInit;
+    expect(sp.body).toBe(JSON.stringify({ text: "hola" }));
+    expect((sp.headers as Record<string, string>).Accept).toBe("audio/mpeg");
+  });
 });
