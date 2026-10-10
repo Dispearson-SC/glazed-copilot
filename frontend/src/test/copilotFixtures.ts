@@ -225,3 +225,16 @@ export const inventoryMany: InventoryResponse = {
     display_status_es: i === 0 ? "Agotado hoy (6.9 h sin stock) · llegan 40 mañana" : `En stock: 5 unidades · cubre 2.5 días (${i})`,
   })),
 };
+
+/** Outlook as served now: the backtest past day, today (is_today) and the forward days. */
+export const outlookFull = {
+  as_of: "2026-07-19",
+  days: [
+    { date: "2026-07-18", projected: false, is_today: false, forecast_kind: "backtest", net_sales: { low: 2346.89, mid: 2618.95, high: 2899.86 }, transactions: { low: 272.5, mid: 284.5, high: 348 }, avg_ticket: { low: 8.33, mid: 8.93, high: 9.58 },
+      actual: { net_sales: 2729.61, transactions: 326, avg_ticket: 8.37 }, vs_forecast_pct: 4.2, expected_waste_usd: null, expected_lost_sales_usd: null, weather: null, weather_note: "Sin pronóstico" },
+    { date: "2026-07-19", projected: false, is_today: true, forecast_kind: "backtest", net_sales: { low: 3256.26, mid: 3605.99, high: 3870.65 }, transactions: { low: 354.7, mid: 407, high: 476.7 }, avg_ticket: { low: 7.89, mid: 8.38, high: 9.03 },
+      actual: { net_sales: 3601.56, transactions: 411, avg_ticket: 8.76 }, vs_forecast_pct: -0.1, expected_waste_usd: null, expected_lost_sales_usd: null, weather: null, weather_note: "Sin pronóstico" },
+    { date: "2026-07-20", projected: true, is_today: false, forecast_kind: "forward", net_sales: { low: 2500, mid: 2910.94, high: 3300 }, transactions: { low: 63.1, mid: 86, high: 103.1 }, avg_ticket: { low: 8.79, mid: 9.24, high: 10.17 },
+      expected_waste_usd: { low: 6.9, mid: 6.9, high: 6.9 }, expected_lost_sales_usd: { low: 0, mid: 26.05, high: 105.35 }, weather: null, weather_note: "Sin pronóstico" },
+  ],
+} as unknown as import("../types").Outlook;

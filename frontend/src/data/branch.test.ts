@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inventoryMany, ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, hoySummary, inventoryWithStatus, metricForecasts, orderPlanA, outlookA } from "../test/copilotFixtures";
+import { inventoryMany, ayerSummary, branchDeliveries, branchExpiring, branchForecast, branchInventory, hoySummary, inventoryWithStatus, metricForecasts, orderPlanA, outlookA, outlookFull } from "../test/copilotFixtures";
 import { buildDayView, isPlaceholder, buildInventoryRows, buildScheduled } from "./copilot";
 
 const input = { asOf: "2026-07-19", forecast: branchForecast, ayer: ayerSummary, hoy: hoySummary, expiring: branchExpiring };
@@ -183,5 +183,33 @@ describe("buildInventoryRows closing status", () => {
     expect(rows).toHaveLength(12);
     expect(rows[0].display).toBe("Agotado hoy (6.9 h sin stock) · llegan 40 mañana");
     expect(rows[0].now).toBe("0");
+  });
+});
+
+describe("buildDayView with the full outlook (backtest + today + forward)", () => {
+  const full = { ...input, outlook: outlookFull };
+  it("Hoy: forecast and range from the is_today day, real sales stay pending, never today's actual", () => {
+    const v = buildDayView("hoy", full);
+    expect(v.expected).toBe("$3,605.99");
+    expect(v.range).toBe("$3,256 – $3,871");
+    expect(v.real).toBe("Pendiente");
+    expect(v.realNote).toBe("Se registra al cierre");
+    expect(JSON.stringify(v)).not.toContain("3,601");
+  });
+  it("Ayer: backtest forecast beside the actual with the variance, never 0", () => {
+    const v = buildDayView("ayer", full);
+    expect(v.expected).toBe("$2,618.95");
+    expect(v.range).toBe("$2,347 – $2,900");
+    expect(v.real).toBe("$849.20");
+    expect(v.conf).toBe("+4% vs pronóstico");
+  });
+  it("Ayer: falls back to the outlook actual when the day summary is missing", () => {
+    const v = buildDayView("ayer", { ...full, ayer: null });
+    expect(v.real).toBe("$2,729.61");
+  });
+  it("Mañana: forward band", () => {
+    const v = buildDayView("manana", full);
+    expect(v.expected).toBe("$2,910.94");
+    expect(v.range).toBe("$2,500 – $3,300");
   });
 });

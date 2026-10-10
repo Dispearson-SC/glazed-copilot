@@ -158,6 +158,8 @@ export interface ForecastPoint {
   quantiles?: Record<string, number>;
   /** True for dates after as_of. */
   projected?: boolean;
+  /** "backtest" for dates up to as_of (forecast made before the day), "forward" after. */
+  forecast_kind?: "backtest" | "forward";
 }
 
 export interface ForecastMetrics {
@@ -375,6 +377,11 @@ export interface OutlookDay {
   weather?: null;
   weather_note?: string;
   projected?: boolean;
+  is_today?: boolean;
+  forecast_kind?: "backtest" | "forward";
+  /** Past days only. Today's actual is never shown (it is recorded at close). */
+  actual?: { net_sales?: number | null; transactions?: number | null; avg_ticket?: number | null } | null;
+  vs_forecast_pct?: number | null;
 }
 
 export interface Outlook {

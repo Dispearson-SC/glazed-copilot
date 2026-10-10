@@ -297,7 +297,7 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
   const { asOf, forecast, ayer, hoy, expiring, outlook, metrics } = input;
   const date = day === "ayer" ? shiftDate(asOf, -1) : day === "hoy" ? asOf : shiftDate(asOf, 1);
   const point = forecast?.points.find((p) => p.date === date);
-  const od: OutlookDay | undefined = day === "ayer" ? undefined : outlook?.days.find((d) => d.date === date);
+  const od: OutlookDay | undefined = outlook?.days.find((d) => d.date === date);
   const sales = od?.net_sales;
   const expectedValue = sales?.mid ?? point?.forecast;
   const range = sales ? rangeText(sales.low, sales.high) : point ? rangeText(point.p10, point.p90) : null;
@@ -309,7 +309,7 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
     date: cap(longDate(date)),
     expected: expectedValue == null ? "Sin datos" : usd(expectedValue),
     range,
-    conf: day === "ayer" ? "Pronóstico cerrado" : `Pronóstico ${NO_DATA}`,
+    conf: day === "ayer" ? (od?.vs_forecast_pct != null ? `${signedPct(od.vs_forecast_pct)} vs pronóstico` : "Pronóstico cerrado") : `Pronóstico ${NO_DATA}`,
     real: "Pendiente",
     realNote: day === "hoy" ? "Se registra al cierre" : "Día futuro",
     realKnown: false,
@@ -328,8 +328,10 @@ export function buildDayView(day: DayKey, input: DayViewInput): DayView {
     const wx = ayer?.context?.weather;
     const delta = ayer?.vs_same_weekday_avg?.delta_pct;
     const rainy = (wx?.precip_mm ?? 0) > 0;
-    view.real = t?.net_sales == null ? "Sin datos" : usd(t.net_sales);
-    view.realKnown = t?.net_sales != null;
+    // Yesterday's real sales: the day summary, else the outlook's backtest actual.
+    const realSales = t?.net_sales ?? od?.actual?.net_sales;
+    view.real = realSales == null ? "Sin datos" : usd(realSales);
+    view.realKnown = realSales != null;
     view.realNote = delta == null ? "Sin comparativo" : `${signedPct(delta)} vs promedio mismo día`;
     view.weather = {
       icon: rainy ? "rainy" : "sunny",
