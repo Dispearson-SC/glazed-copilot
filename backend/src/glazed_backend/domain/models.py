@@ -56,6 +56,16 @@ def alert_category(kind: str | None, issue_category: str | None = None) -> str:
     return "automatica" if kind == "compliance_deviation" else "operacion"
 
 
+# The integrity auditor runs as its own agent but is shown as Centinela: the user-facing roster keeps the
+# seven original roles of the architecture (the auditor was added later in the alert catalog).
+HIDDEN_AGENTS = {"auditor": "sentinel"}
+
+
+def public_agent_id(agent_id: str) -> str:
+    """The agent id shown to the manager: hidden roles fold into the original role that fronts them."""
+    return HIDDEN_AGENTS.get(agent_id, agent_id)
+
+
 def alert_agent(kind: str | None) -> str:
     """The agent that owns the detector behind an alert kind."""
     return _AGENT_BY_KIND.get(kind or "", "orchestrator")

@@ -74,7 +74,7 @@ def test_agent_ids_become_spanish_roles():
     assert out == ("Según el analista histórico y el analista de abastecimiento, consulté a Centinela. "
                    "Pregunté al de el estratega.".replace("de el estratega", "del estratega"))
     assert sanitize_reply("glazed_present dice que sí; glazed_auditor, glazed_liaison y glazed_orchestrator.")[0] == (
-        "El analista del presente dice que sí; el auditor de datos, el enlace entre sucursales y el copiloto.")
+        "El analista del presente dice que sí; Centinela, el enlace entre sucursales y el copiloto.")
     assert "glazed_" not in sanitize_reply("glazed_nuevo opina")[0]
 
 
@@ -146,3 +146,8 @@ def test_many_foreign_tokens_raise_contamination_but_one_does_not():
 def test_foreign_fixes_skip_code_and_urls():
     text = "Usa `seriously` y https://x.io/please/help para ver."
     assert clean_reply(text).text == text
+
+
+def test_the_integrity_auditor_is_presented_as_centinela():
+    out = sanitize_reply("Consulté al Auditor de Integridad y el auditor de datos confirma la diferencia.")[0]
+    assert "uditor" not in out and out.count("Centinela") == 2

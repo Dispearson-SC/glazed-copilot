@@ -9,7 +9,7 @@ from tests.unit.copilot_support import stockout_issue, with_issues
     ("stockout_risk", "operacion", "supply"), ("late_delivery", "operacion", "supply"), ("inflated_order", "operacion", "supply"),
     ("overstock_waste", "operacion", "present"), ("expiring", "operacion", "present"), ("calendar_uplift", "operacion", "present"),
     ("misleading_promo", "operacion", "strategist"),
-    ("sku_key_mismatch", "integridad", "auditor"), ("orphan_sku", "integridad", "auditor"),
+    ("sku_key_mismatch", "integridad", "sentinel"), ("orphan_sku", "integridad", "sentinel"),  # the auditor is shown as Centinela
     ("compliance_deviation", "automatica", "sentinel"),
     ("something_new", "operacion", "orchestrator")])
 def test_category_and_owning_agent_by_detector(kind, category, agent):

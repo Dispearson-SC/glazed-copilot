@@ -32,9 +32,10 @@ _HEADING = re.compile(r"^\s{0,3}#{1,3}\s+(.+?)\s*$", re.M)
 
 
 _ROLES = {"present": "el analista del presente", "past": "el analista histórico", "supply": "el analista de abastecimiento",
-          "strategist": "el estratega", "sentinel": "Centinela", "auditor": "el auditor de datos",
+          "strategist": "el estratega", "sentinel": "Centinela", "auditor": "Centinela",
           "liaison": "el enlace entre sucursales", "orchestrator": "el copiloto"}
 _AGENT = re.compile(r"`?\bglazed_([a-z]+)\b`?")
+_HIDDEN_ROLE = re.compile(r"\b(?:el |la )?(?:agente )?auditor(?:a)? de (?:integridad|datos)\b", re.I)
 _TOOL = re.compile(r"(?:\b(?:la|el|mi|su) (?:herramienta|tool|función) )?`?\b(?:(?:get|forecast|project|propose)_[a-z0-9_]+|ask_peer)\b(?:\(\))?`?",
                    re.I)
 _FIELDS = {"deadline_passed": "pedidos con fecha límite vencida", "below_min_order": "por debajo del pedido mínimo",
@@ -64,6 +65,7 @@ def _role(text: str, m: re.Match[str]) -> str:
 def humanize_internal_names(text: str) -> str:
     """Agent ids, tool names and raw field keys are internal: the manager reads Spanish roles and plain labels."""
     text = _AGENT.sub(lambda m: _role(text, m), text)
+    text = _HIDDEN_ROLE.sub("Centinela", text)  # the auditor is presented as Centinela (seven original roles)
     text = re.sub(r"\b(de|a) el\b", lambda m: "del" if m.group(1) == "de" else "al", text)
 
     def ticked(m: re.Match[str]) -> str:

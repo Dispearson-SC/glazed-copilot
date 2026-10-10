@@ -309,7 +309,7 @@ class AgentsStatus:
         self._cached: dict[str, Any] | None = None
 
     def execute(self) -> dict[str, Any]:
-        from ..domain.models import AGENT_IDS
+        from ..domain.models import AGENT_IDS, HIDDEN_AGENTS
         from .reply_sanitizer import role_name_es
         now = self.clock.now()
         if self._cached is None or self._at is None or (now - self._at).total_seconds() >= self.CACHE_S:
@@ -321,7 +321,7 @@ class AgentsStatus:
                 connected, state = False, "down"
             self._cached = {"connected": connected, "agents": [
                 {"agent_id": a, "display_name_es": role_name_es(a), "status": state}
-                for a in AGENT_IDS]}
+                for a in AGENT_IDS if a not in HIDDEN_AGENTS]}
             self._at = now
         return self._cached
 

@@ -4,7 +4,7 @@ from datetime import timedelta
 from fastapi.testclient import TestClient
 
 from glazed_backend.adapters.driving.app import Container, create_app
-from glazed_backend.domain.models import AGENT_IDS
+from glazed_backend.domain.models import AGENT_IDS, HIDDEN_AGENTS
 from tests.fakes import (FakeClock, FakeCore, FakeMetrics, InMemoryAlerts, InMemoryBacktests, InMemoryCases,
                          InMemoryExecutions, InMemoryProposals, InMemoryTrace)
 
@@ -26,7 +26,8 @@ def test_reachable_core_reports_every_agent_up_with_spanish_names():
     client, _ = env()
     out = status(client)
     assert out["connected"] is True
-    assert [a["agent_id"] for a in out["agents"]] == list(AGENT_IDS)
+    assert [a["agent_id"] for a in out["agents"]] == [a for a in AGENT_IDS if a not in HIDDEN_AGENTS]
+    assert len(out["agents"]) == 7 and "auditor" not in {a["agent_id"] for a in out["agents"]}  # the seven original roles
     assert {a["status"] for a in out["agents"]} == {"up"}
     names = {a["agent_id"]: a["display_name_es"] for a in out["agents"]}
     assert names["supply"] == "Analista de abastecimiento" and names["sentinel"] == "Centinela" and names["orchestrator"] == "Copiloto"

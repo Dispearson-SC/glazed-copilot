@@ -8,6 +8,7 @@ from typing import Any
 
 from ..domain import (Alert, AlertState, BacktestRun, Case, DecisionMemory, DomainError, Execution, Experience, FutureDate, InvalidTransition, NotFound,
                       Proposal, TraceEvent, TurnRecord, alert_type_for_kind, canonical_agent_id, case_id_from_session, new_id, utcnow)
+from ..domain.models import public_agent_id
 from .reply_sanitizer import clean_reply, role_name_es, sanitize_reply  # noqa: F401 - sanitize_reply stays importable from here
 from ..ports import (AlertRepository, BacktestRepository, CaseRepository, Clock, CorePort,
                      ExecutionRepository, ExperienceMemoryPort, MetricsPort, ProposalRepository, TracePort,
@@ -223,7 +224,7 @@ class GetTurn:
             else:
                 continue
             if target:
-                agent = canonical_agent_id(str(target))
+                agent = public_agent_id(canonical_agent_id(str(target)))
                 if agent not in order:
                     order.append(agent)
                 state[agent] = "done" if answered else "consulting"

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from ... import application as uc
 from ...application import copilot as uc_copilot, decisions as uc_decisions, outcomes as uc_outcomes, forecast as uc_forecast, manager as uc_manager, notes as uc_notes, sentinel, transfers as uc_transfers
 from ...domain import AlertState, DomainError, NotFound
-from ...domain.models import alert_agent, alert_category
+from ...domain.models import alert_agent, alert_category, public_agent_id
 from .auth_api import AuthGuard
 from .store_names import StoreNames
 
@@ -118,7 +118,7 @@ def alert_view(alert: Any) -> dict[str, Any]:
     issue = alert.issue or {}
     label = _TITLES.get(kind or "", (kind or "alerta").replace("_", " ").capitalize())
     product = issue.get("product_name") or issue.get("sku") or issue.get("supplier_name") or issue.get("supplier_id")
-    return {**out, "category": alert_category(kind, issue.get("category")), "agent_id": alert_agent(kind),
+    return {**out, "category": alert_category(kind, issue.get("category")), "agent_id": public_agent_id(alert_agent(kind)),
             "ts": out["created_at"], "kind_label_es": label,
             "title_es": f"{label}: {product}" if product else label}
 

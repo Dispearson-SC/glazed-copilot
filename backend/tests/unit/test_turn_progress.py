@@ -77,9 +77,9 @@ def test_a_finished_turn_closes_every_consultation_and_keeps_it_on_re_read(env):
     c.core.transcript = [entry(1, tid, "peer_exchange", {"target_agent_id": "glazed_auditor", "question": "q"})]
     out = client.get(f"/api/v1/cases/{cid}/turns/{tid}").json()
     assert out["status"] == "done" and out["progress"] == [
-        {"agent_id": "auditor", "display_name_es": "Auditor de datos", "state": "done"}]
+        {"agent_id": "sentinel", "display_name_es": "Centinela", "state": "done"}]
     c.core.transcript = []
-    assert progress(client, cid, tid)[0]["agent_id"] == "auditor"  # stored with the finished turn
+    assert progress(client, cid, tid)[0]["agent_id"] == "sentinel"  # the auditor is shown as Centinela; stored with the finished turn
 
 
 def test_a_transcript_failure_does_not_break_the_poll(env):
