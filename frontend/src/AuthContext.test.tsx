@@ -191,3 +191,93 @@ describe("scopeStores fails closed for managers", () => {
     expect(scopeStores(stores, { user_id: "u", email: "m@x", name: "M", role: "manager", store_ids: ["S002"] }).map((s) => s.store_id)).toEqual(["S002"]);
   });
 });
+
+describe("demo picker", () => {
+  const users = [
+    { email: "admin@demo.mx", name: "Admin Demo", role: "admin" as const, store_ids: [] },
+    { email: "s1@demo.mx", name: "Gerente S001", role: "manager" as const, store_ids: ["S001"] },
+  ];
+  const gated = (over: Record<string, unknown> = {}, demo = true) =>
+    fakeApi({
+      getHealth: vi.fn(async () => ({ auth_required: true, demo_login: demo })),
+      me: vi.fn(async () => { throw unauth(); }),
+      getDemoUsers: vi.fn(async () => users),
+      ...over,
+    });
+
+  it("shows the picker with roles and stores, form collapsed", async () => {
+    const api = gated();
+    open(api);
+    expect(await screen.findByText("Elige un usuario para entrar")).toBeInTheDocument();
+    expect(screen.getByText("Todas las sucursales")).toBeInTheDocument();
+    expect(screen.getByText("Sucursal S001")).toBeInTheDocument();
+    expect(screen.getByText("Administrador")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Correo del turno")).toBeNull();
+    expect(api.listStores).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Entrar con correo y contraseña" }));
+    expect(screen.getByLabelText("Correo del turno")).toBeInTheDocument();
+  });
+
+  it("is hidden and the form expanded when demo_login is false or users 404", async () => {
+    open(gated({}, false));
+    expect(await screen.findByLabelText("Correo del turno")).toBeInTheDocument();
+    expect(screen.queryByText("Elige un usuario para entrar")).toBeNull();
+  });
+
+  it("falls back to the form when demo-users 404s", async () => {
+    open(gated({ getDemoUsers: vi.fn(async () => { throw new ApiError(404, "x"); }) }));
+    expect(await screen.findByLabelText("Correo del turno")).toBeInTheDocument();
+    expect(screen.queryByText("Elige un usuario para entrar")).toBeNull();
+  });
+
+  it("one tap logs in and enters the app", async () => {
+    const demoLogin = vi.fn(async () => ({ user: manager }));
+    open(gated({ demoLogin }));
+    await userEvent.click(await screen.findByRole("button", { name: /Entrar como Gerente S001/ }));
+    await nav();
+    expect(demoLogin).toHaveBeenCalledWith("s1@demo.mx");
+  });
+
+  it("401 shows the unavailable message and re-enables the cards", async () => {
+    open(gated({ demoLogin: vi.fn(async () => { throw unauth(); }) }));
+    await userEvent.click(await screen.findByRole("button", { name: /Entrar como Admin Demo/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Ese usuario ya no está disponible");
+    expect(screen.getByRole("button", { name: /Entrar como Admin Demo/ })).toBeEnabled();
+  });
+
+  it("a network error shows the connection message", async () => {
+    open(gated({ demoLogin: vi.fn(async () => { throw new ApiError(0, "x"); }) }));
+    await userEvent.click(await screen.findByRole("button", { name: /Entrar como Admin Demo/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo conectar");
+  });
+
+  it("disables the other cards while pending", async () => {
+    open(gated({ demoLogin: vi.fn(() => new Promise(() => {})) }));
+    await userEvent.click(await screen.findByRole("button", { name: /Entrar como Admin Demo/ }));
+    expect(screen.getByRole("button", { name: /Entrar como Gerente S001/ })).toBeDisabled();
+  });
+
+  it("logout returns to the login with the picker", async () => {
+    let signed = true;
+    const api = gated({ me: vi.fn(async () => { if (signed) return { user: manager }; throw unauth(); }) });
+    open(api);
+    await nav();
+    signed = false;
+    await userEvent.click(screen.getByRole("button", { name: "Ajustes del copiloto" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /Cerrar sesión/ }));
+    expect(await screen.findByText("Elige un usuario para entrar")).toBeInTheDocument();
+  });
+
+  it("a 401 from /stores on first load routes to the login", async () => {
+    const api = fakeApi({
+      getHealth: vi.fn(async () => ({ auth_required: true })),
+      me: vi.fn(async () => ({ user: manager })),
+      listStores: vi.fn(async () => {
+        (api.setOnUnauthorized as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]).filter(Boolean).pop()?.();
+        throw unauth();
+      }),
+    });
+    open(api);
+    expect(await screen.findByLabelText("Correo del turno")).toBeInTheDocument();
+  });
+});
