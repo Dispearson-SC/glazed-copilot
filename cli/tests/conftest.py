@@ -15,6 +15,11 @@ CASE = {
 }
 
 
+class _Const:
+    def __init__(self, value: object) -> None:
+        self.value = value
+
+
 class FakeApi:
     """Records requests and answers from a (method, path) -> response table."""
 
@@ -23,8 +28,11 @@ class FakeApi:
         self.routes: dict[tuple[str, str], object] = {}
 
     def on(self, method: str, path: str, body: object, status: int = 200) -> None:
-        """body may be a value or a list (consumed in order, last one repeats)."""
-        self.routes[(method, path)] = (status, body)
+        self.routes[(method, path)] = (status, _Const(body))
+
+    def seq(self, method: str, path: str, bodies: list) -> None:
+        """Answer with each body in order; the last one repeats."""
+        self.routes[(method, path)] = (200, list(bodies))
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         self.calls.append(request)
@@ -32,10 +40,10 @@ class FakeApi:
         if key not in self.routes:
             return httpx.Response(404, json={"detail": f"no route {key}"})
         status, body = self.routes[key]
-        if isinstance(body, list):
-            item = body.pop(0) if len(body) > 1 else body[0]
+        if isinstance(body, _Const):
+            item = body.value
         else:
-            item = body
+            item = body.pop(0) if len(body) > 1 else body[0]
         return httpx.Response(status, json=item)
 
     def last(self) -> httpx.Request:
@@ -53,4 +61,19 @@ def api(monkeypatch, tmp_path):
     monkeypatch.setenv("GLAZED_API_URL", "http://backend.test")
     monkeypatch.setenv("GLAZED_POLL_INTERVAL", "0")
     monkeypatch.setenv("NO_COLOR", "1")
+    monkeypatch.setenv("COLUMNS", "200")
     return fake
+
+
+@pytest.fixture
+def run(api):
+    from typer.testing import CliRunner
+
+    from glazed_cli.app import app
+
+    runner = CliRunner()
+
+    def _run(*args: str):
+        return runner.invoke(app, list(args))
+
+    return _run
