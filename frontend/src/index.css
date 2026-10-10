@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    @apply bg-surface font-body-md text-on-surface;
+    overscroll-behavior: none;
+  }
+
+  /* Tailwind preflight strips heading/list styles; keep legacy pages readable until restyled. */
+  main h2 {
+    @apply font-headline-md text-headline-md text-primary mb-space-sm;
+  }
+  main h3 {
+    @apply font-headline-sm text-headline-sm text-primary mt-space-md mb-space-xs;
+  }
+  main table {
+    @apply w-full;
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
