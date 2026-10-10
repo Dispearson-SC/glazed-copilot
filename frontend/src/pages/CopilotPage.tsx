@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import AgentWindow from "../components/copilot/AgentWindow";
 import AlertsWindow from "../components/copilot/AlertsWindow";
@@ -39,15 +39,26 @@ function CopilotShell() {
   const warningsData = useWarningsData(storeId, caseId, session.refreshKey);
   const memoryData = useMemoryData(caseId, session.refreshKey);
   const inbox = useInbox(caseId, session.refreshKey);
+  const [rejectItem, setRejectItem] = useState<DecisionItem | null>(null);
   const { decide, busyId } = useDecide(caseId, async () => {
     await data.refresh();
     await inbox.refreshCounts();
     await memoryData.refresh();
   });
+  // A different case starts clean: handled ids, accepted count, analysis cards, context and open sheets belong to the old one.
+  useEffect(() => {
+    dispatch({ type: "resetCase" });
+    setRejectItem(null);
+  }, [caseId, dispatch]);
   const [site, branch] = splitStoreName(active ? storeLabel(active) : "Sucursal");
 
   // Every decision seen this session stays available to the chat cards even after it is decided.
   const known = useRef(new Map<string, DecisionItem>());
+  const knownCase = useRef(caseId);
+  if (knownCase.current !== caseId) {
+    knownCase.current = caseId;
+    known.current.clear();
+  }
   data.items.forEach((i) => known.current.set(i.id, i));
   const visible = data.items.filter((i) => !state.handled.includes(i.id));
   const approvals = visible.filter((i) => i.kind === "approval").length;
@@ -77,7 +88,6 @@ function CopilotShell() {
   };
 
   // The item the reject sheet was opened for; used when known.current no longer has it, so the sheet always renders.
-  const [rejectItem, setRejectItem] = useState<DecisionItem | null>(null);
   const openReject = (i: DecisionItem) => {
     setRejectItem(i);
     dispatch({ type: "openReject", id: i.id });

@@ -57,6 +57,9 @@ export function useCurrentCase(storeId: string, refreshKey = 0) {
     60_000,
     false,
     [storeId, refreshKey, caseId],
+    { keepOnChange: true },
   );
-  return { currentCase: res.data, loading: res.loading, error: res.error };
+  // Never hand back a case of another store while the new store's cases are loading.
+  const currentCase = res.data && res.data.store_id === storeId ? res.data : null;
+  return { currentCase, loading: res.loading, error: res.error };
 }

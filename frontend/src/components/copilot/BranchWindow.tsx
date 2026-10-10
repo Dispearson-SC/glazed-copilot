@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { isPlaceholder, type DayKey, type DayView, type InventoryRow, type ScheduledRow } from "../../data/copilot";
 
 /** Rows shown before "Ver todo"; the backend already sorts critical first. */
@@ -47,6 +47,7 @@ export default function BranchWindow({
   onGoDecisiones: () => void;
 }) {
   const [showAll, setShowAll] = useState(false);
+  useEffect(() => setShowAll(false), [storeCode]);
   if (!view) {
     return (
       <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-[112px]">

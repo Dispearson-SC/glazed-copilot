@@ -66,10 +66,13 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
   const lastText = useRef("");
   const lastContext = useRef<MessageContext | undefined>(undefined);
 
+  const liveCase = useRef(caseId);
+  liveCase.current = caseId;
   const refreshProposals = useCallback(async () => {
     if (!caseId) return;
     try {
       const all = await api.listProposals({ case_id: caseId, status: "pending" });
+      if (liveCase.current !== caseId) return; // answered after the case changed
       setProposals(all.filter((p) => p.status === "pending"));
     } catch {
       /* keep the last list; the next refresh retries */

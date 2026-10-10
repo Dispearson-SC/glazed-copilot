@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { filterMemories, SOON_TEXT, type Memory } from "../../data/copilot";
 import type { MemoryState } from "../../useMemoryData";
 
@@ -43,6 +43,7 @@ export default function MemoriesWindow({
   state: MemoryState;
 }) {
   const [query, setQuery] = useState("");
+  useEffect(() => setQuery(""), [storeCode]);
   const shown = filterMemories(memories, filter, query);
   return (
     <main className="mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 pb-28 pt-[104px]">

@@ -106,6 +106,7 @@ export default function AgentWindow({
   const { state, dispatch, showToast } = useCopilot();
   const [draft, setDraft] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
+  useEffect(() => setDraft(""), [caseId]);
   const busy = chat.status === "working";
   const pendingIds = new Set(openIds ?? items.map((i) => i.id));
 
