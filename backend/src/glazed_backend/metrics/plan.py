@@ -112,6 +112,10 @@ def plan_line(state: SkuState, cfg: Config, typical_qty: float | None, window_re
     deadline, why = order_deadline(state, stockout)
     loss = scenario_losses(rec, qty, p.price, p.unit_cost, perishable)
     case = max(1, p.case_size or 1)
+    from .options import eval_delta  # lazy: options imports this module
+    idle = scenario_losses(rec, 0, p.price, p.unit_cost, perishable)  # the same loss model with nothing ordered
+    do_nothing = {"net_usd_mid": round(-(idle["waste_usd"]["mid"] + idle["lost_sales_usd"]["mid"]), 2),
+                  "expected_lost_sales_usd": idle["lost_sales_usd"], "expected_waste_usd": idle["waste_usd"]}
     caveats = []
     if state.censored.censored_share > 0.2:
         caveats.append(f"{state.censored.censored_share:.0%} of days had stockouts: demand is corrected upward (capped at p90).")
@@ -124,6 +128,9 @@ def plan_line(state: SkuState, cfg: Config, typical_qty: float | None, window_re
         "qty_range": {"low": min(qtys), "high": max(qtys)}, "qty_low": min(qtys), "qty_high": max(qtys),
         "est_cost_usd": round(qty * p.unit_cost, 2),
         "expected_delivery": _iso(rec.delivery), "days_to_next_delivery": (rec.delivery - state.t).days,
+        "next_delivery_date": _iso(rec.delivery), "lead_time_days": max(1, round(state.supplier.lead_mean)),
+        "net_usd_mid": round(eval_delta(rec, qty, 0, p.price, p.unit_cost, perishable)["net_mid"], 2),
+        "do_nothing": do_nothing,
         "usable_stock": round(rec.usable, 2), "in_transit_qty": round(rec.arrivals, 2),
         "projected_stockout_date": _iso(stockout), "order_deadline": _iso(deadline), "order_deadline_status": why,
         "stockout_risk_without_order": stockout_risk(state, None),

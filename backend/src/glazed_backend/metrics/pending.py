@@ -29,7 +29,7 @@ def technical_from_issue(issue: dict[str, Any]) -> dict[str, Any] | None:
             "supplier_name": issue.get("supplier_name"), "qty": p.get("qty"), "expected_delivery": None,
             "cost_usd": {"low": best.get("cost_usd") or 0.0, "mid": best.get("cost_usd") or 0.0, "high": best.get("cost_usd") or 0.0},
             "why": a["dialog"]["why"], "impact_chips": [f"Efecto neto esperado {usd(best.get('net_usd_mid'))}"],
-            "deadline": a["deadline"], "confidence": a["confidence"]["score"], "tier": a["tier"],
+            "deadline": a["deadline"], "confidence": a["confidence"], "tier": a["tier"],
             "label": a["recommendation"]["label"]}
 
 
@@ -60,6 +60,18 @@ def _chips(line: dict[str, Any]) -> list[str]:
     return chips
 
 
+def _do_nothing_of(issue: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The issue's do_nothing option as the order-line comparison (absolute expected losses of not acting)."""
+    dn = next((o for o in (issue or {}).get("options") or [] if o.get("action_type") == "do_nothing"), None)
+    if dn is None:
+        return None
+    imp = dn.get("loss_impact") or {}
+    waste, lost = float(imp.get("waste_usd_delta") or 0.0), float(imp.get("lost_sales_usd_delta") or 0.0)
+    cost = float((dn.get("cost_of_inaction_usd") or {}).get("mid", dn.get("cost_usd") or 0.0))
+    return {"net_usd_mid": round(-cost, 2), "expected_lost_sales_usd": {"mid": round(lost, 2)},
+            "expected_waste_usd": {"mid": round(waste, 2)}}
+
+
 def technical_from_line(line: dict[str, Any], issue: dict[str, Any] | None) -> dict[str, Any]:
     name = line.get("product_name") or line.get("name") or line["sku"]
     qty, cost = line.get("qty"), float(line.get("est_cost_usd") or 0.0)
@@ -70,12 +82,18 @@ def technical_from_line(line: dict[str, Any], issue: dict[str, Any] | None) -> d
           f"; el pedido llega el {line.get('expected_delivery')}."
     warning, codes = line_warning(line)
     best = pick_best(issue["options"]) if issue and issue.get("options") else None
-    conf = ((best or {}).get("confidence") or {}).get("score")
+    bc = (best or {}).get("confidence") or {}
+    conf = line.get("confidence") if isinstance(line.get("confidence"), dict) else (
+        {"score": bc.get("score"), "calibrated": (bc.get("n_backtest") or 0) > 0} if bc else None)
+    conf = {"score": conf.get("score"), "calibrated": conf.get("calibrated")} if conf else None
     out = {"issue_id": (issue or {}).get("issue_id"), "option_id": (best or {}).get("option_id"), "sku": line["sku"],
            "product_name": name, "supplier_id": line.get("supplier_id"), "supplier_name": line.get("supplier_name"),
            "qty": qty, "expected_delivery": line.get("expected_delivery"),
            "cost_usd": {"low": round(min(lo, cost), 2), "mid": round(cost, 2), "high": round(max(hi, cost), 2)},
            "why": why, "impact_chips": _chips(line), "deadline": line.get("order_deadline"), "confidence": conf,
+           "do_nothing": line.get("do_nothing") or _do_nothing_of(issue), "lead_time_days": line.get("lead_time_days"),
+           "next_delivery_date": line.get("next_delivery_date") or line.get("expected_delivery"),
+           "min_order_warning": line.get("min_order_warning"),
            "tier": (best or {}).get("tier"), "label": label(best, issue) if best and issue else f"Pedir {qty} unidades de {name}"}
     if warning:
         out["warning"], out["warning_codes"] = warning, codes

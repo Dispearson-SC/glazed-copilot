@@ -67,3 +67,14 @@ def test_min_order_value_is_a_warning_never_an_inflated_quantity():
     assert w["min_order_value"] == 150.0 and w["order_value_usd"] == 18.0 and "consolidate" in w["suggestion"]
     ok = apply_min_order([{"supplier_id": "SUP", "qty": 1, "est_cost_usd": 200.0}], {"SUP": 150.0})
     assert ok[0]["min_order_warning"] is None
+
+
+def test_plan_line_compares_with_doing_nothing_and_names_lead_time_and_delivery():
+    s = state(3, closing=5, rows=flat_rows(closing=5), case=6, supplier=sup(lead=2.0, p90=3.0))
+    line = plan_line(s, Config(), typical_qty=30, window_received=300, window_sold=200)
+    dn = line["do_nothing"]
+    assert set(dn) == {"net_usd_mid", "expected_lost_sales_usd", "expected_waste_usd"}
+    assert dn["expected_lost_sales_usd"]["mid"] > line["expected_lost_sales_usd"]["mid"]  # not ordering loses more sales
+    assert dn["net_usd_mid"] == pytest.approx(-(dn["expected_lost_sales_usd"]["mid"] + dn["expected_waste_usd"]["mid"]), abs=0.02)
+    assert isinstance(line["net_usd_mid"], float)  # value of ordering, to put next to the do-nothing figure
+    assert line["lead_time_days"] == 2 and line["next_delivery_date"] == line["expected_delivery"]

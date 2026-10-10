@@ -69,3 +69,13 @@ def test_replay_scores_stockout_orders_and_never_uses_outcomes_past_ref():
     assert c.n_backtest > 0 and 0.0 <= c.score <= 1.0
     empty = StoreSnapshot(StoreInfo(18.0), {}, {}, [], {})
     assert calibrate(empty, ref, Config()) == {}
+
+
+def test_line_confidence_is_score_plus_calibrated_flag():
+    from glazed_backend.metrics.confidence import Calibration, line_confidence
+    cal = Calibration(0.9, 40, 12.0)
+    assert line_confidence(cal, 50.0, Config()) == {"score": 0.9, "calibrated": True, "n_backtest": 40, "noise_capped": False}
+    none = line_confidence(None, 50.0, Config())
+    assert none["score"] == 0.3 and none["calibrated"] is False and none["n_backtest"] == 0
+    capped = line_confidence(cal, 0.1, Config())  # under the noise floor
+    assert capped["score"] == 0.3 and capped["calibrated"] is True and capped["noise_capped"] is True

@@ -34,7 +34,7 @@ def test_envelope_and_split_between_approvals_and_technical():
     t = out["technical"][0]
     assert t["sku"] == "R1" and t["product_name"] == "Prod R1" and t["supplier_name"] == "Northfield Bakery"
     assert t["qty"] == 20 and t["expected_delivery"] == "2026-07-21" and t["issue_id"] == "S030|stockout_risk|R1"
-    assert t["option_id"] == "bestR1" and t["deadline"] == "2026-07-19" and t["confidence"] == 0.82
+    assert t["option_id"] == "bestR1" and t["deadline"] == "2026-07-19" and t["confidence"] == {"score": 0.82, "calibrated": True}
     assert t["cost_usd"]["mid"] == 30.0 and t["cost_usd"]["low"] < 30.0 < t["cost_usd"]["high"]
     assert t["why"] and t["impact_chips"] and all(isinstance(c, str) for c in t["impact_chips"]) and "warning" not in t
 

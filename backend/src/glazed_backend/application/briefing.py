@@ -22,7 +22,8 @@ MAX_ISSUES, MAX_INTEGRITY, MAX_LINES, MAX_EVIDENCE, MAX_DECISIONS, MAX_PENDING =
 _ISSUE_DROP = ("as_of_date", "engine_version", "store_id", "store_display_name")
 _CONFIDENCE_KEEP = ("score", "n_backtest", "noise_capped")  # replay internals (effect mean, noise floor) stay out
 _LINE_KEEP = ("sku", "name", "supplier_id", "supplier_name", "qty", "cases", "est_cost_usd", "expected_delivery",
-              "projected_stockout_date", "order_deadline", "order_deadline_status", "stockout_risk_without_order")
+              "projected_stockout_date", "order_deadline", "order_deadline_status", "stockout_risk_without_order",
+              "do_nothing", "lead_time_days", "next_delivery_date", "min_order_warning")
 _PROPOSAL_KEEP = ("proposal_id", "case_id", "issue_id", "action_type", "params", "tier", "status", "reason",
                   "agent_id")
 
@@ -49,6 +50,8 @@ def trim_line(line: dict[str, Any]) -> dict[str, Any]:
     out = {k: line.get(k) for k in _LINE_KEEP}
     out["expected_loss_usd"] = round(_mid(line.get("expected_waste_usd")) + _mid(line.get("expected_lost_sales_usd")), 2)
     out["below_min_order"] = bool(line.get("min_order_warning"))
+    conf = line.get("confidence")
+    out["confidence"] = {"score": conf.get("score"), "calibrated": conf.get("calibrated")} if isinstance(conf, dict) else None
     if isinstance(line.get("issue"), dict):
         out["issue_id"] = line["issue"].get("issue_id")
     return out

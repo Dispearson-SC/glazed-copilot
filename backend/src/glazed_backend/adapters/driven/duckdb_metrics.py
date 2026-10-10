@@ -20,7 +20,7 @@ from ...metrics.integrity import integrity_issues, scan_sales
 from ...metrics.issues import detect_issues
 from ...metrics.replay import calibrate
 from ...metrics.losses import lost_sales_window
-from ...metrics.confidence import realized_add_net, realized_reduce_net
+from ...metrics.confidence import line_confidence, realized_add_net, realized_reduce_net
 from ...metrics.demand import uncensor
 from ...metrics.forecast import same_weekday_dates
 from ...metrics.inventory import is_short_life
@@ -407,6 +407,7 @@ class DuckDBMetrics:
     def _plan_lines(self, snap: StoreSnapshot, store_id: str, as_of: date) -> list[dict[str, Any]]:
         ref = self._ref_date(store_id, as_of)
         lines = []
+        calib = self._calibration(store_id, as_of).get(("stockout_risk", "place_order"))
         for sku in snap.products:
             state = snap.state_at(sku, ref)
             if state is None:
@@ -415,6 +416,7 @@ class DuckDBMetrics:
             ln = plan_line(state, self.config, snap.typical_order_qty(sku, ref), rec, sold)
             if ln:
                 ln["supplier_name"] = snap.supplier_names.get(ln["supplier_id"])
+                ln["confidence"] = line_confidence(calib, ln["net_usd_mid"], self.config)
                 lines.append(ln)
         apply_min_order(lines, {k: v[2] for k, v in snap.suppliers.items()})
         lines.sort(key=lambda l: (-l["stockout_risk_without_order"], -l["est_cost_usd"], l["sku"]))

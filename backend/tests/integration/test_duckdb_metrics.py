@@ -345,3 +345,18 @@ def test_flow_and_staffing_history_skip_days_the_cleaning_flagged_as_invalid(m):
     assert all(r["date"] != bad for r in m.flow_history("S001", JUL, bad - timedelta(days=3)))
     assert not any(r["store_id"] == "S001" and r["date"] == bad for r in m.staffing_history("S001", JUL, bad - timedelta(days=3))["rows"])
     assert all(r["transactions"] < 2000 for r in m.flow_history("S001", JUL, JUL - timedelta(days=90)))
+
+
+def test_every_order_plan_line_is_complete_for_the_manager(m):
+    plan = m.order_plan(S, AS_OF)
+    mov = {s["supplier_id"]: s["min_order_value"] for s in plan["suppliers"]}
+    paid = {s["supplier_id"]: s["order_value_usd"] for s in plan["suppliers"]}
+    assert plan["lines"]
+    for line in plan["lines"]:
+        c = line["confidence"]
+        assert 0 <= c["score"] <= 1 and isinstance(c["calibrated"], bool)
+        dn = line["do_nothing"]
+        assert dn["expected_lost_sales_usd"]["mid"] >= 0 and dn["expected_waste_usd"]["mid"] >= 0 and dn["net_usd_mid"] <= 0
+        assert line["lead_time_days"] >= 1 and line["next_delivery_date"] == line["expected_delivery"]
+        below = paid[line["supplier_id"]] < mov[line["supplier_id"]]
+        assert bool(line["min_order_warning"]) == below  # a warning only, the quantity is never inflated

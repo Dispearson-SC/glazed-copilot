@@ -54,3 +54,10 @@ def confidence_for(calib: Calibration | None, option_net: float, cfg: Config) ->
     return {"score": min(calib.score, CAP_UNCALIBRATED) if capped else round(calib.score, 4),
             "n_backtest": calib.n_backtest, "method": calib.method, "noise_capped": capped,
             "effect_mean_usd": round(calib.effect_mean_usd, 2), "noise_floor_usd": cfg.noise_floor_usd}
+
+
+def line_confidence(calib: Calibration | None, option_net: float, cfg: Config) -> dict:
+    """The confidence of an order-plan line: {score, calibrated} (+ the replay count and whether the noise floor capped it)."""
+    c = confidence_for(calib, option_net, cfg)
+    return {"score": c["score"], "calibrated": c["n_backtest"] > 0, "n_backtest": c["n_backtest"],
+            "noise_capped": c["noise_capped"]}
