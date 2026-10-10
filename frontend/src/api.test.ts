@@ -107,7 +107,7 @@ describe("api client", () => {
 describe("resolveBase", () => {
   it("turns a same-origin base into the page origin without embedded credentials", async () => {
     const { resolveBase } = await import("./api");
-    expect(resolveBase("", "https://glazed.farone.cloud")).toBe("https://glazed.farone.cloud");
+    expect(resolveBase("", "https://glazed.example.com")).toBe("https://glazed.example.com");
   });
   it("keeps an explicit API URL", async () => {
     const { resolveBase } = await import("./api");
