@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { caseA, fakeApi, renderPage } from "../../test/helpers";
 import CopilotPage from "../../pages/CopilotPage";
 
@@ -23,6 +23,8 @@ const open = (over = {}) =>
   );
 
 describe("Conversaciones (Agente)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("Nueva conversación creates a live case for the same store and date, then switches to it", async () => {
     const created = mk("c9", "2026-07-19T12:00:00Z");
     let all = [base, c2, c3];
@@ -79,9 +81,11 @@ describe("Conversaciones (Agente)", () => {
   it("survives localStorage throwing", async () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("denied"); });
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("denied"); });
-    open();
+    const listTurns = vi.fn(async () => []);
+    open({ listTurns });
     await userEvent.click(await screen.findByRole("button", { name: "Conversaciones anteriores" }));
     await userEvent.click(await screen.findByRole("button", { name: /Abrir conversación.*Conversación 09:00/ }));
-    vi.restoreAllMocks();
+    expect(screen.queryByRole("dialog", { name: "Conversaciones anteriores" })).toBeNull();
+    await waitFor(() => expect(listTurns).toHaveBeenCalledWith("c2"));
   });
 });
