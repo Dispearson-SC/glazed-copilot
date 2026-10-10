@@ -67,7 +67,7 @@ export default function DaySwitcher({ storeId, className = "" }: { storeId: stri
       if (liveAt(list, target).length === 0) list = await ensureCaseAt(api, storeId, target);
       const pick = liveAt(list, target)[0];
       if (pick) {
-        session.setCaseId(pick.case_id);
+        session.setCaseId(pick.case_id, storeId);
         session.bump();
       }
     } catch (e) {

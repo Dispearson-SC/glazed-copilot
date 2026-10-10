@@ -1,7 +1,7 @@
 import type { Api } from "./api";
 import { useApi } from "./ApiContext";
 import { DEFAULT_SIM_TODAY } from "./config";
-import { useSession } from "./SessionContext";
+import { readStoredCase, useSession } from "./SessionContext";
 import type { Case } from "./types";
 import { usePolling } from "./usePolling";
 
@@ -45,6 +45,8 @@ export function useCurrentCase(storeId: string, refreshKey = 0) {
     async () => {
       if (!storeId) return null;
       const cases = await api.listCases({ store_id: storeId });
+      const remembered = caseId ? "" : readStoredCase(storeId);
+      if (remembered && cases.some((c) => c.case_id === remembered)) return pickCase(cases, remembered);
       if (caseId || liveAt(cases, DEFAULT_SIM_TODAY).length > 0) return pickCase(cases, caseId);
       try {
         return pickCase(await ensureDefaultCase(api, storeId), caseId);

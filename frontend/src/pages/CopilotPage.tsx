@@ -90,6 +90,8 @@ function CopilotShell() {
       {state.tab === "agente" && (
         <AgentWindow
           caseId={caseId}
+          storeId={storeId}
+          simToday={simToday}
           chat={chat}
           items={[...known.current.values()]}
           openIds={visible.map((i) => i.id)}

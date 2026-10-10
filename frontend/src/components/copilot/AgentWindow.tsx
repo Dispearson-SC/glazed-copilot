@@ -9,6 +9,7 @@ import type { AgentsStatusResponse } from "../../types";
 import type { useChat } from "../../useChat";
 import AgentOrb from "./AgentOrb";
 import AnalysisCard from "./AnalysisCard";
+import ConversationBar from "./ConversationBar";
 
 type Chat = ReturnType<typeof useChat>;
 
@@ -75,6 +76,8 @@ function AnalysisLoader({ caseId, item, mode, open, busy, onApprove, onReject }:
 /** Agente window: the existing chat (useChat) in the copilot look, with the pinned context and the analysis cards. */
 export default function AgentWindow({
   caseId,
+  storeId = "",
+  simToday = "",
   chat,
   items,
   openIds,
@@ -85,6 +88,8 @@ export default function AgentWindow({
   onReject,
 }: {
   caseId: string;
+  storeId?: string;
+  simToday?: string;
   chat: Chat;
   /** Every decision seen this session, so a decided card still renders as 'Decisión registrada'. */
   items: DecisionItem[];
@@ -141,6 +146,8 @@ export default function AgentWindow({
             <h1 className="m-0 mt-2 font-headline-lg text-headline-lg tracking-tight text-primary">¿Qué decidimos hoy?</h1>
             <p className="m-0 mt-1 font-body-md text-body-md text-on-surface-variant">{pendingLine}</p>
           </section>
+
+          <ConversationBar storeId={storeId} simToday={simToday} caseId={caseId} />
 
           {state.ctx && (
             <div className="mb-3 flex items-center gap-2 rounded-full bg-surface-container-high py-2 pl-3.5 pr-2 text-primary">
