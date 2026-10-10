@@ -49,7 +49,7 @@ export default function DecisionsWindow({
   const approvals = items.filter((i) => i.kind === "approval");
   const techs = items.filter((i) => i.kind === "tech");
   return (
-    <main className="mx-auto flex w-full max-w-[640px] flex-col gap-6 px-4 pb-28 pt-[104px]">
+    <main className="mx-auto flex w-full max-w-[640px] flex-col gap-6 px-4 pb-28 pt-[calc(var(--copilot-header-h,104px)_+_16px)]">
       <header className="flex flex-col gap-1 pt-3">
         <span className="font-label-md text-label-md uppercase tracking-[0.05em] text-on-tertiary-container first-letter:uppercase">{simToday ? dateLabel(simToday) : loading ? "\u00a0" : "Sin datos"}</span>
         <h1 className="m-0 font-headline-lg text-headline-lg tracking-tight text-primary">Decisiones de hoy</h1>

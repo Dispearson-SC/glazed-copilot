@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "../../AuthContext";
 import DaySwitcher from "../DaySwitcher";
 import ConversationBar from "./ConversationBar";
@@ -8,8 +8,20 @@ import StoreSwitcher from "../StoreSwitcher";
 export default function CopilotTopBar({ storeCode, onSettings }: { storeCode: string; onSettings: () => void }) {
   const { user, logout } = useAuth();
   const [menu, setMenu] = useState(false);
+  const bar = useRef<HTMLElement>(null);
+  // Publish the real header height (safe area, day switcher and its wrapping note included) so content starts below it.
+  useLayoutEffect(() => {
+    const el = bar.current;
+    if (!el) return;
+    const publish = () => document.documentElement.style.setProperty("--copilot-header-h", `${Math.ceil(el.getBoundingClientRect().height)}px`);
+    publish();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
-    <header className="fixed inset-x-0 top-0 z-40 bg-surface/[.88] pt-safe backdrop-blur-xl shadow-[0_1px_8px_rgba(75,48,37,.04)]">
+    <header ref={bar} className="fixed inset-x-0 top-0 z-40 bg-surface/[.88] pt-safe backdrop-blur-xl shadow-[0_1px_8px_rgba(75,48,37,.04)]">
       <div className="mx-auto flex h-16 max-w-[640px] items-center justify-between px-4">
         <div className="flex min-w-0 items-center gap-2">
           <img alt="Logo Glazed Co." src="/Logo.png" className="h-8 w-8 flex-shrink-0 rounded-full object-contain" />

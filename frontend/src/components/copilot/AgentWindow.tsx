@@ -144,7 +144,7 @@ export default function AgentWindow({
 
   return (
     <>
-      <div ref={scroller} className="fixed inset-x-0 bottom-[204px] top-[100px] overflow-y-auto">
+      <div ref={scroller} className="fixed inset-x-0 bottom-[204px] top-[calc(var(--copilot-header-h,100px)_+_12px)] overflow-y-auto">
         <div className="mx-auto max-w-[640px] px-4 pb-4">
           <section className="flex flex-col items-center px-2 pb-4 pt-5 text-center">
             <AgentOrb size={116} />
