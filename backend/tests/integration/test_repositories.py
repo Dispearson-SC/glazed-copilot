@@ -121,3 +121,17 @@ def test_turns_roundtrip_upsert_and_order():
         repo.add(t1)
         got = repo.get("t1")
         assert got == t1 and got.final and got.reply_meta is None
+
+
+def test_decision_memories_roundtrip_and_store_scope():
+    from glazed_backend.adapters.driven.memory import InMemoryDecisionMemories
+    from glazed_backend.domain import DecisionMemory
+    for repo in (InMemoryDecisionMemories(), _pg().memories):
+        m = DecisionMemory("m1", "S030", "c1", "d1", "preferencias", "Rechazaste pedir X", "precio", "place_order", "SKU-1",
+                           datetime(2026, 3, 1, tzinfo=timezone.utc), reason="muy caro")
+        repo.add(m)
+        repo.add(DecisionMemory("m2", "S001", "c9", "d9", "preferencias", "otra tienda", None, "skip_order", None,
+                                datetime(2026, 3, 2, tzinfo=timezone.utc)))
+        assert [x.memory_id for x in repo.list("S030")] == ["m1"] and repo.list("S030")[0] == m
+        repo.add(m)  # upsert by memory_id: no duplicate
+        assert len(repo.list("S030")) == 1 and repo.get("m2").store_id == "S001" and repo.get("zz") is None

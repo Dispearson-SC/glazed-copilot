@@ -5,7 +5,8 @@ from datetime import date, datetime
 from typing import Any, Protocol
 
 from ..metrics.types import SkuSeries
-from ..domain import Alert, AlertState, BacktestRun, Case, Execution, Experience, Proposal, TraceEvent, TurnRecord
+from ..domain import (Alert, AlertState, BacktestRun, Case, DecisionMemory, Execution, Experience, Proposal, TraceEvent,
+                      TurnRecord)
 
 
 class MetricsPort(Protocol):
@@ -108,6 +109,12 @@ class TurnRepository(Protocol):
     def add(self, turn: TurnRecord) -> None: ...  # upsert by turn_id
     def get(self, turn_id: str) -> TurnRecord | None: ...
     def list(self, case_id: str) -> list[TurnRecord]: ...  # ordered by ts
+
+
+class DecisionMemoryRepository(Protocol):
+    def add(self, memory: DecisionMemory) -> None: ...  # upsert by memory_id
+    def get(self, memory_id: str) -> DecisionMemory | None: ...
+    def list(self, store_id: str) -> list[DecisionMemory]: ...  # ordered by created_at
 
 
 class TracePort(Protocol):

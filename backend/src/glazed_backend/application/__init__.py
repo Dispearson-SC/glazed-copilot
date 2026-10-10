@@ -6,8 +6,8 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from ..domain import (Alert, AlertState, BacktestRun, Case, DomainError, Execution, Experience, FutureDate, InvalidTransition, NotFound,
-                      Proposal, TraceEvent, TurnRecord, alert_type_for_kind, canonical_agent_id, case_id_from_session, new_id)
+from ..domain import (Alert, AlertState, BacktestRun, Case, DecisionMemory, DomainError, Execution, Experience, FutureDate, InvalidTransition, NotFound,
+                      Proposal, TraceEvent, TurnRecord, alert_type_for_kind, canonical_agent_id, case_id_from_session, new_id, utcnow)
 from .reply_sanitizer import clean_reply, role_name_es, sanitize_reply  # noqa: F401 - sanitize_reply stays importable from here
 from ..ports import (AlertRepository, BacktestRepository, CaseRepository, Clock, CorePort,
                      ExecutionRepository, ExperienceMemoryPort, MetricsPort, ProposalRepository, TracePort,
@@ -489,11 +489,12 @@ class ProposeOption:
 class DecideProposal:
     def __init__(self, cases: CaseRepository, proposals: ProposalRepository, executions: ExecutionRepository,
                  alerts: AlertRepository, memory: ExperienceMemoryPort | None = None,
-                 classifier: Any = None) -> None:
+                 classifier: Any = None, decision_memories: Any = None, clock: Clock | None = None) -> None:
         self.cases, self.proposals, self.executions, self.alerts = cases, proposals, executions, alerts
         self.memory, self.classifier = memory, classifier
+        self.decision_memories, self.clock = decision_memories, clock
 
-    def execute(self, proposal_id: str, approved: bool, reason: str = "") -> Execution:
+    def execute(self, proposal_id: str, approved: bool, reason: str = "", subject: str | None = None) -> Execution:
         proposal = self.proposals.get(proposal_id)
         if proposal is None:
             raise NotFound(f"proposal {proposal_id!r} not found")
@@ -512,7 +513,24 @@ class DecideProposal:
         self.executions.add(execution)
         self._advance_alert(proposal, approved)
         self._remember(proposal)
+        if not approved and reason.strip():
+            self._keep_preference(proposal, subject)
         return execution
+
+    def _keep_preference(self, p: Proposal, subject: str | None) -> None:
+        """A rejection with a reason is a stated preference: keep it as a `preferencias` memory (best effort)."""
+        if self.decision_memories is None:
+            return
+        try:
+            from ..metrics.memory_view import rejected_text
+            case = self.cases.get(p.case_id)
+            when = case.sim_today.isoformat() if case else None
+            text = rejected_text(p.action_type, subject or p.params.get("sku") or p.issue_id, when, p.reason, p.reason_category)
+            self.decision_memories.add(DecisionMemory(
+                f"rej-{p.proposal_id}", p.store_id, p.case_id, p.proposal_id, "preferencias", text, p.reason_category,
+                p.action_type, p.params.get("sku"), self.clock.now() if self.clock else utcnow(), p.reason))
+        except Exception:  # noqa: BLE001 - never blocks a decision
+            pass
 
     def _advance_alert(self, proposal: Proposal, approved: bool) -> None:
         """Alert lifecycle for a decision: scoped to the proposal's own case, idempotent, and never an error

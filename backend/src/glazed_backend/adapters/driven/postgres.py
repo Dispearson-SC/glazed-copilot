@@ -9,9 +9,9 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from ...domain import Alert, AlertState, BacktestRun, Case, Execution, Proposal, TraceEvent, TurnRecord
+from ...domain import Alert, AlertState, BacktestRun, Case, DecisionMemory, Execution, Proposal, TraceEvent, TurnRecord
 
-_TABLES = ("turns", "store_assistants", "trace_events", "backtests", "executions", "proposals", "alerts", "cases")
+_TABLES = ("decision_memories", "turns", "store_assistants", "trace_events", "backtests", "executions", "proposals", "alerts", "cases")
 
 
 class PostgresStore:
@@ -26,6 +26,7 @@ class PostgresStore:
         self.backtests, self.trace = _Backtests(self), _Trace(self)
         self.assistants = _Assistants(self)
         self.turns = _Turns(self)
+        self.memories = _DecisionMemories(self)
 
     def migrate(self) -> None:
         files = sorted(f for f in resources.files("glazed_backend.migrations").iterdir() if f.name.endswith(".sql"))
@@ -217,3 +218,23 @@ class _Turns(_Repo):
 
     def list(self, case_id: str) -> list[TurnRecord]:
         return [self._row(r) for r in self.s.q("SELECT * FROM glazed.turns WHERE case_id=%s ORDER BY ts", (case_id,))]  # type: ignore[misc]
+
+
+class _DecisionMemories(_Repo):
+    _COLS = ("memory_id", "store_id", "case_id", "decision_id", "category", "text", "reason_category", "action_type", "sku",
+             "created_at", "reason")
+
+    def add(self, m: DecisionMemory) -> None:
+        sets = ", ".join(f"{k}=EXCLUDED.{k}" for k in self._COLS[1:])
+        self.s.q(f"INSERT INTO glazed.decision_memories ({', '.join(self._COLS)}) VALUES ({', '.join(['%s'] * len(self._COLS))})"
+                 f" ON CONFLICT (memory_id) DO UPDATE SET {sets}", [getattr(m, k) for k in self._COLS])
+
+    def _row(self, r: dict | None) -> DecisionMemory | None:
+        return DecisionMemory(**{k: r[k] for k in self._COLS}) if r else None
+
+    def get(self, memory_id: str) -> DecisionMemory | None:
+        return self._row(self._one("SELECT * FROM glazed.decision_memories WHERE memory_id=%s", (memory_id,)))
+
+    def list(self, store_id: str) -> list[DecisionMemory]:
+        return [self._row(r) for r in self.s.q(  # type: ignore[misc]
+            "SELECT * FROM glazed.decision_memories WHERE store_id=%s ORDER BY created_at", (store_id,))]

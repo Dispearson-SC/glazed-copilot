@@ -5,7 +5,7 @@ import copy
 import dataclasses
 from datetime import datetime, timezone
 
-from ...domain import Alert, AlertState, BacktestRun, Case, Execution, Proposal, TraceEvent, TurnRecord
+from ...domain import Alert, AlertState, BacktestRun, Case, DecisionMemory, Execution, Proposal, TraceEvent, TurnRecord
 
 
 class InMemoryCases:
@@ -124,6 +124,20 @@ class InMemoryTurns:
 
     def list(self, case_id: str) -> list[TurnRecord]:
         return copy.deepcopy(sorted((t for t in self._d.values() if t.case_id == case_id), key=lambda t: t.ts))
+
+
+class InMemoryDecisionMemories:
+    def __init__(self) -> None:
+        self._d: dict[str, DecisionMemory] = {}
+
+    def add(self, memory: DecisionMemory) -> None:
+        self._d[memory.memory_id] = copy.deepcopy(memory)
+
+    def get(self, memory_id: str) -> DecisionMemory | None:
+        return copy.deepcopy(self._d.get(memory_id))
+
+    def list(self, store_id: str) -> list[DecisionMemory]:
+        return copy.deepcopy(sorted((m for m in self._d.values() if m.store_id == store_id), key=lambda m: m.created_at))
 
 
 class SystemClock:

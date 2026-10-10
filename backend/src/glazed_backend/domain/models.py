@@ -16,6 +16,7 @@ CASE_MODES = ("live", "sandbox", "backtest")
 EXECUTION_SOURCES = ("simulated", "demo_injected", "operational")
 EXECUTION_STATUSES = ("executed", "not_executed", "partial")
 TRACE_KINDS = ("message", "tool_call", "tool_result", "escalation")
+MEMORY_CATEGORIES = ("proveedores", "demanda", "eventos", "preferencias")
 AGENT_IDS = ("orchestrator", "present", "past", "supply", "strategist", "sentinel", "auditor", "liaison")
 
 
@@ -283,3 +284,20 @@ class Experience:
     created_at: datetime = field(default_factory=utcnow)
     score: float | None = None
     ref: str | None = None  # id to re-verify the memory with (a promo id such as PR002)
+
+
+@dataclass
+class DecisionMemory:
+    """What the manager told us when rejecting a proposal (a stated preference): kept per store, written by code from
+    the decision, never by an agent's free text. `category` is one of MEMORY_CATEGORIES."""
+    memory_id: str
+    store_id: str
+    case_id: str
+    decision_id: str
+    category: str
+    text: str
+    reason_category: str | None
+    action_type: str | None
+    sku: str | None
+    created_at: datetime
+    reason: str = ""

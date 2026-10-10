@@ -245,8 +245,8 @@ def build_public_router(c: Any) -> APIRouter:
 
     @r.post("/proposals/{proposal_id}/decision")
     def decide(proposal_id: str, b: DecisionBody):
-        return jsonable_encoder(uc.DecideProposal(c.cases, c.proposals, c.executions, c.alerts, c.memory, c.classifier)
-                                .execute(proposal_id, b.approved, b.reason))
+        return jsonable_encoder(uc.DecideProposal(c.cases, c.proposals, c.executions, c.alerts, c.memory, c.classifier,
+                                                  c.decision_memories, c.clock).execute(proposal_id, b.approved, b.reason))
 
     @r.post("/proposals/{proposal_id}/outcome", status_code=201)
     def outcome(proposal_id: str, b: OutcomeBody):
@@ -265,7 +265,7 @@ def build_public_router(c: Any) -> APIRouter:
     def post_decision(case_id: str, b: CaseDecisionBody, response: Response,
                       idempotency_key: Annotated[str | None, Header()] = None):
         out, created = uc_copilot.RecordDecision(c.cases, c.proposals, c.executions, c.alerts, c.metrics, c.served,
-                                                 c.memory, c.classifier, getattr(c, "rejections", None), c.clock).execute(
+                                                 c.memory, c.classifier, c.decision_memories, c.clock).execute(
             case_id, b.issue_id, b.option_id, b.approved, b.reason, idempotency_key)
         if not created:
             response.status_code = 200
@@ -325,6 +325,11 @@ def build_public_router(c: Any) -> APIRouter:
     @r.get("/cases/{case_id}/staffing")
     def staffing(case_id: str, days: int | None = None):
         return uc_manager.StaffingView(c.metrics, names, c.flow_forecaster).execute(case_of(case_id), days)
+
+    @r.get("/cases/{case_id}/memories")
+    def memories(case_id: str, category: str | None = None, q: str | None = None):
+        return uc_copilot.ListMemories(c.cases, c.proposals, c.metrics, c.memory, c.decision_memories, c.clock).execute(
+            case_of(case_id), category, q)
 
     @r.get("/cases/{case_id}/outlook")
     def outlook(case_id: str, days: int | None = None):
