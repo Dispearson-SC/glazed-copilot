@@ -56,10 +56,14 @@ class KeywordClassifier:
 
 class BackboardSystemOne:
     """Jev (TypeSafe System One) through Backboard: llm_provider "typesafe", a Choice question over the label set.
-    The classifier assistant is created lazily and kept in memory."""
+    The classifier assistant is created lazily; its id is persisted in an assistants repository (when given) so a
+    process restart reuses it instead of creating a new one."""
 
-    def __init__(self, api_key: str, client_factory: Callable[[], Any] | None = None, model: str = JEV_MODEL) -> None:
-        self.api_key, self.model = api_key, model
+    ASSISTANT_KEY = "__jev_classifier__"
+
+    def __init__(self, api_key: str, client_factory: Callable[[], Any] | None = None, model: str = JEV_MODEL,
+                 assistants: Any = None) -> None:
+        self.api_key, self.model, self.assistants = api_key, model, assistants
         self._factory = client_factory or self._default_client
         self._assistant_id: str | None = None
 
@@ -69,11 +73,15 @@ class BackboardSystemOne:
 
     async def _ask(self, kind: str, text: str) -> Any:
         client = self._factory()
+        if self._assistant_id is None and self.assistants is not None:
+            self._assistant_id = self.assistants.get(self.ASSISTANT_KEY)
         if self._assistant_id is None:
             a = await client.create_assistant(name="Glazed · Jev classifier",
                                               description="Closed-label text classification (System One)",
                                               system_prompt="Classify the text into one label. Not a source of numbers.")
             self._assistant_id = str(a.assistant_id)
+            if self.assistants is not None:
+                self.assistants.set(self.ASSISTANT_KEY, self._assistant_id)
         thread = await client.create_thread(self._assistant_id)
         question = {"type": "choice", "instructions": f"Classify this {kind.replace('_', ' ')}.",
                     "criteria": {label: DESCRIPTIONS[label] for label in labels_for(kind)}}

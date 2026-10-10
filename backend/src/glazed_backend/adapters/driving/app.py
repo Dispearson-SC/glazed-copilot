@@ -90,18 +90,19 @@ def build_container(env: dict[str, str] | None = None) -> Container:
         core = _NoCore()
     cors = cors_origins_from_env(env)
     key = env.get("BACKBOARD_API_KEY", "")
-    classifier = build_classifier(env)
     from ..driven.backboard_memory import BackboardMemory
     from .store_names import StoreNames
     if env.get("GLAZED_STORAGE", "memory") == "postgres":
         from ..driven.postgres import PostgresStore
         store = PostgresStore(env["GLAZED_DATABASE_URL"])
         store.migrate()
+        classifier = build_classifier(env, store.assistants)
         return Container(metrics, core, store.cases, store.alerts, store.proposals, store.executions,
                          store.backtests, store.trace, SystemClock(),
                          BackboardMemory(key, store.assistants, display_name=StoreNames(metrics).of), "postgres",
                          "configured" if core_url else "missing", cors,
                          float(env.get("GLAZED_TURN_TIMEOUT_S", "120")), classifier=classifier)
+    classifier = build_classifier(env, None)
     return Container(metrics, core, InMemoryCases(), InMemoryAlerts(), InMemoryProposals(), InMemoryExecutions(),
                      InMemoryBacktests(), InMemoryTrace(), SystemClock(),
                      BackboardMemory(key, InMemoryAssistants(), display_name=StoreNames(metrics).of), "memory",
@@ -109,13 +110,13 @@ def build_container(env: dict[str, str] | None = None) -> Container:
                          float(env.get("GLAZED_TURN_TIMEOUT_S", "120")), classifier=classifier)
 
 
-def build_classifier(env: dict[str, str]) -> Any:
+def build_classifier(env: dict[str, str], assistants: Any = None) -> Any:
     """Jev through Backboard first (account access is unverified), then the MiniMax fallback. A missing key only
     removes its adapter; with none configured every answer is the escape label."""
     from ..driven.classifiers import BackboardSystemOne, ChainClassifier, LLMFallback
     adapters: list[Any] = []
     if env.get("BACKBOARD_API_KEY"):
-        adapters.append(BackboardSystemOne(env["BACKBOARD_API_KEY"]))
+        adapters.append(BackboardSystemOne(env["BACKBOARD_API_KEY"], assistants=assistants))
     if env.get("MINIMAX_API_KEY"):
         adapters.append(LLMFallback(env["MINIMAX_API_KEY"], env.get("MINIMAX_API_BASE", "https://api.minimax.io/v1"),
                                     env.get("MINIMAX_CLASSIFIER_MODEL", "MiniMax-M3.1-flash-preview")))

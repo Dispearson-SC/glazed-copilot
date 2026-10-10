@@ -212,3 +212,21 @@ def test_approval_is_not_classified_and_classifier_failures_never_block_a_decisi
     decide(w2, False, "no", Spy())
     p = w2.props.get(w2.prop.proposal_id)
     assert Spy.calls == 1 and p.status == "rejected" and p.reason_category is None
+
+
+# --- persisted classifier assistant -----------------------------------------------------------------------------------
+def test_classifier_assistant_id_is_persisted_and_reused_across_instances():
+    from glazed_backend.adapters.driven.memory import InMemoryAssistants
+    repo = InMemoryAssistants()
+    created = []
+
+    class CountingBB(FakeBB):
+        async def create_assistant(self, **kw):
+            created.append(kw["name"])
+            return SimpleNamespace(assistant_id="a-jev")
+
+    c = CountingBB({"choice": "precio", "probabilities": {"precio": 0.9}})
+    BackboardSystemOne("key", client_factory=lambda: c, assistants=repo).classify("rejection_reason", "caro")
+    restarted = BackboardSystemOne("key", client_factory=lambda: c, assistants=repo)  # a process restart
+    restarted.classify("rejection_reason", "caro")
+    assert created == ["Glazed · Jev classifier"] and repo.get("__jev_classifier__") == "a-jev"
