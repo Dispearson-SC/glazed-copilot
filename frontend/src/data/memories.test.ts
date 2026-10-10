@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { alertsA, integrityA, memoriesA } from "../test/copilotFixtures";
+import { clockTime } from "../format";
+import { agentsA, alertsA, integrityA, memoriesA } from "../test/copilotFixtures";
 import { buildMemories, buildWarnings, filterMemories, filterWarnings } from "./copilot";
 
 describe("buildMemories", () => {
@@ -30,26 +31,42 @@ describe("buildMemories", () => {
 });
 
 describe("buildWarnings", () => {
-  const w = buildWarnings({ alerts: alertsA, integrity: integrityA });
+  const w = buildWarnings({ alerts: alertsA, integrity: integrityA, agents: agentsA });
 
-  it("maps open alerts to operation warnings and integrity issues to data warnings", () => {
+  it("maps alerts by the category the backend serves and integrity issues to data warnings", () => {
     expect(w.map((x) => [x.id, x.cat, x.toneLabel])).toEqual([
-      ["al1", "operacion", "Seguimiento"], ["al2", "operacion", "Seguimiento"], ["al3", "operacion", "Seguimiento"],
+      ["al1", "operacion", "Seguimiento"], ["al2", "operacion", "Seguimiento"], ["al3", "auto", "Automática"],
       ["S030|orphan_sku|SKU-7xxxxx", "datos", "Datos"],
     ]);
   });
 
   it("writes Spanish titles and bodies from the structured fields", () => {
-    expect(w[0]).toMatchObject({ title: "Exceso de inventario: 12 Croiss-Ant Donuts", body: "Merma estimada de $687.40.", time: "11/03" });
+    expect(w[0]).toMatchObject({ title: "Exceso de inventario: 12 Croiss-Ant Donuts", body: "Merma estimada de $687.40." });
     expect(w[1].title).toBe("Efecto de calendario: School break");
     expect(w[2].title).toBe("Acción aprobada sin ejecutar");
     expect(w[3]).toMatchObject({ title: "Ventas sin producto en el catálogo", body: "Exposición de $14,537.12.", time: "19/07" });
   });
 
-  it("never claims an agent or an automatic action", () => {
-    expect(w.every((x) => x.agent === null && !x.revertible)).toBe(true);
-    expect(filterWarnings(w, "auto")).toEqual([]);
+  it("shows the owning agent by its Spanish name and the time from the alert ts", () => {
+    expect(w[0].agent).toBe("Analista del presente");
+    expect(w[2].agent).toBe("Centinela");
+    expect(w[0].time).toBe(clockTime("2026-10-10T07:10:00Z"));
+    expect(w[3].agent).toBeNull();
+  });
+
+  it("leaves the agent empty when its name is not known, and never offers Revertir", () => {
+    expect(buildWarnings({ alerts: alertsA, integrity: [] }).map((x) => x.agent)).toEqual([null, null, null]);
+    expect(w.every((x) => !x.revertible)).toBe(true);
+  });
+
+  it("filters by category", () => {
+    expect(filterWarnings(w, "auto").map((x) => x.id)).toEqual(["al3"]);
     expect(filterWarnings(w, "datos")).toHaveLength(1);
     expect(filterWarnings(w, "todas")).toHaveLength(4);
+  });
+
+  it("accepts integridad alerts as data warnings", () => {
+    const a = [{ ...alertsA[0], alert_id: "i1", category: "integridad" }];
+    expect(buildWarnings({ alerts: a, integrity: [] })[0]).toMatchObject({ cat: "datos", toneLabel: "Datos" });
   });
 });

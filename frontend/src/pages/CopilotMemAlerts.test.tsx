@@ -1,7 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { alertsA, integrityA, memoriesA, pendingA } from "../test/copilotFixtures";
+import { agentsA, alertsA, integrityA, memoriesA, pendingA } from "../test/copilotFixtures";
 import { caseA, fakeApi, renderPage } from "../test/helpers";
 import CopilotPage from "./CopilotPage";
 
@@ -12,6 +12,7 @@ const api = (over = {}) =>
     getPending: async () => pendingA,
     listIssues: vi.fn(async (_c: string, q: { category?: string } = {}) => (q.category === "integrity" ? integrityA : [])),
     getMemories: vi.fn(async () => memoriesA),
+    getAgentsStatus: async () => ({ connected: true, agents: agentsA }),
     listAlerts: vi.fn(async () => alertsA),
     ...over,
   });
@@ -103,10 +104,20 @@ describe("Advertencias window", () => {
     expect(screen.getByText("Ventas sin producto en el catálogo")).toBeInTheDocument();
   });
 
-  it("has no Revertir button and shows an empty state for Automáticas", async () => {
+  it("has no Revertir button; Automáticas lists the alerts of the 'automatica' category with their agent", async () => {
     await open(/^Alertas/);
     await screen.findByText("Exceso de inventario: 12 Croiss-Ant Donuts");
     expect(screen.queryByRole("button", { name: "Revertir" })).toBeNull();
+    expect(screen.getAllByText("Analista del presente").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("button", { name: "Automáticas" }));
+    expect(screen.getByText("Acción aprobada sin ejecutar")).toBeInTheDocument();
+    expect(screen.getByText("Centinela")).toBeInTheDocument();
+    expect(screen.queryByText("Exceso de inventario: 12 Croiss-Ant Donuts")).toBeNull();
+  });
+
+  it("shows the empty state of Automáticas when no alert is automatic", async () => {
+    await open(/^Alertas/, api({ listAlerts: async () => [alertsA[0]] }));
+    await screen.findByText("Exceso de inventario: 12 Croiss-Ant Donuts");
     await userEvent.click(screen.getByRole("button", { name: "Automáticas" }));
     expect(screen.getByText(/Sin acciones automáticas todavía/)).toBeInTheDocument();
   });

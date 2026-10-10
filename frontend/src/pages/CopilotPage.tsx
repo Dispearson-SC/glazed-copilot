@@ -53,7 +53,7 @@ function CopilotShell() {
   const techs = visible.length - approvals;
   const pendingLine = `${approvals} esperan tu opinión · ${techs} listas para aceptar`;
   const memories = buildMemories(memoryData.records);
-  const warnings = warningsData ? buildWarnings(warningsData) : [];
+  const warnings = warningsData ? buildWarnings({ ...warningsData, agents: inbox.agents?.agents }) : [];
   const badges: CapsuleBadges = { decisiones: inbox.counts ? inbox.counts.approvals + inbox.counts.technical : visible.length, memorias: memories.filter((m) => m.isNew).length, alertas: inbox.counts ? inbox.counts.alerts : warnings.length };
 
   const openCard = useCallback(

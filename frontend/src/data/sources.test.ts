@@ -13,9 +13,6 @@ describe("data sources the backend does not serve yet", () => {
       src.fetchInventoryStatus(probe, "c1"),
       src.fetchAutonomyLog(probe, "c1"),
       src.revertAutonomy(probe, "c1", "x"),
-      src.fetchAgentsStatus(probe),
-      src.fetchTurnProgress(probe, "c1", "t1"),
-      src.fetchInboxCounts(probe, "c1"),
     ]);
     for (const c of calls) expect(c).toEqual({ status: "soon" });
     expect(spy).not.toHaveBeenCalled();
@@ -31,8 +28,4 @@ describe("data sources the backend does not serve yet", () => {
     await expect(src.fetchOutlook(boom, "c1")).rejects.toThrow("x");
   });
 
-  it("exposes an alert's agent as unknown until the API carries agent_id", () => {
-    expect(src.alertAgent({ alert_id: "a" } as never)).toBeNull();
-    expect(api).toBeDefined();
-  });
 });

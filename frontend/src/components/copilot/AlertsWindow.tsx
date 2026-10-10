@@ -11,6 +11,7 @@ export const ALERT_FILTERS = [
 const TONES = {
   warn: "bg-[rgba(185,133,86,.18)] text-on-tertiary-fixed-variant",
   info: "bg-surface-container-high text-on-surface-variant",
+  auto: "bg-primary-container text-tertiary-fixed-dim",
 } as const;
 
 /** Advertencias window: what the system detected, with a question shortcut to the chat. */

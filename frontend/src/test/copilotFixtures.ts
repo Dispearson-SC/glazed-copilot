@@ -124,9 +124,9 @@ export const suppliersA: SupplierPerformance[] = [
   { supplier_id: "SUP03", supplier_name: "Summit Frozen Foods", received_pos: 667, lead_time_mean_days: 2.17, on_time_pct: 90.1, fill_pct: 99.9, window_days: 180 },
 ];
 export const alertsA: AlertRecord[] = [
-  { alert_id: "al1", alert_type: 1, store_id: "S030", case_id: "x", severity_usd: 687.4, state: "nueva", as_of: "2026-03-11", issue: { kind: "overstock_waste", sku: "SKU-100502", product_name: "12 Croiss-Ant Donuts" } },
-  { alert_id: "al2", alert_type: 19, store_id: "S030", case_id: "x", severity_usd: 202.9, state: "nueva", as_of: "2026-03-14", issue: { kind: "calendar_uplift", event: { name: "School break" } } as never },
-  { alert_id: "al3", alert_type: 21, store_id: "S030", case_id: "x", severity_usd: 58.92, state: "nueva", as_of: "2026-05-30", issue: { kind: "compliance_deviation" } },
+  { alert_id: "al1", alert_type: 1, store_id: "S030", case_id: "x", severity_usd: 687.4, state: "nueva", as_of: "2026-03-11", category: "operacion", agent_id: "present", ts: "2026-10-10T07:10:00Z", issue: { kind: "overstock_waste", sku: "SKU-100502", product_name: "12 Croiss-Ant Donuts" } },
+  { alert_id: "al2", alert_type: 19, store_id: "S030", case_id: "x", severity_usd: 202.9, state: "nueva", as_of: "2026-03-14", category: "operacion", agent_id: "present", ts: "2026-10-10T06:00:00Z", issue: { kind: "calendar_uplift", event: { name: "School break" } } as never },
+  { alert_id: "al3", alert_type: 21, store_id: "S030", case_id: "x", severity_usd: 58.92, state: "nueva", as_of: "2026-05-30", category: "automatica", agent_id: "sentinel", ts: "2026-10-10T05:30:00Z", issue: { kind: "compliance_deviation" } },
 ];
 export const integrityA: IssueT[] = [
   { issue_id: "S030|orphan_sku|SKU-7xxxxx", kind: "orphan_sku", integrity: true, category: "integrity", exposure_usd: 14537.12, as_of: "2026-07-19" } as IssueT,
@@ -182,4 +182,9 @@ export const memoriesA: MemoryRecord[] = [
   { memory_id: "dec-3c379580f251", category: "proveedores", text: "Aprobaste omitir el pedido de 12 Croiss-Ant Donuts el 2026-07-19.", source: "decision_log", cases_count: 3, verified: true, created_at: "2026-10-09T09:00:00+00:00", new: false },
   { memory_id: "bb-1", category: "demanda", text: "La dona glaseada recibe 1.9 veces lo que vende.", source: "backboard", cases_count: 1, verified: false, created_at: "2026-10-01T09:00:00+00:00", new: false },
   { memory_id: "bb-2", category: "eventos", text: "Bloqueo del 14 de marzo: -38% de afluencia.", source: "backboard", cases_count: 1, verified: true, created_at: "2026-09-01T09:00:00+00:00", new: false },
+];
+
+export const agentsA = [
+  { agent_id: "present", display_name_es: "Analista del presente", status: "up" as const },
+  { agent_id: "sentinel", display_name_es: "Centinela", status: "up" as const },
 ];

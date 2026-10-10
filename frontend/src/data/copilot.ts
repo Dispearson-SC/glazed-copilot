@@ -1,7 +1,7 @@
 import { isUnavailable, type Api } from "../api";
-import { avgTicket, dayMonth, longDate, shiftDate, signedPct, usd, usdWhole, weekdayDay } from "../format";
+import { avgTicket, clockTime, dayMonth, longDate, shiftDate, signedPct, usd, usdWhole, weekdayDay } from "../format";
 import type {
-  AlertRecord, DaySummary, DeliveriesResponse, ExpiringResponse, ForecastResponse, InventoryResponse, Issue, IssueAnalysis, Kpis, OrderPlan,
+  AgentStatus, AlertRecord, DaySummary, DeliveriesResponse, ExpiringResponse, ForecastResponse, InventoryResponse, Issue, IssueAnalysis, Kpis, OrderPlan,
   Outlook, OutlookDay, MemoryRecord, PendingResponse, Range3, TurnProgress,
 } from "../types";
 
@@ -61,14 +61,6 @@ export const fetchInventoryStatus = async (_api: Api, _caseId: string): Promise<
 export const fetchAutonomyLog = async (_api: Api, _caseId: string): Promise<Source<never>> => SOON;
 /** POST /cases/{id}/autonomy/{action_id}/revert (pending). */
 export const revertAutonomy = async (_api: Api, _caseId: string, _actionId: string): Promise<Source<never>> => SOON;
-/** GET /agents/status (pending). */
-export const fetchAgentsStatus = async (_api: Api): Promise<Source<never>> => SOON;
-/** Turn `progress[]` (pending). */
-export const fetchTurnProgress = async (_api: Api, _caseId: string, _turnId: string): Promise<Source<never>> => SOON;
-/** GET /cases/{id}/inbox-counts (pending): badges are counted from the loaded lists meanwhile. */
-export const fetchInboxCounts = async (_api: Api, _caseId: string): Promise<Source<never>> => SOON;
-/** Alert `agent_id` / `category` (pending on /alerts). */
-export const alertAgent = (a: AlertRecord): string | null => (a as { agent_id?: string }).agent_id ?? null;
 
 // ---------------------------------------------------------------------------------------------
 // Decisions: GET /cases/{id}/decisions/pending -> cards. The UI never computes: it formats backend values.
@@ -458,12 +450,12 @@ export type WarningCategory = "operacion" | "datos" | "auto";
 export interface WarningItem {
   id: string;
   cat: WarningCategory;
-  tone: "warn" | "info";
+  tone: "warn" | "info" | "auto";
   toneLabel: string;
   icon: string;
   title: string;
   body: string;
-  /** Agent that raised it; null until `agent_id` is served. */
+  /** Spanish name of the agent that raised it; null when unknown. */
   agent: string | null;
   time: string;
   /** Only N1 automatic actions can be reverted, and N1 auto-execution does not exist. */
@@ -490,12 +482,19 @@ const INTEGRITY_TITLES: Record<string, string> = {
   sku_key_mismatch: "Claves de producto que no coinciden",
 };
 
-export function buildWarnings(input: { alerts: AlertRecord[]; integrity: Issue[] }): WarningItem[] {
+const ALERT_CATEGORIES: Record<string, { cat: WarningCategory; tone: WarningItem["tone"]; toneLabel: string }> = {
+  operacion: { cat: "operacion", tone: "warn", toneLabel: "Seguimiento" },
+  integridad: { cat: "datos", tone: "info", toneLabel: "Datos" },
+  automatica: { cat: "auto", tone: "auto", toneLabel: "Automática" },
+};
+
+export function buildWarnings(input: { alerts: AlertRecord[]; integrity: Issue[]; agents?: readonly AgentStatus[] | null }): WarningItem[] {
+  const names = new Map((input.agents ?? []).map((a) => [a.agent_id, a.display_name_es]));
   const ops = input.alerts
     .filter((a) => a.state === "nueva")
     .map((a): WarningItem => ({
-      id: a.alert_id, cat: "operacion", tone: "warn", toneLabel: "Seguimiento", ...alertCopy(a),
-      agent: alertAgent(a), time: a.as_of ? dayMonth(a.as_of) : "", revertible: false,
+      id: a.alert_id, ...(ALERT_CATEGORIES[a.category ?? "operacion"] ?? ALERT_CATEGORIES.operacion), ...alertCopy(a),
+      agent: (a.agent_id && names.get(a.agent_id)) || null, time: clockTime(a.ts ?? a.created_at) || (a.as_of ? dayMonth(a.as_of) : ""), revertible: false,
     }));
   const data = input.integrity.map((i): WarningItem => ({
     id: i.issue_id, cat: "datos", tone: "info", toneLabel: "Datos", icon: "sensors",
