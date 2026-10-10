@@ -31,6 +31,47 @@ _GREETING = re.compile(r"^\s*(?:¡\s*)?(?:hola|buen(?:os|as)? (?:d[ií]as?|tarde
 _HEADING = re.compile(r"^\s{0,3}#{1,3}\s+(.+?)\s*$", re.M)
 
 
+_ROLES = {"present": "el analista del presente", "past": "el analista histórico", "supply": "el analista de abastecimiento",
+          "strategist": "el estratega", "sentinel": "Centinela", "auditor": "el auditor de datos",
+          "liaison": "el enlace entre sucursales", "orchestrator": "el copiloto"}
+_AGENT = re.compile(r"`?\bglazed_([a-z]+)\b`?")
+_TOOL = re.compile(r"(?:\b(?:la|el|mi|su) (?:herramienta|tool|función) )?`?\b(?:(?:get|forecast|project|propose)_[a-z0-9_]+|ask_peer)\b(?:\(\))?`?",
+                   re.I)
+_FIELDS = {"deadline_passed": "pedidos con fecha límite vencida", "below_min_order": "por debajo del pedido mínimo",
+           "sanitized": "respuesta depurada", "net_usd_mid": "efecto neto estimado (USD)",
+           "lost_sales_usd": "venta perdida (USD)", "expected_waste_usd": "merma esperada (USD)",
+           "days_of_cover": "días de cobertura", "do_nothing": "no hacer nada", "skip_order": "omitir el pedido",
+           "order_up_to": "nivel objetivo de pedido"}
+_KEY = r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*"
+_TICKED = re.compile(rf"`({_KEY})(?:\s*[:=]\s*([^`]*?))?\s*`")
+_BARE = re.compile(rf"\b({'|'.join(k for k in _FIELDS if '_' in k)})\b")
+_NUMERIC = re.compile(r"-?\$?\d[\d,]*(?:\.\d+)?%?")
+_SENTENCE_START = re.compile(r"(?:^|[.!?:]\s+|\n\s*(?:[-*#>]+\s*)?|^\s*#+\s*)$")
+
+
+def _role(text: str, m: re.Match[str]) -> str:
+    role = _ROLES.get(m.group(1), "un agente especialista")
+    return role[0].upper() + role[1:] if _SENTENCE_START.search(text[:m.start()]) else role
+
+
+def humanize_internal_names(text: str) -> str:
+    """Agent ids, tool names and raw field keys are internal: the manager reads Spanish roles and plain labels."""
+    text = _AGENT.sub(lambda m: _role(text, m), text)
+    text = re.sub(r"\b(de|a) el\b", lambda m: "del" if m.group(1) == "de" else "al", text)
+
+    def ticked(m: re.Match[str]) -> str:
+        key, value = m.group(1), (m.group(2) or "").strip()
+        if key in _FIELDS:
+            value = {"true": "sí", "false": "no"}.get(value.lower(), value)
+            return f"{_FIELDS[key]}: {value}" if value else _FIELDS[key]
+        if "_" not in key:
+            return m.group(0)
+        return value if _NUMERIC.fullmatch(value) else ""
+    text = _TICKED.sub(ticked, text)
+    text = _TOOL.sub("", text)
+    return _BARE.sub(lambda m: _FIELDS[m.group(1)], text)
+
+
 @dataclass
 class ReplyCleaning:
     text: str
@@ -91,7 +132,7 @@ def _tidy(text: str) -> str:
 
 def clean_reply(text: str) -> ReplyCleaning:
     original, removed = text, []
-    text = _strip_think(text, removed)
+    text = humanize_internal_names(_strip_think(text, removed))
     think_removed = bool(removed)
     foreign = _FOREIGN_RUN.findall(text)
     text = _FOREIGN_RUN.sub("", text)

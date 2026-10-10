@@ -66,3 +66,35 @@ def test_concatenated_drafts_are_flagged():
 def test_a_normal_answer_is_not_contaminated():
     out = clean_reply("Hola. Hoy vendimos $1,392.15 en 12 cajas.\n\n## Resumen\nTodo bien.")
     assert not out.contaminated and out.score == 0
+
+
+# ---- Q2: internal names never reach the manager ----
+def test_agent_ids_become_spanish_roles():
+    out = sanitize_reply("Según glazed_past y `glazed_supply`, consulté a glazed_sentinel. Pregunté al de glazed_strategist.")[0]
+    assert out == ("Según el analista histórico y el analista de abastecimiento, consulté a Centinela. "
+                   "Pregunté al de el estratega.".replace("de el estratega", "del estratega"))
+    assert sanitize_reply("glazed_present dice que sí; glazed_auditor, glazed_liaison y glazed_orchestrator.")[0] == (
+        "El analista del presente dice que sí; el auditor de datos, el enlace entre sucursales y el copiloto.")
+    assert "glazed_" not in sanitize_reply("glazed_nuevo opina")[0]
+
+
+def test_tool_names_are_removed():
+    out = sanitize_reply("Usé la herramienta get_briefing y `forecast_demand()` luego propose_action y ask_peer para verlo.")[0]
+    assert out == "Usé y luego y para verlo."
+    for name in ("get_snapshot", "project_inventory", "propose_action", "ask_peer"):
+        assert name not in sanitize_reply(f"x {name} y")[0]
+
+
+def test_known_field_keys_in_backticks_become_plain_spanish():
+    out = sanitize_reply("`deadline_passed: 0`, `below_min_order: true`, `sanitized: false` y `days_of_cover: 3.5`")[0]
+    assert out == ("pedidos con fecha límite vencida: 0, por debajo del pedido mínimo: sí, "
+                   "respuesta depurada: no y días de cobertura: 3.5")
+    assert sanitize_reply("Opciones `do_nothing` o `skip_order`; `order_up_to` 12")[0] == (
+        "Opciones no hacer nada o omitir el pedido; nivel objetivo de pedido 12")
+    assert sanitize_reply("`net_usd_mid`, `lost_sales_usd`, `expected_waste_usd`")[0] == (
+        "efecto neto estimado (USD), venta perdida (USD), merma esperada (USD)")
+
+
+def test_leftover_backticked_snake_case_keys_are_dropped_keeping_numeric_values():
+    assert sanitize_reply("Vale `foo_bar: 12.5` y `baz_qux: hola` ok `x` y `S030`")[0] == "Vale 12.5 y ok `x` y `S030`"
+    assert sanitize_reply("el `weird_key` aparece")[0] == "el aparece"
