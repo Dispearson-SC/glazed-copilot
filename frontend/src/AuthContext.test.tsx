@@ -218,6 +218,11 @@ describe("demo picker", () => {
     expect(screen.getByLabelText("Correo del turno")).toBeInTheDocument();
   });
 
+  it("the hero subtitle points to today's decisions", async () => {
+    open(gated());
+    expect(await screen.findByText("Ingresa para ver las decisiones de hoy.")).toBeInTheDocument();
+  });
+
   it("is hidden and the form expanded when demo_login is false or users 404", async () => {
     open(gated({}, false));
     expect(await screen.findByLabelText("Correo del turno")).toBeInTheDocument();
@@ -249,6 +254,35 @@ describe("demo picker", () => {
     open(gated({ demoLogin: vi.fn(async () => { throw new ApiError(0, "x"); }) }));
     await userEvent.click(await screen.findByRole("button", { name: /Entrar como Admin Demo/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo conectar");
+  });
+
+  it.each([
+    [404, "El modo demo está desactivado"],
+    [429, "Demasiados intentos. Espera unos minutos."],
+    [500, "No se pudo iniciar sesión"],
+  ])("demo login %i shows its own message", async (status, text) => {
+    open(gated({ demoLogin: vi.fn(async () => { throw new ApiError(status, "x"); }) }));
+    await userEvent.click(await screen.findByRole("button", { name: /Entrar como Admin Demo/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(text);
+  });
+
+  it("a non-API error in demo login falls back to the generic message", async () => {
+    open(gated({ demoLogin: vi.fn(async () => { throw new Error("boom"); }) }));
+    await userEvent.click(await screen.findByRole("button", { name: /Entrar como Admin Demo/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo iniciar sesión");
+  });
+
+  it("a gate error with the picker shown keeps the alert and Reintentar visible, outside the collapsed form", async () => {
+    let fail = true;
+    const me = vi.fn(async () => { if (fail) throw new ApiError(500, "down"); throw unauth(); });
+    open(gated({ me }));
+    expect(await screen.findByText("Elige un usuario para entrar")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Correo del turno")).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent("No se pudo conectar");
+    fail = false;
+    await userEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+    await waitFor(() => expect(me).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Reintentar" })).toBeNull());
   });
 
   it("disables the other cards while pending", async () => {

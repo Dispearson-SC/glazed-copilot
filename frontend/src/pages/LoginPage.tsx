@@ -15,6 +15,16 @@ function messageFor(e: unknown): string {
   return "No se pudo conectar";
 }
 
+function demoMessageFor(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 401) return "Ese usuario ya no está disponible";
+    if (e.status === 404) return "El modo demo está desactivado";
+    if (e.status === 429) return "Demasiados intentos. Espera unos minutos.";
+    if (e.status === 0) return "No se pudo conectar";
+  }
+  return "No se pudo iniciar sesión";
+}
+
 /** Login.dc.html. The page keeps the URL it was opened at; the gate returns to the app there once the session exists. */
 export default function LoginPage({ onLogin, demo = false, loadFailed = false, onRetry }: { onLogin: (u: AuthUser) => void; demo?: boolean; loadFailed?: boolean; onRetry?: () => void }) {
   const api = useApi();
@@ -49,7 +59,7 @@ export default function LoginPage({ onLogin, demo = false, loadFailed = false, o
       const { user } = await api.demoLogin(u.email);
       onLogin(user);
     } catch (err) {
-      setDemoError(err instanceof ApiError && err.status === 401 ? "Ese usuario ya no está disponible" : "No se pudo conectar");
+      setDemoError(demoMessageFor(err));
       setPending(null);
     }
   }
@@ -101,9 +111,17 @@ export default function LoginPage({ onLogin, demo = false, loadFailed = false, o
                 <span aria-hidden="true" className="material-symbols-outlined text-[20px]">coffee_maker</span>
               </div>
               <h1 className="m-0 font-headline-lg text-headline-lg tracking-tight">Pasa detrás de la barra</h1>
-              <p className="m-0 font-body-md text-body-md text-surface-variant">Ingresa con tu cuenta de turno para ver el resumen de hoy.</p>
+              <p className="m-0 font-body-md text-body-md text-surface-variant">Ingresa para ver las decisiones de hoy.</p>
             </div>
           </section>
+          {loadFailed && (
+            <div role="alert" className="flex items-center justify-between gap-2 rounded-[14px] border border-error/20 bg-error-container/40 px-4 py-2.5 text-on-error-container">
+              <span>No se pudo conectar</span>
+              <button type="button" onClick={onRetry} className="min-h-[44px] rounded-full bg-transparent px-3 font-semibold text-secondary underline underline-offset-2">
+                Reintentar
+              </button>
+            </div>
+          )}
           {picker && (
             <section aria-label="Modo demo" className="rounded-[18px] border border-surface-container bg-white p-6 shadow-sm shadow-primary/5">
               <h2 className="m-0 font-headline-md text-headline-md tracking-tight text-primary" style={{ fontFamily: '"Playfair Display", serif' }}>Modo demo</h2>
@@ -152,14 +170,6 @@ export default function LoginPage({ onLogin, demo = false, loadFailed = false, o
           )}
           {formVisible && (
           <section id="login-form" className="rounded-[18px] border border-surface-container bg-white p-6 shadow-sm shadow-primary/5">
-            {loadFailed && (
-              <div role="alert" className="mb-4 flex items-center justify-between gap-2 rounded-[14px] border border-error/20 bg-error-container/40 px-4 py-2.5 text-on-error-container">
-                <span>No se pudo conectar</span>
-                <button type="button" onClick={onRetry} className="min-h-[44px] rounded-full bg-transparent px-3 font-semibold text-secondary underline underline-offset-2">
-                  Reintentar
-                </button>
-              </div>
-            )}
             <form className="m-0 flex flex-col gap-4" onSubmit={submit} noValidate>
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="login-email" className="font-label-md text-label-md text-on-surface">Correo del turno</label>
