@@ -28,6 +28,7 @@ from ...metrics.sentinel import HORIZON_DAYS
 from ...metrics.calendar_effect import calendar_issue, event_effect
 from ...metrics.plan import apply_min_order, plan_line
 from ...metrics.promo_audit import BASELINE, PromoRef, audit_promo, promo_issue
+from ...metrics.deliveries import LATE_LOOKBACK_DAYS
 from ...metrics.schedule import next_delivery_after, parse_delivery_days
 from ...metrics.snapshot import StoreSnapshot
 from ...metrics.types import Config, DayRow, Product, PurchaseOrder, SkuSeries, StoreInfo
@@ -544,6 +545,22 @@ class DuckDBMetrics:
     def selling_skus(self, store_id: str, as_of: date, start: date) -> set[str]:
         return {r[0] for r in self._q("SELECT DISTINCT sku FROM sales_daily WHERE store_id=? AND date BETWEEN ? AND ?"
                                       " AND units_sold>0", [store_id, start, as_of])}
+
+    def delivery_inputs(self, store_id: str, as_of: date, until: date) -> dict[str, Any]:
+        """Orders placed by as_of that are open, overdue (within the lookback) or received on as_of, expected by `until`;
+        a receipt after as_of is reported as not received. Plus the delivery weekdays of the store's suppliers."""
+        pos = self._rows(
+            "SELECT po.po_id, po.supplier_id, s.supplier_name, po.sku, p.product_name, po.qty_ordered qty, po.unit_cost,"
+            " po.order_date, po.expected_date, CASE WHEN po.received_date<=? THEN po.received_date END received_date"
+            " FROM purchase_orders po LEFT JOIN suppliers s USING (supplier_id) LEFT JOIN products p USING (sku)"
+            " WHERE po.store_id=? AND po.order_date<=? AND po.expected_date<=? AND po.expected_date>=?"
+            " AND (po.received_date IS NULL OR po.received_date>=?) ORDER BY po.expected_date, po.po_id, po.sku",
+            [as_of, store_id, as_of, until, as_of - timedelta(days=LATE_LOOKBACK_DAYS), as_of])
+        sups = self._rows("SELECT supplier_id, supplier_name, delivery_days FROM suppliers WHERE supplier_id IN"
+                          " (SELECT DISTINCT supplier_id FROM products WHERE sku IN"
+                          " (SELECT DISTINCT sku FROM inventory_daily WHERE store_id=?)) ORDER BY supplier_id", [store_id])
+        return {"pos": pos, "suppliers": [{"supplier_id": r["supplier_id"], "supplier_name": r["supplier_name"],
+                                           "delivery_days": sorted(parse_delivery_days(r["delivery_days"]))} for r in sups]}
 
     # -- Sentinel ----------------------------------------------------------------
     def observed_outcome(self, store_id: str, as_of: date, action_type: str, params: dict[str, Any]) -> dict[str, Any] | None:

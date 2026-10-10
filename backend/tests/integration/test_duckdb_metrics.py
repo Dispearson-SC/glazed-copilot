@@ -308,3 +308,12 @@ def test_selling_skus_counts_sales_in_the_window_only(m):
     sold = m.selling_skus(S, JUL, JUL - timedelta(days=27))
     assert 40 <= len(sold) <= 80
     assert m.selling_skus(S, JUL, JUL + timedelta(days=1)) == set()  # nothing at or before as_of from a later start
+
+
+def test_delivery_inputs_are_known_at_as_of_and_hide_later_receipts(m):
+    got = m.delivery_inputs(S, JUL, JUL + timedelta(days=7))
+    assert got["pos"] and got["suppliers"]
+    assert all(p["order_date"] <= JUL for p in got["pos"])
+    assert all(p["received_date"] is None or p["received_date"] <= JUL for p in got["pos"])
+    assert all(p["expected_date"] <= JUL + timedelta(days=7) for p in got["pos"])
+    assert all(isinstance(s["delivery_days"], list) and s["delivery_days"] for s in got["suppliers"])

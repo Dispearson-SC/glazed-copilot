@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from typing import Any
 
 from ..domain import Case, DomainError
+from ..metrics.deliveries import LATE_LOOKBACK_DAYS, build_delivery_days
 from ..metrics.expiry import MAX_SHELF_LIFE_DAYS, expiring_items, summarize_expiry
 from ..metrics.inventory_view import SORTS, inventory_item, sort_items
 
@@ -113,3 +114,18 @@ def case_history(metrics: Any, checker: Any, case: Case, weeks: int | None = Non
     out = metrics.history(case.store_id, case.sim_today)
     series = [w for w in out.get("weeks", []) if w["week_start"] <= case.sim_today.isoformat()]  # NO LOOK-AHEAD
     return {**out, "weeks": series[-weeks:] if weeks else series, "decision_log": checker.decision_log(case.case_id)}
+
+
+class DeliveriesView(_View):
+    SOURCE = "purchase_orders+suppliers.delivery_days"
+    MAX_DAYS = 14
+
+    def execute(self, case: Case, days: int | None = None) -> dict[str, Any]:
+        days = 7 if days is None else days
+        if not 1 <= days <= self.MAX_DAYS:
+            raise DomainError(f"days must be between 1 and {self.MAX_DAYS}")
+        as_of = case.sim_today
+        got = self.metrics.delivery_inputs(case.store_id, as_of, as_of + timedelta(days=days))
+        pos = [p for p in got["pos"] if p["order_date"] <= as_of]  # a PO placed after the case date is not known yet
+        return self.envelope(case, window_days=days, late_lookback_days=LATE_LOOKBACK_DAYS,
+                             days=build_delivery_days(pos, got["suppliers"], as_of, days))

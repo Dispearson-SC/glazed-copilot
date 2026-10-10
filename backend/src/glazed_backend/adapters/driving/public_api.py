@@ -273,6 +273,10 @@ def build_public_router(c: Any) -> APIRouter:
     def case_history(case_id: str, weeks: int | None = None):
         return uc_manager.case_history(c.metrics, checker(), case_of(case_id), weeks)
 
+    @r.get("/cases/{case_id}/deliveries")
+    def deliveries(case_id: str, days: int | None = None):
+        return uc_manager.DeliveriesView(c.metrics, names).execute(case_of(case_id), days)
+
     @r.get("/cases/{case_id}/executions")
     def executions(case_id: str):
         uc.ResumeCase(c.cases).execute(case_id)
