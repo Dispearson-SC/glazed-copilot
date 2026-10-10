@@ -131,6 +131,6 @@ Lectura: en lazo abierto omitir pedidos cuesta ventas porque el sistema no puede
 
 ## 9. Archivos y como reproducir
 
-- Script: `backend/scripts/holdout_counterfactual.py` (etapas `decide`, `simulate`, `report`). Tablas: `resumen_total.csv`, `por_tienda.csv`, `serie_diaria.csv`, `acciones_recomendadas.csv`, `fidelidad_A.csv`, `sensibilidad_repetido.csv`.
-- Lectura de solo lectura de `Dataset/clean/glazed.duckdb`; no se toca Postgres ni los contenedores.
+- Script (analysis only, removed from the product tree; see git history before the release cleanup, `backend/scripts/holdout_counterfactual.py`) (etapas `decide`, `simulate`, `report`). Tablas: `resumen_total.csv`, `por_tienda.csv`, `serie_diaria.csv`, `acciones_recomendadas.csv`, `fidelidad_A.csv`, `sensibilidad_repetido.csv`.
+- Lectura de solo lectura de `data/clean/glazed.duckdb`; no se toca Postgres ni los contenedores.
 - Calculo: 34 minutos de CPU sumados en 8 regiones (corre en paralelo por region porque los traslados solo ocurren dentro de una region).

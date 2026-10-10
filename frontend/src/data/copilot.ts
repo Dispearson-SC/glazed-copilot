@@ -46,7 +46,7 @@ export interface CopilotContext {
 // ---------------------------------------------------------------------------------------------
 // Data sources. Each source is ONE function so swapping it for the real route is a one-line change.
 // `{status: "soon"}` means the backend route does not exist yet: the UI shows "Disponible pronto".
-// See the GAP LIST in odd/tasks/copiloto.md for the suggested contracts.
+// Mock data for the copilot screens; the suggested API contracts are documented in docs/architecture.md.
 // ---------------------------------------------------------------------------------------------
 
 export type Source<T> = { status: "ok"; data: T } | { status: "soon" };

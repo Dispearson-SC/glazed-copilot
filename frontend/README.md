@@ -25,7 +25,7 @@ The app has four screens: the three below plus `/copiloto`. The three were copie
 
 - The app is the Copiloto only: `/copiloto` is the single screen; `/`, `/resumen`, `/login`, `/chat` and any unknown path redirect to it (`?tab=` picks the opening window).
 
-- `/copiloto`: the decision copilot (handoff `Copiloto.dc.html`), five windows behind a capsule navigation. It wires real data only; whatever the backend does not serve yet shows "Sin datos" / "Disponible pronto" (see the GAP LIST in `odd/tasks/copiloto.md`).
+- `/copiloto`: the decision copilot (handoff `Copiloto.dc.html`), five windows behind a capsule navigation. It wires real data only; whatever the backend does not serve yet shows "Sin datos" / "Disponible pronto".
   - Agente: the chat over `useChat` (polling, history, inline proposals, markdown), pinned context ("Hablando de: ..."), suggestions and analysis/dialogue cards. The context is prefixed into the message text (`chatContextText`) until `POST /messages` accepts a `context` field.
   - Decisiones: approvals = `/issues` whose recommended option is N2/N3; technical = `/order-plan` lines (plus N1 issue options). Aceptar/Aprobar/Rechazar run `POST /proposals` then `POST /proposals/{id}/decision` with Idempotency-Key; the card, toast and learned memory change only after the backend accepted. An order-plan line without issue is read-only.
   - Sucursal: Ayer (day-summary + vs same-weekday average), Hoy and Mañana (forecast / `/outlook` when deployed). Today's real sales are never shown ("Pendiente · Se registra al cierre"). Mañana weather is permanently "Sin pronóstico".
