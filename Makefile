@@ -1,4 +1,4 @@
-.PHONY: test backend-test deps up down api
+.PHONY: test backend-test deps up down api load-data seed-memory
 PY ?= python3
 deps:
 	cd backend && $(PY) -m pip install --target .deps -e . --no-deps && $(PY) -m pip install --target .deps duckdb fastapi uvicorn httpx "psycopg[binary]" pytest pydantic
@@ -13,3 +13,5 @@ down:
 	docker compose -f infra/docker-compose.yml down
 seed-memory:
 	cd backend && PYTHONPATH=.deps:src $(PY) scripts/seed_experiences.py --stores $(or $(STORES),S030)
+load-data:
+	cd backend && PYTHONPATH=.deps:src $(PY) -m glazed_backend.loader $(or $(PARQUET_DIR),../../Dataset/clean)
