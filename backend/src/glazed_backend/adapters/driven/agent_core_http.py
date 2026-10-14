@@ -8,6 +8,7 @@ GET /admin/conversations/{session_id} (role admin).
 from __future__ import annotations
 
 import json
+import threading
 import time
 from collections.abc import Iterator
 from typing import Any
@@ -22,11 +23,21 @@ class AgentCoreHttp:
     """Identity per Agent-Core's Glazed vertical (VERTICAL_GLAZED.md): channel `glazed`, role `glazed-manager`
     (`glazed-service` for scheduled turns), tenant = store, session = case, profile `glazed_orchestrator`."""
 
+    # Every SSE stream holds one pooled connection for the length of a turn, out of the same pool sending and
+    # polling use (httpx's default: 100). Past this many open streams a new one is refused at once and the turn is
+    # polled instead, so streams can never take the connections the rest of the API needs.
+    DEFAULT_MAX_STREAMS = 16
+
     def __init__(self, base_url: str, profile_id: str = "glazed_orchestrator", subject_id: str = "manager-1",
                  timeout: float = 30.0, client: httpx.Client | None = None, channel: str = "glazed",
-                 roles: str = "glazed-manager", service_roles: str = "glazed-service") -> None:
+                 roles: str = "glazed-manager", service_roles: str = "glazed-service",
+                 max_streams: int = DEFAULT_MAX_STREAMS) -> None:
+        if max_streams < 0:
+            raise ValueError(f"max_streams must be at least 0, got {max_streams}")
         self.profile_id, self.subject_id = profile_id, subject_id
         self.channel, self.roles, self.service_roles = channel, roles, service_roles
+        self.max_streams = max_streams
+        self._streams = threading.BoundedSemaphore(max_streams) if max_streams else None
         self._c = client or httpx.Client(base_url=base_url, timeout=timeout)
 
     @classmethod
@@ -34,7 +45,8 @@ class AgentCoreHttp:
         return cls(base_url, env.get("GLAZED_CORE_PROFILE", "glazed_orchestrator"),
                    env.get("GLAZED_CORE_SUBJECT", "manager-1"), channel=env.get("GLAZED_CORE_CHANNEL", "glazed"),
                    roles=env.get("GLAZED_CORE_ROLES", "glazed-manager"),
-                   service_roles=env.get("GLAZED_CORE_SERVICE_ROLES", "glazed-service"))
+                   service_roles=env.get("GLAZED_CORE_SERVICE_ROLES", "glazed-service"),
+                   max_streams=int(env.get("GLAZED_CORE_MAX_STREAMS", cls.DEFAULT_MAX_STREAMS)))
 
     def _headers(self, store_id: str, admin: bool = False, service: bool = False) -> dict[str, str]:
         roles = self.service_roles if service else self.roles
@@ -77,7 +89,16 @@ class AgentCoreHttp:
 
     def stream_turn(self, turn_id: str, store_id: str) -> Iterator[tuple[str, dict[str, Any]]]:
         """The turn's Server-Sent Events as (event, data) pairs, until the server closes the stream. Comments
-        (keepalives) are skipped; an HTTP error raises CoreError (the caller then polls)."""
+        (keepalives) are skipped; an HTTP error raises CoreError (the caller then polls). Past `max_streams` open
+        streams it raises CoreError before taking a connection; a closed or failed stream gives its slot back."""
+        if self._streams is None or not self._streams.acquire(blocking=False):
+            raise CoreError(f"Agent-Core stream refused: {self.max_streams} streams already open, polling instead")
+        try:
+            yield from self._events(turn_id, store_id)
+        finally:
+            self._streams.release()
+
+    def _events(self, turn_id: str, store_id: str) -> Iterator[tuple[str, dict[str, Any]]]:
         headers = {**self._headers(store_id), "Accept": "text/event-stream"}
         try:
             with self._c.stream("GET", f"/turns/{turn_id}/events", headers=headers,

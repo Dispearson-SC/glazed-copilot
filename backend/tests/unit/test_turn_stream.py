@@ -15,6 +15,7 @@ import httpx
 import pytest
 
 from glazed_backend.adapters.driven.agent_core_http import AgentCoreHttp
+from glazed_backend.domain.models import CoreError
 from glazed_backend.adapters.driven.memory import InMemoryTurns
 from glazed_backend.application import AskAgent, GetTurn, StartCase, TurnTracker
 from glazed_backend.application.turn_stream import TurnStreams
@@ -107,6 +108,37 @@ def test_a_stream_that_fails_or_closes_early_is_broken(frames, error):
     assert streams.state("t1").broken and not streams.state("t1").live
 
 
+def test_a_stream_the_registry_stops_following_is_closed_at_once():
+    """Slice gm6: closing is what gives a capped stream's slot (and its connection) back; the registry
+    closes the stream when the turn ends instead of leaving it to the garbage collector."""
+    closed = []
+
+    class Closing(StreamingCore):
+        def __init__(self) -> None:
+            super().__init__()
+            self.made = []  # another holder (a pool, a debugger): the collector will not close it
+
+        def stream_turn(self, turn_id, store_id):
+            def frames():
+                try:
+                    yield ("snapshot", _snapshot(turn_id, "Hola", state="finished"))
+                    yield ("delta", {"turn_id": turn_id, "text": "never read"})
+                finally:
+                    closed.append(turn_id)
+
+            self.made.append(frames())
+            return self.made[-1]
+
+    events = []
+    core = Closing()
+    streams = TurnStreams(core, FakeClock(), spawn=lambda fn: events.append(fn))
+    streams.watch("t1", "S030")
+
+    events[0]()
+
+    assert closed == ["t1"] and streams.state("t1").finished
+
+
 def test_a_core_without_a_stream_is_never_watched():
     streams = TurnStreams(FakeCore(), FakeClock(), spawn=lambda fn: fn())
     streams.watch("t1", "S030")
@@ -146,6 +178,51 @@ def test_the_core_adapter_raises_on_an_http_error_so_the_stream_is_broken():
         transport=httpx.MockTransport(lambda r: httpx.Response(503)), base_url="http://core"))
     with pytest.raises(Exception):
         list(core.stream_turn("t1", "S030"))
+
+
+def _sse_core(max_streams: int, requests: list | None = None) -> AgentCoreHttp:
+    body = b"event: delta\ndata: {\"turn_id\": \"t1\", \"text\": \"Hola\"}\n\nevent: end\ndata: {}\n\n"
+
+    def handler(req: httpx.Request):
+        if requests is not None:
+            requests.append(req.url.path)
+        if req.url.path.endswith("/events"):
+            return httpx.Response(200, content=body, headers={"content-type": "text/event-stream"})
+        return httpx.Response(200, json={"turn_id": "t1", "status": "running"})
+
+    return AgentCoreHttp("http://core", max_streams=max_streams,
+                         client=httpx.Client(transport=httpx.MockTransport(handler), base_url="http://core"))
+
+
+def test_streams_past_the_cap_are_refused_at_once_so_the_turn_polls_instead():
+    """Slice gm6: every stream holds a pooled connection for the length of a turn. Past
+    `max_streams` open streams a new one is refused immediately (CoreError: the registry marks it
+    broken and GetTurn polls), so streams can never take the connections polling and sending need."""
+    requests: list[str] = []
+    core = _sse_core(2, requests)
+    first, second = core.stream_turn("t1", "S030"), core.stream_turn("t2", "S030")
+    assert next(first)[0] == "delta" and next(second)[0] == "delta"  # two streams are open
+
+    with pytest.raises(CoreError, match="stream"):
+        next(core.stream_turn("t3", "S030"))
+    assert "/turns/t3/events" not in requests, "a refused stream never takes a connection"
+    assert core.get_turn("t3", "S030")["status"] == "running", "polling still has its connections"
+
+    first.close()  # a finished (or abandoned) stream gives its slot back
+    assert next(core.stream_turn("t4", "S030"))[0] == "delta"
+
+
+def test_a_stream_that_fails_gives_its_slot_back():
+    core = AgentCoreHttp("http://core", max_streams=1, client=httpx.Client(
+        transport=httpx.MockTransport(lambda r: httpx.Response(503)), base_url="http://core"))
+    for _ in range(3):
+        with pytest.raises(CoreError, match="503"):
+            list(core.stream_turn("t1", "S030"))
+
+
+@pytest.mark.parametrize("env, cap", [({}, 16), ({"GLAZED_CORE_MAX_STREAMS": "4"}, 4)])
+def test_the_stream_cap_is_set_from_the_environment(env, cap):
+    assert AgentCoreHttp.from_env("http://core", env).max_streams == cap
 
 
 # ---- GetTurn over a stream ----

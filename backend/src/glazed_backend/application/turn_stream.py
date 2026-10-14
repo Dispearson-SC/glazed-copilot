@@ -77,6 +77,13 @@ class TurnStreams:
         except Exception:  # noqa: BLE001 - a broken stream only means GetTurn polls
             self._mark_broken(turn_id)
             return
+        finally:  # close now, not when collected: closing gives the stream's connection (and capped slot) back
+            close = getattr(events, "close", None)
+            try:
+                if close is not None:
+                    close()
+            except Exception:  # noqa: BLE001 - the turn is followed by polling either way
+                pass
         self._mark_broken(turn_id)  # the server closed without saying the turn ended: poll
 
     def _mark_broken(self, turn_id: str) -> None:
