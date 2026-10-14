@@ -95,8 +95,22 @@ def test_a_tool_has_its_effect_and_a_description_the_model_reads(
 ) -> None:
     method, path, effect = TOOLS[name]
     op = _operations(spec)[(method, path)]
+    description = op["x-agent-description"]
     assert op["x-agent-effect"] == effect
-    assert len(op["x-agent-description"]) > 20
+    # written for the model: a sentence or more, trimmed, no route or code path leaking into it
+    assert description == description.strip() and len(description) >= 60
+    assert description.split("\n")[0].endswith((".", ":")), "the first line is a sentence"
+    assert PREFIX not in description and "/internal" not in description
+    # and about THIS tool, not the operation's summary or another tool's text
+    assert description != op.get("summary")
+
+
+def test_no_two_tools_share_a_description(spec: dict[str, Any]) -> None:
+    texts = {
+        name: _operations(spec)[(m, p)]["x-agent-description"] for name, (m, p, _) in TOOLS.items()
+    }
+    duplicated = {n for n, t in texts.items() if list(texts.values()).count(t) > 1}
+    assert duplicated == set()
 
 
 def test_writes_that_create_a_proposal_key_their_retries(spec: dict[str, Any]) -> None:
@@ -116,7 +130,55 @@ def test_memory_recall_surfaces_the_warning_header(spec: dict[str, Any]) -> None
     assert op["x-agent-warning"] is True
 
 
-def test_the_committed_snapshot_is_the_current_internal_contract(spec: dict[str, Any]) -> None:
-    from scripts.export_internal_openapi import internal_contract
+def test_the_committed_snapshot_is_the_current_internal_contract() -> None:
+    from scripts.export_internal_openapi import _current
 
-    assert json.loads(SNAPSHOT.read_text(encoding="utf-8")) == internal_contract(spec)
+    assert json.loads(SNAPSHOT.read_text(encoding="utf-8")) == _current()
+
+
+def test_the_snapshot_does_not_move_when_only_the_public_api_changes() -> None:
+    """G2b: the snapshot is built from the internal routes alone (no public schema, title or route)."""
+    from pydantic import BaseModel
+
+    from glazed_backend.adapters.driving.app import create_app
+    from scripts.export_internal_openapi import internal_spec
+    from tests.unit.test_forecast_internal import make_container
+
+    class OnlyPublic(BaseModel):
+        secret_public_field: str
+
+    container = make_container()
+    app = create_app(container)
+    before = internal_spec(container)
+    app.add_api_route("/api/v1/extra", lambda: OnlyPublic(secret_public_field="x"), methods=["GET"],
+                      response_model=OnlyPublic)
+    app.title, app.version, app.openapi_schema = "renamed", "9.9.9", None
+
+    assert before["paths"], "the internal routes are in the document"
+    assert internal_spec(container) == before
+    assert "OnlyPublic" not in json.dumps(before) and before["info"]["title"] != "renamed"
+    assert all(path.startswith(PREFIX) for path in before["paths"])
+
+
+def test_check_mode_with_no_snapshot_fails_and_says_so(tmp_path: Path, monkeypatch, capsys) -> None:
+    import scripts.export_internal_openapi as export
+
+    monkeypatch.setattr(export, "SNAPSHOT", tmp_path / "absent" / "internal_openapi.json")
+
+    assert export.main(["--check"]) == 1
+    assert "missing" in capsys.readouterr().err
+    assert not (tmp_path / "absent").exists(), "--check never writes"
+
+
+def test_check_mode_reports_a_stale_snapshot_without_rewriting_it(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    import scripts.export_internal_openapi as export
+
+    stale = tmp_path / "internal_openapi.json"
+    stale.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(export, "SNAPSHOT", stale)
+
+    assert export.main(["--check"]) == 1
+    assert "stale" in capsys.readouterr().err
+    assert stale.read_text(encoding="utf-8") == "{}\n"

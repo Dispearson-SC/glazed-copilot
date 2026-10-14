@@ -110,6 +110,79 @@
     "title": "HTTPValidationError",
     "type": "object"
    },
+   "NoteBody": {
+    "description": "A manager note. Store and as-of come from the case; the code decides what is written where.",
+    "properties": {
+     "category": {
+      "default": "eventos",
+      "title": "Category",
+      "type": "string"
+     },
+     "date_from": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date From"
+     },
+     "date_to": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date To"
+     },
+     "impact": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Impact"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "title": "NoteBody",
+    "type": "object"
+   },
+   "PromoAuditBody": {
+    "description": "A proposed promotion template: department plus discount percentage.",
+    "properties": {
+     "department": {
+      "title": "Department",
+      "type": "string"
+     },
+     "discount_pct": {
+      "title": "Discount Pct",
+      "type": "number"
+     }
+    },
+    "required": [
+     "department",
+     "discount_pct"
+    ],
+    "title": "PromoAuditBody",
+    "type": "object"
+   },
    "ProposalBody": {
     "description": "The agent names an option; action_type/params/tier below are legacy fields that are ignored.",
     "properties": {
@@ -225,85 +298,12 @@
     ],
     "title": "ValidationError",
     "type": "object"
-   },
-   "glazed_backend__adapters__driving__internal_api__NoteBody": {
-    "description": "A manager note. Store and as-of come from the case; the code decides what is written where.",
-    "properties": {
-     "category": {
-      "default": "eventos",
-      "title": "Category",
-      "type": "string"
-     },
-     "date_from": {
-      "anyOf": [
-       {
-        "format": "date",
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Date From"
-     },
-     "date_to": {
-      "anyOf": [
-       {
-        "format": "date",
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Date To"
-     },
-     "impact": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Impact"
-     },
-     "text": {
-      "title": "Text",
-      "type": "string"
-     }
-    },
-    "required": [
-     "text"
-    ],
-    "title": "NoteBody",
-    "type": "object"
-   },
-   "glazed_backend__adapters__driving__internal_api__PromoAuditBody": {
-    "description": "A proposed promotion template: department plus discount percentage.",
-    "properties": {
-     "department": {
-      "title": "Department",
-      "type": "string"
-     },
-     "discount_pct": {
-      "title": "Discount Pct",
-      "type": "number"
-     }
-    },
-    "required": [
-     "department",
-     "discount_pct"
-    ],
-    "title": "PromoAuditBody",
-    "type": "object"
    }
   }
  },
  "info": {
-  "title": "glazed-backend",
-  "version": "0.1.0"
+  "title": "glazed-internal-api",
+  "version": "1"
  },
  "openapi": "3.1.0",
  "paths": {
@@ -2062,7 +2062,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/glazed_backend__adapters__driving__internal_api__NoteBody"
+        "$ref": "#/components/schemas/NoteBody"
        }
       }
      },
@@ -2476,7 +2476,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/glazed_backend__adapters__driving__internal_api__PromoAuditBody"
+        "$ref": "#/components/schemas/PromoAuditBody"
        }
       }
      },

@@ -11,7 +11,7 @@ from tests.fakes import (FakeClock, FakeCore, FakeMetrics, InMemoryAlerts, InMem
 from tests.unit.test_forecast_api import AS_OF, START, StubForecast, units_a
 
 
-def build(series=None, flow=None, leak=False, forecasters=None):
+def make_container(series=None, flow=None, leak=False, forecasters=None):
     m = FakeMetrics()
     m.series = series if series is not None else [make_series("A", 2.0, START, AS_OF, units_a)]
     m.flow = flow if flow is not None else []
@@ -19,6 +19,11 @@ def build(series=None, flow=None, leak=False, forecasters=None):
     c = Container(metrics=m, core=FakeCore(), cases=InMemoryCases(), alerts=InMemoryAlerts(), proposals=InMemoryProposals(),
                   executions=InMemoryExecutions(), backtests=InMemoryBacktests(), trace=InMemoryTrace(), clock=FakeClock(),
                   forecasters=forecasters if forecasters is not None else [BaselineForecast()])
+    return c
+
+
+def build(series=None, flow=None, leak=False, forecasters=None):
+    c = make_container(series, flow, leak, forecasters)
     client = TestClient(create_app(c))
     cid = client.post("/api/v1/cases", json={"store_id": "S030", "sim_today": AS_OF.isoformat()}).json()["case_id"]
     return client, {"X-Glazed-Case": cid}
