@@ -3,9 +3,14 @@ name: glazed-copilot
 # Secrets are never written here. Run through `make up` (or pass `--env-file .env`) so
 # POSTGRES_PASSWORD and MINIMAX_API_KEY come from the git-ignored .env at the repository root.
 x-core: &core
+  # Agent-Core with the glazed addons (Phase 3, G7): branch feat/glazed-addons of Agent-Core, no
+  # longer the patched vertical/glazed branch. AGENT_CORE_SRC is that checkout's ROOT (Core/ and
+  # addons/), default the sibling ../Agent-Core; the build context is infra/core (Dockerfile and the
+  # deployment's policy rule). Deploy and rollback: docs/agent-core-addons-runbook.md.
   build:
-    context: ../../Agent-Core/Core
-    dockerfile: ../../glazed-copilot/infra/core/Dockerfile
+    context: ./core
+    additional_contexts:
+      agent_core: ${AGENT_CORE_SRC:-../../Agent-Core}
   environment: &core-env
     # Agent-Core creates and migrates its own app and DBOS databases through the admin URL.
     AGENT_CORE_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change-me}@db:5432/agent_core
@@ -14,10 +19,21 @@ x-core: &core
     AGENT_CORE_HTTP_PORT: "8000"
     # LLM provider is MiniMax; Agent-Core reads the credential as MINIMAX_API.
     MINIMAX_API: ${MINIMAX_API_KEY:-}
-    GLAZED_BACKEND_URL: http://backend:8080  # where the Glazed tools call the internal API
+    # The addons (also the image's defaults, repeated here so the deployment states them).
+    AGENT_CORE_ADDONS: http_tool_bridge,glazed_tools,plain_language,glazed_vertical
+    AGENT_CORE_ADDONS_DIR: /app/addons
+    AGENT_CORE_ADDONS_CONFIG: /app/addons/glazed_vertical/addons_config.yaml
+    # Core's rules plus infra/core/policy/glazed_deployment.yaml (the ask_peer allow); the addon
+    # brings the other glazed rules and needs this directory to exist.
+    AGENT_CORE_POLICY_DIR: /app/Core/policy
+    # Where the glazed tools call the internal API (was GLAZED_BACKEND_URL). Core reads the
+    # backend's /openapi.json from here ONCE at startup and stops if it cannot.
+    AGENT_CORE_ADDON__GLAZED_TOOLS__BASE_URL: http://backend:8080
   depends_on:
     db:
       condition: service_healthy
+    backend:
+      condition: service_healthy   # the glazed tools are built from its OpenAPI at startup
 
 services:
   db:
@@ -42,6 +58,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Healthy once it serves /openapi.json: Agent-Core builds the glazed tools from it at startup.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/openapi.json', timeout=3)"]
+      interval: 10s
+      retries: 12
+      start_period: 30s
     environment:
       GLAZED_STORAGE: postgres
       GLAZED_DATABASE_URL: postgresql://glazed_app:glazed_dev@db:5432/glazed_app
@@ -101,6 +123,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      backend:
+        condition: service_healthy   # the glazed tools are built from its OpenAPI at startup
       core:
         condition: service_healthy   # the core serve process creates and migrates the databases first
 

@@ -1,0 +1,16 @@
+# The glazed deployment's own policy rule (Phase 3, G7). Every other glazed rule ships with the
+# glazed_tools addon; this one allows `ask_peer`, a tool of Core, and an addon may allow only its own
+# tools (Agent-Core docs/ADDONS.md "The glazed audit and policy", D88). Same rule id and text as the
+# vertical/glazed branch, so the audit trail's join from a row to its rule does not break.
+# Without it the orchestrator's ask_peer is refused and the manager gets no specialist.
+rules:
+  - rule_id: glazed-orchestrator-asks-specialists
+    tool_pattern: ask_peer
+    effect: allow
+    subject_roles:
+      - glazed-manager
+    channels:
+      - glazed
+    reason: >-
+      The orchestrator delegates to its specialists. The two-sided allowlist and the hop
+      limit still decide which peer.
