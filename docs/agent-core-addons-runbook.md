@@ -127,3 +127,48 @@ Not checked: a start against the live database and backend (needs this deploy).
    docker compose -f infra/docker-compose.yml --env-file .env up -d --no-build backend core core-peer-worker
    ```
 4. Remove `AGENT_CORE_SRC` from `.env` and, when no longer needed, the `../Agent-Core-deploy` worktree.
+
+## Phase 5: switch Agent-Core-deploy to `feat/fast-comms` (P5)
+
+What changes: the Core image is built from Agent-Core `feat/fast-comms` instead of `feat/glazed-addons` (deployed
+today: `7a33df4`). It adds the System One turn router (Jev through the Typesafe API, addon `system_one_router`), the
+ten layer-B intent plans and the orchestrator's routing opt-in, plus Core's SSE feed which the backend now follows
+for first-text latency (`GLAZED_CORE_STREAM`, on by default; `false` = polling only, the old behaviour).
+
+- **Migrations** `0045` (`audit_turn_routes`), `0046` (route reason and token usage) and `0047`
+  (`audit_turn_intents`) are additive and idempotent; they run at the first start and the old build ignores them.
+- **Drain: YES.** The pinned DBOS application version changes from `agent-core-turns.11` (`7a33df4`) to
+  `agent-core-turns.12` (the route step runs for every person turn). A turn or peer callee still suspended under
+  `.11` (an open approval, an unanswered peer ask) is never recovered by `.12`. Before the deploy, stop new turns
+  and run against the OLD core until it reports 0:
+
+  ```
+  docker exec glazed-core python -m agent_core stranded-turns
+  ```
+
+  If something cannot be drained, cancel it after the deploy (Agent-Core `docs/OPERATIONS.md`, "Cancel what is
+  left") and tell the manager to ask again.
+- **Routing stays OFF** after this deploy: `AGENT_CORE_TURN_ROUTING` defaults to `false` in the compose file, the
+  `system_one_router` addon is loaded but inert, and every turn runs the orchestrator as today. `JEV_API_KEY` is
+  passed from `.env` into the core containers (never printed, never in the compose file).
+- **Before turning routing on** (`AGENT_CORE_TURN_ROUTING=true` in `.env`, then recreate `core` and
+  `core-peer-worker`): a routed turn runs the specialist with the MANAGER's identity (`glazed-manager`), and
+  glazed_tools' policy allows the specialists' read tools only to `peer` and `glazed-service`. With today's policy
+  every routed turn and every intent plan is refused its reads (plans fall back as `policy_denied`, a routed
+  specialist answers without data). Turning it on needs a decision first: allow those read tools to
+  `glazed-manager` on channel `glazed` in the deployment policy (`infra/core/policy/`), or have Core run a routed
+  turn under a delegated identity. Turn it off again with `AGENT_CORE_TURN_ROUTING=false` and a recreate.
+
+Deploy, with the backups and checks of the sections above (tag images `:pre-p5`, dump both Agent-Core databases):
+
+```
+git -C ../Agent-Core fetch origin
+git -C ../Agent-Core-deploy checkout --detach origin/feat/fast-comms
+docker compose -f infra/docker-compose.yml --env-file .env config -q
+make up SERVICES="backend core core-peer-worker"
+docker exec glazed-core python -m agent_core addons list    # 5 addons, system_one_router among them
+docker exec glazed-core python -m agent_core stranded-turns # exit 0
+```
+
+Rollback: `git -C ../Agent-Core-deploy checkout --detach 7a33df4`, restore the `:pre-p5` images and the dumps as
+in "Rollback" above (the `.11` build cannot recover turns started under `.12`: drain again or cancel them).

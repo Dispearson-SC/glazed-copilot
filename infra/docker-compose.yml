@@ -3,8 +3,9 @@ name: glazed-copilot
 # Secrets are never written here. Run through `make up` (or pass `--env-file .env`) so
 # POSTGRES_PASSWORD and MINIMAX_API_KEY come from the git-ignored .env at the repository root.
 x-core: &core
-  # Agent-Core with the glazed addons (Phase 3, G7): branch feat/glazed-addons of Agent-Core, no
-  # longer the patched vertical/glazed branch. AGENT_CORE_SRC is that checkout's ROOT (Core/ and
+  # Agent-Core with the glazed addons (Phase 3, G7; Phase 5 since P5): branch feat/fast-comms of Agent-Core
+  # (feat/glazed-addons before it), no longer the patched vertical/glazed branch.
+  # AGENT_CORE_SRC is that checkout's ROOT (Core/ and
   # addons/), default the sibling ../Agent-Core; the build context is infra/core (Dockerfile and the
   # deployment's policy rule). Deploy and rollback: docs/agent-core-addons-runbook.md.
   build:
@@ -20,7 +21,7 @@ x-core: &core
     # LLM provider is MiniMax; Agent-Core reads the credential as MINIMAX_API.
     MINIMAX_API: ${MINIMAX_API_KEY:-}
     # The addons (also the image's defaults, repeated here so the deployment states them).
-    AGENT_CORE_ADDONS: http_tool_bridge,glazed_tools,plain_language,glazed_vertical
+    AGENT_CORE_ADDONS: http_tool_bridge,glazed_tools,plain_language,glazed_vertical,system_one_router
     AGENT_CORE_ADDONS_DIR: /app/addons
     AGENT_CORE_ADDONS_CONFIG: /app/addons/glazed_vertical/addons_config.yaml
     # Core's rules plus infra/core/policy/glazed_deployment.yaml (the ask_peer allow); the addon
@@ -29,6 +30,16 @@ x-core: &core
     # Where the glazed tools call the internal API (was GLAZED_BACKEND_URL). Core reads the
     # backend's /openapi.json from here ONCE at startup and stops if it cannot.
     AGENT_CORE_ADDON__GLAZED_TOOLS__BASE_URL: http://backend:8080
+    # Phase 5 (Agent-Core feat/fast-comms): System One routing before the orchestrator reasons. A confident
+    # Jev answer sends the manager's turn to one specialist or answers a frequent intent with its fixed plan;
+    # anything else runs the orchestrator as before. OFF unless .env sets AGENT_CORE_TURN_ROUTING=true (read the
+    # runbook first: the policy decision it names must be taken before turning it on). The router addon is always
+    # loaded and harmless while routing is off. The key is passed through from .env, never written here.
+    AGENT_CORE_TURN_ROUTING: ${AGENT_CORE_TURN_ROUTING:-false}
+    AGENT_CORE_ADDON__SYSTEM_ONE_ROUTER__ROUTES_FILE: glazed_vertical/routing/system_one_routes.yaml
+    AGENT_CORE_ADDON__SYSTEM_ONE_ROUTER__API_KEY_ENV: JEV_API_KEY
+    AGENT_CORE_ADDON__SYSTEM_ONE_ROUTER__THRESHOLD: "0.5"
+    JEV_API_KEY: ${JEV_API_KEY:-}
   depends_on:
     db:
       condition: service_healthy
@@ -70,6 +81,8 @@ services:
       GLAZED_DUCKDB_PATH: /data/glazed.duckdb
       GLAZED_RAW_PATH: /raw
       GLAZED_CORE_URL: http://core:8000
+      # P5: follow each Core turn over SSE (first-text latency, partial reply); false -> poll GET /turns/{id} only.
+      GLAZED_CORE_STREAM: ${GLAZED_CORE_STREAM:-true}
       GLAZED_CORS_ORIGINS: ${GLAZED_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       BACKBOARD_API_KEY: ${BACKBOARD_API_KEY:-}
       MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}

@@ -1,6 +1,6 @@
 # Agent-Core with the glazed addons (Phase 3, G7). Build context: this directory (infra/core), which
 # carries the glazed deployment's own policy rule. The Agent-Core checkout is the additional build
-# context `agent_core` (its repository ROOT, branch feat/glazed-addons): the image needs both Core/
+# context `agent_core` (its repository ROOT, branch feat/fast-comms): the image needs both Core/
 # and addons/. See infra/docker-compose.yml and docs/agent-core-addons-runbook.md.
 FROM python:3.12-slim
 WORKDIR /app/Core
@@ -29,7 +29,7 @@ COPY policy/glazed_deployment.yaml ./policy/glazed_deployment.yaml
 ENV AGENT_CORE_HTTP_HOST=0.0.0.0 AGENT_CORE_HTTP_PORT=8000 \
     AGENT_CORE_POLICY_DIR=/app/Core/policy \
     AGENT_CORE_ADDONS_DIR=/app/addons \
-    AGENT_CORE_ADDONS=http_tool_bridge,glazed_tools,plain_language,glazed_vertical \
+    AGENT_CORE_ADDONS=http_tool_bridge,glazed_tools,plain_language,glazed_vertical,system_one_router \
     AGENT_CORE_ADDONS_CONFIG=/app/addons/glazed_vertical/addons_config.yaml
 EXPOSE 8000
 CMD ["python", "-m", "agent_core", "serve"]
