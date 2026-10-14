@@ -148,16 +148,31 @@ for first-text latency (`GLAZED_CORE_STREAM`, on by default; `false` = polling o
 
   If something cannot be drained, cancel it after the deploy (Agent-Core `docs/OPERATIONS.md`, "Cancel what is
   left") and tell the manager to ask again.
-- **Routing stays OFF** after this deploy: `AGENT_CORE_TURN_ROUTING` defaults to `false` in the compose file, the
-  `system_one_router` addon is loaded but inert, and every turn runs the orchestrator as today. `JEV_API_KEY` is
-  passed from `.env` into the core containers (never printed, never in the compose file).
-- **Before turning routing on** (`AGENT_CORE_TURN_ROUTING=true` in `.env`, then recreate `core` and
-  `core-peer-worker`): a routed turn runs the specialist with the MANAGER's identity (`glazed-manager`), and
-  glazed_tools' policy allows the specialists' read tools only to `peer` and `glazed-service`. With today's policy
-  every routed turn and every intent plan is refused its reads (plans fall back as `policy_denied`, a routed
-  specialist answers without data). Turning it on needs a decision first: allow those read tools to
-  `glazed-manager` on channel `glazed` in the deployment policy (`infra/core/policy/`), or have Core run a routed
-  turn under a delegated identity. Turn it off again with `AGENT_CORE_TURN_ROUTING=false` and a recreate.
+- **Routing is ON** after this deploy: `AGENT_CORE_TURN_ROUTING` defaults to `true` in the compose file. A confident
+  System One answer sends the manager's turn to one specialist (layer A) or runs one of the ten read-only intent
+  plans (layer B); anything else (below the 0.5 threshold, a timeout, no `JEV_API_KEY`) runs the orchestrator as
+  before. `JEV_API_KEY` is passed from `.env` into the core containers (never printed, never in the compose file).
+- **Who a routed turn runs as** (Agent-Core D98): the specialist's PEER identity (`peer-agent`, channel `peer`,
+  role `peer`), on behalf of the manager, exactly as when the orchestrator asks that specialist with `ask_peer`.
+  So the glazed policy is unchanged: the specialists' reads stay allowed only to `peer` and `glazed-service`, the
+  manager identity still reads nothing directly, and a route lands only where the orchestrator's own `ask_peer`
+  could go (its peers allowlist plus `glazed-orchestrator-asks-specialists` in `infra/core/policy/`). The reply is
+  still delivered to the manager. Migration `0048` (additive) records both identities: `audit_tool_calls.caller` is
+  `peer-agent` and `on_behalf_of` the manager; `audit_turn_routes` and `audit_turn_intents` carry `actor` and
+  `on_behalf_of`. A refused delegation runs the orchestrator, with the reason in `audit_turn_routes.fallback_reason`
+  (`peer_refused:<reason>`, `ask_peer_not_allowed:<effect>`).
+- **Turn routing off**: `AGENT_CORE_TURN_ROUTING=false` in `.env`, then recreate `core` and `core-peer-worker`
+  (`make up SERVICES="core core-peer-worker"`). No drain is needed to switch it either way: the route step stays in
+  every turn and simply passes. The DRAIN above is still required for this deploy itself (`.11` -> `.12`).
+- **Streams are capped**: the backend keeps at most `GLAZED_CORE_MAX_STREAMS` (default 16) SSE streams open; a turn
+  past the cap is polled as before, so streams never take the connections sending and polling need. A partial reply
+  is shown only when the final reply's quality guard would keep it.
+
+What the router did, and as whom (Agent-Core `docs/OPERATIONS.md` has more):
+
+```
+docker exec glazed-db psql -U postgres -d agent_core -c "SELECT turn_id, profile_id, decision, label, confidence, fallback_reason, actor, on_behalf_of FROM audit_turn_routes ORDER BY id DESC LIMIT 20;"
+```
 
 Deploy, with the backups and checks of the sections above (tag images `:pre-p5`, dump both Agent-Core databases):
 

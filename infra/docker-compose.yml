@@ -32,10 +32,11 @@ x-core: &core
     AGENT_CORE_ADDON__GLAZED_TOOLS__BASE_URL: http://backend:8080
     # Phase 5 (Agent-Core feat/fast-comms): System One routing before the orchestrator reasons. A confident
     # Jev answer sends the manager's turn to one specialist or answers a frequent intent with its fixed plan;
-    # anything else runs the orchestrator as before. OFF unless .env sets AGENT_CORE_TURN_ROUTING=true (read the
-    # runbook first: the policy decision it names must be taken before turning it on). The router addon is always
-    # loaded and harmless while routing is off. The key is passed through from .env, never written here.
-    AGENT_CORE_TURN_ROUTING: ${AGENT_CORE_TURN_ROUTING:-false}
+    # anything else runs the orchestrator as before. ON by default (Core D98: a routed turn runs as the specialist's
+    # peer turn would, on behalf of the manager, so the glazed policy is unchanged); .env AGENT_CORE_TURN_ROUTING=false
+    # turns it off with a recreate of core and core-peer-worker. Without JEV_API_KEY every turn simply passes
+    # (missing_api_key) and runs the orchestrator. The key is passed through from .env, never written here.
+    AGENT_CORE_TURN_ROUTING: ${AGENT_CORE_TURN_ROUTING:-true}
     AGENT_CORE_ADDON__SYSTEM_ONE_ROUTER__ROUTES_FILE: glazed_vertical/routing/system_one_routes.yaml
     AGENT_CORE_ADDON__SYSTEM_ONE_ROUTER__API_KEY_ENV: JEV_API_KEY
     AGENT_CORE_ADDON__SYSTEM_ONE_ROUTER__THRESHOLD: "0.5"
@@ -83,6 +84,8 @@ services:
       GLAZED_CORE_URL: http://core:8000
       # P5: follow each Core turn over SSE (first-text latency, partial reply); false -> poll GET /turns/{id} only.
       GLAZED_CORE_STREAM: ${GLAZED_CORE_STREAM:-true}
+      # At most this many SSE streams at once (each holds a pooled connection); past it a turn is polled.
+      GLAZED_CORE_MAX_STREAMS: ${GLAZED_CORE_MAX_STREAMS:-16}
       GLAZED_CORS_ORIGINS: ${GLAZED_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       BACKBOARD_API_KEY: ${BACKBOARD_API_KEY:-}
       MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
