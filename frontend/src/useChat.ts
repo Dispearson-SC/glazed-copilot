@@ -4,7 +4,7 @@ import { ApiError } from "./api";
 import { buildHistory, buildTurnHistory, type ChatMessage } from "./chatHistory";
 import { parseTraceMessage } from "./parseTraceMessage";
 import { sanitizeReply } from "./sanitize";
-import type { MessageContext, Proposal, TurnProgress, TurnRecord } from "./types";
+import type { MessageContext, Proposal, Turn, TurnProgress, TurnRecord } from "./types";
 
 export type ChatStatus = "idle" | "working" | "waiting_approval";
 
@@ -49,6 +49,9 @@ const isPendingTurn = (t: TurnRecord) => t.status === "pending";
 
 const NO_TEXT_REPLY = "El copiloto terminó sin respuesta de texto.";
 
+/** The pending turn's partial reply, cleaned like a final one; "" when the backend sent none. */
+const partialText = (t: Turn) => (t.partial_reply ? sanitizeReply(t.partial_reply) : "");
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function useChat(caseId: string, opts: UseChatOptions = {}) {
@@ -60,6 +63,8 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
   const [status, setStatus] = useState<ChatStatus>("idle");
   const [stillRunning, setStillRunning] = useState(false);
   const [progress, setProgress] = useState<TurnProgress[]>([]);
+  /** The live turn's reply streamed so far ("" when none): shown while it runs, replaced by the final reply. */
+  const [partialReply, setPartialReply] = useState("");
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [decisionError, setDecisionError] = useState<Error | null>(null);
   const run = useRef(0); // bumped to cancel any in-flight polling loop
@@ -88,6 +93,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
     setStatus("idle");
     setStillRunning(false);
     setProgress([]);
+    setPartialReply("");
     setProposals([]);
     setHistoryLoading(Boolean(enabled && caseId));
     if (!enabled || !caseId) return;
@@ -119,6 +125,8 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
           if (t.status === "pending") {
             setStillRunning(Boolean(t.still_running));
             setProgress(t.progress ?? []);
+            const partial = partialText(t);
+            if (partial) patch(id, { id, role: "assistant", text: partial, turnId: turn.turn_id });
           } else {
             setStillRunning(false);
             setProgress([]);
@@ -176,12 +184,14 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
         setStatus("idle");
         setStillRunning(false);
         setProgress([]);
+        setPartialReply("");
       };
       // Exhausted retries: the turn may still be running, so no resend is offered.
       const unconfirmed = () => {
         addLocal({ role: "error", text: UNCONFIRMED_TEXT });
         setStatus("idle");
         setStillRunning(false);
+        setPartialReply("");
       };
       const budget = errorBudget(pollMs, errorWindowMs);
       while (run.current === token) {
@@ -193,9 +203,12 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
           if (t.status === "pending") {
             setStillRunning(Boolean(t.still_running));
             setProgress(t.progress ?? []);
+            const partial = partialText(t);
+            if (partial) setPartialReply(partial); // a read without one keeps the last: no flicker
           } else {
             setStillRunning(false);
             setProgress([]);
+            setPartialReply("");
             if (t.status === "failed") return fail(t.error || "El copiloto no pudo responder.");
             if (t.reply) addLocal({ role: "assistant", text: sanitizeReply(t.reply), turnId, meta: t.reply_meta });
             setStatus(t.status === "waiting_approval" ? "waiting_approval" : "idle");
@@ -230,6 +243,7 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
       if (!isRetry) addLocal({ role: "user", text: display?.trim() || clean });
       setStatus("working");
       setStillRunning(false);
+      setPartialReply("");
       try {
         const { turn_id } = voice ? await api.sendMessage(caseId, clean, context, { voice: true }) : context ? await api.sendMessage(caseId, clean, context) : await api.sendMessage(caseId, clean);
         await pollTurn(turn_id, clean, token);
@@ -269,6 +283,8 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
     status,
     stillRunning,
     progress,
+    /** The live turn's partial reply ("" when none); the final reply replaces it in `messages`. */
+    partialReply,
     proposals,
     decisionError,
     send,

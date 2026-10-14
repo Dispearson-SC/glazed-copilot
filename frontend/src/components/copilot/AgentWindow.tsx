@@ -239,6 +239,14 @@ export default function AgentWindow({
               </div>
             ))}
             {renderCards(chat.messages.length)}
+            {busy && chat.partialReply && (
+              <div data-testid="partial-reply" aria-busy="true" aria-live="polite" className="flex justify-start gap-2">
+                <div className="mt-1 flex-shrink-0"><AgentOrb size={28} /></div>
+                <div className="min-w-0 max-w-[85%] rounded-[16px_16px_16px_6px] border border-surface-container-high bg-white px-4 py-2.5 opacity-80">
+                  <div className="text-on-surface"><Markdown text={chat.partialReply} /></div>
+                </div>
+              </div>
+            )}
             {busy && (
               <div className="flex items-center gap-2">
                 <AgentOrb size={28} />

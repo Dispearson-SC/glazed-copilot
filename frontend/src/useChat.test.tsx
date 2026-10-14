@@ -399,3 +399,62 @@ describe("useChat turn progress", () => {
     expect(result.current.progress).toEqual([]);
   });
 });
+
+describe("useChat partial reply", () => {
+  it("shows the partial reply while the turn runs and the final reply replaces it", async () => {
+    let finished = false;
+    const getTurn = vi.fn(async () =>
+      finished
+        ? { turn_id: "t1", status: "done" as const, reply: "Hoy vendiste 12 cajas y 3 bolsas." }
+        : { turn_id: "t1", status: "pending" as const, partial_reply: "<think>x</think>Hoy vendiste 12" },
+    );
+    const { result } = setup(fakeApi({ getTurn }));
+    await act(async () => { void result.current.send("¿cómo vamos?"); });
+    await waitFor(() => expect(result.current.partialReply).toBe("Hoy vendiste 12"));
+    expect(result.current.messages.filter((m) => m.role === "assistant")).toEqual([]);
+    finished = true;
+    await waitFor(() => expect(result.current.status).toBe("idle"));
+    expect(result.current.partialReply).toBe("");
+    expect(result.current.messages.filter((m) => m.role === "assistant").map((m) => m.text)).toEqual(["Hoy vendiste 12 cajas y 3 bolsas."]);
+  });
+
+  it("keeps the last partial while a later read carries none, and clears it when the turn fails", async () => {
+    const getTurn = vi
+      .fn()
+      .mockResolvedValueOnce({ turn_id: "t1", status: "pending", partial_reply: "Revisando" })
+      .mockResolvedValueOnce({ turn_id: "t1", status: "pending" })
+      .mockImplementation(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+        return { turn_id: "t1", status: "failed", error: "boom" };
+      });
+    const { result } = setup(fakeApi({ getTurn }));
+    act(() => { void result.current.send("hola"); });
+    await waitFor(() => expect(result.current.partialReply).toBe("Revisando"));
+    await waitFor(() => expect(getTurn).toHaveBeenCalledTimes(3));
+    expect(result.current.partialReply).toBe("Revisando");
+    await waitFor(() => expect(result.current.messages.at(-1)?.role).toBe("error"));
+    expect(result.current.partialReply).toBe("");
+  });
+
+  it("has no partial reply when the backend does not send one", async () => {
+    const { result } = setup(fakeApi());
+    await act(async () => { await result.current.send("hola"); });
+    expect(result.current.partialReply).toBe("");
+  });
+
+  it("shows a resumed turn's partial reply in its pending bubble until the final one", async () => {
+    let finished = false;
+    const listTurns = vi.fn().mockResolvedValue([
+      { turn_id: "t9", ts: "2026-10-14T10:00:00Z", user_text: "¿qué pido?", status: "pending", reply: null },
+    ]);
+    const getTurn = vi.fn(async () =>
+      finished
+        ? { turn_id: "t9", status: "done" as const, reply: "Pide 40 cajas." }
+        : { turn_id: "t9", status: "pending" as const, partial_reply: "Pide 40" },
+    );
+    const { result } = setup(fakeApi({ listTurns, getTurn }));
+    await waitFor(() => expect(result.current.messages.at(-1)?.text).toBe("Pide 40"));
+    finished = true;
+    await waitFor(() => expect(result.current.messages.at(-1)?.text).toBe("Pide 40 cajas."));
+  });
+});

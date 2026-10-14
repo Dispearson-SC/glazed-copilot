@@ -74,7 +74,7 @@ describe("AnalysisCard", () => {
 
 type Chat = ReturnType<typeof useChat>;
 const chatOf = (over: Partial<Chat> = {}): Chat => ({
-  messages: [], status: "idle", stillRunning: false, progress: [], proposals: [], decisionError: null,
+  messages: [], status: "idle", stillRunning: false, progress: [], partialReply: "", proposals: [], decisionError: null,
   send: vi.fn(async () => {}), retry: vi.fn(async () => {}), decide: vi.fn(async () => {}), ...over,
 }) as Chat;
 
@@ -117,6 +117,21 @@ describe("AgentWindow", () => {
     render(<AgentWindow chat={chatOf({ status: "working", progress })} {...props} />, { wrapper: wrap });
     expect(screen.getByText("Consultando a Analista de abastecimiento y Analista histórico…")).toBeInTheDocument();
     expect(screen.queryByText("Esperando respuesta…")).toBeNull();
+  });
+
+  it("shows the partial reply as the copilot's bubble while the turn runs, above the wait pill", () => {
+    render(<AgentWindow chat={chatOf({ status: "working", partialReply: "Hoy vendiste **12** cajas" })} {...props} />, { wrapper: wrap });
+    const bubble = screen.getByTestId("partial-reply");
+    expect(within(bubble).getByText("12")).toBeInTheDocument();
+    expect(bubble).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("Esperando respuesta…")).toBeInTheDocument();
+  });
+
+  it("shows no partial bubble without a partial reply or once the turn is no longer running", () => {
+    const { rerender } = render(<AgentWindow chat={chatOf({ status: "working" })} {...props} />, { wrapper: wrap });
+    expect(screen.queryByTestId("partial-reply")).toBeNull();
+    rerender(<AgentWindow chat={chatOf({ status: "idle", partialReply: "Hoy vendiste" })} {...props} />);
+    expect(screen.queryByTestId("partial-reply")).toBeNull();
   });
 
   it("joins three agents with commas and 'y'", () => {

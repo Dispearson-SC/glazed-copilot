@@ -93,6 +93,10 @@ export interface Turn {
   reply_meta?: ReplyMeta | null;
   /** Agents the orchestrator is consulting; present on every read of a turn. */
   progress?: TurnProgress[];
+  /** The reply streamed so far, while the turn is pending; absent when the backend has none to show (P5). */
+  partial_reply?: string;
+  /** Milliseconds from sending the turn to its first streamed text (P5). */
+  first_text_ms?: number;
 }
 
 export interface TurnProgress {
