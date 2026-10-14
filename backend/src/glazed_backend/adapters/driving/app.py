@@ -38,6 +38,7 @@ class Container:
     cors_origins: list[str] | None = None  # None -> DEFAULT_CORS_ORIGINS
     turn_timeout_s: float = 600.0  # soft timeout: past it a turn Core still runs is flagged still_running, not failed
     turn_tracker: Any = field(default_factory=TurnTracker)
+    turn_streams: Any = None  # TurnStreams (P5): follow each turn's SSE feed; None -> plain polling of GET /turns/{id}
     classifier: Any = None  # TextClassifierPort (Jev via Backboard, LLM fallback); None -> escape labels
     served: dict = field(default_factory=dict)  # (case_id, issue_id) -> issue as served, for option lookup
     warm_on_startup: bool = False  # production only: precompute recent briefings and init clients in the background
@@ -157,6 +158,14 @@ def build_container(env: dict[str, str] | None = None) -> Container:
                          forecasters=build_forecasters(env)), env)
 
 
+def build_turn_streams(env: dict[str, str], core: Any, clock: Any) -> Any:
+    """P5: follow Core turns over SSE (first-text latency, partial reply) unless GLAZED_CORE_STREAM is false."""
+    if env.get("GLAZED_CORE_STREAM", "true").strip().lower() in ("0", "false", "no", "off"):
+        return None
+    from ...application.turn_stream import TurnStreams
+    return TurnStreams(core, clock)
+
+
 def _flag(env: dict[str, str], name: str) -> bool:
     return env.get(name, "false").strip().lower() in ("1", "true", "yes", "on")
 
@@ -169,6 +178,8 @@ def _with_auth(c: Container, env: dict[str, str]) -> Container:
     c.sessions = SessionTokens.from_env(env)
     ensure_admin(c.users, c.hasher, env)
     c.voice = build_voice(env)
+    if env.get("GLAZED_CORE_URL"):
+        c.turn_streams = build_turn_streams(env, c.core, c.clock)
     return c
 
 

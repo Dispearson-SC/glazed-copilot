@@ -119,8 +119,9 @@ class AskAgent:
     """Send a manager message to the orchestrator through the case's Core conversation."""
 
     def __init__(self, cases: CaseRepository, core: CorePort, tracker: TurnTracker | None = None,
-                 clock: Clock | None = None, turns: TurnRepository | None = None) -> None:
+                 clock: Clock | None = None, turns: TurnRepository | None = None, streams: Any = None) -> None:
         self.cases, self.core, self.tracker, self.clock, self.turns = cases, core, tracker, clock, turns
+        self.streams = streams  # TurnStreams (P5): follow the turn's SSE feed; None -> GetTurn polls
 
     def execute(self, case_id: str, text: str, context: dict[str, Any] | None = None,
                 lookup: Any = None, voice: bool = False) -> str:
@@ -147,6 +148,8 @@ class AskAgent:
         if self.turns is not None and self.clock:
             self.turns.add(TurnRecord(turn_id, case.case_id, case.store_id, self.clock.now(), text,
                                       reply_meta={"context": echo} if echo else None))
+        if self.streams is not None:
+            self.streams.watch(turn_id, case.store_id)
         return turn_id
 
 
@@ -167,9 +170,13 @@ class GetTurn:
 
     def __init__(self, cases: CaseRepository, core: CorePort, tracker: TurnTracker | None = None,
                  clock: Clock | None = None, timeout_s: float = 600.0, grace_s: float = 120.0,
-                 turns: TurnRepository | None = None, stale_s: float = 1800.0) -> None:
+                 turns: TurnRepository | None = None, stale_s: float = 1800.0, streams: Any = None,
+                 core_check_s: float = 5.0) -> None:
         self.cases, self.core, self.tracker, self.clock = cases, core, tracker, clock
         self.timeout_s, self.grace_s, self.turns, self.stale_s = timeout_s, grace_s, turns, stale_s
+        # P5: a turn followed over SSE (TurnStreams) answers `pending` with its streamed text and asks the Core for
+        # the status itself at most every `core_check_s`; a finished or broken stream is plain polling.
+        self.streams, self.core_check_s = streams, core_check_s
 
     def _age(self, turn_id: str) -> float | None:
         started = self.tracker.started_at(turn_id) if self.tracker and self.clock else None
@@ -184,7 +191,10 @@ class GetTurn:
         if rec is not None and rec.status == "done" and rec.reply is not None and rec.reply_meta:
             return self._stored(turn_id, rec)  # final and already judged: stable, never rewritten again
         meta: dict[str, Any] = {}
-        out = self._poll(case, turn_id, meta)
+        out = self._streamed(turn_id)
+        if out is None:
+            out = self._poll(case, turn_id, meta)
+        self._stream_fields(turn_id, out, meta)
         out["progress"] = self._progress(case, turn_id, out.get("status") in ("done", "failed"))
         if out["progress"] and out.get("status") == "done":
             meta["progress"] = out["progress"]
@@ -194,9 +204,38 @@ class GetTurn:
             out["reply_meta"] = {**out.get("reply_meta", {}), "context": ctx}
         return out
 
+    def _streamed(self, turn_id: str) -> dict[str, Any] | None:
+        """`pending` from a live stream, without asking the Core, unless the Core was not asked for `core_check_s`
+        (approvals, failures and stale turns are only seen there). None: ask the Core."""
+        state = self.streams.state(turn_id) if self.streams is not None else None
+        if state is None or not state.live or self.clock is None:
+            return None
+        now = self.clock.now()
+        if state.checked_at is not None and (now - state.checked_at).total_seconds() < self.core_check_s:
+            return {"turn_id": turn_id, "status": "pending"}
+        state.checked_at = now
+        return None
+
+    def _stream_fields(self, turn_id: str, out: dict[str, Any], meta: dict[str, Any]) -> None:
+        """`first_text_ms` (since the turn was sent) when the stream saw text; `partial_reply` (cleaned) while
+        pending. Both optional: a client that ignores them sees the contract it always had."""
+        state = self.streams.state(turn_id) if self.streams is not None else None
+        if state is None or state.first_text_at is None:
+            return
+        started = self.tracker.started_at(turn_id) if self.tracker is not None else None
+        if started is not None:
+            out["first_text_ms"] = meta["first_text_ms"] = round(
+                (state.first_text_at - started).total_seconds() * 1000)
+        if out.get("status") == "pending" and state.live and state.text:  # never a finished (maybe rewriting) reply
+            out["partial_reply"] = clean_reply(state.text).text
+        if out.get("status") in ("done", "failed"):
+            self.streams.forget(turn_id)
+
     @staticmethod
     def _stored(turn_id: str, rec: TurnRecord) -> dict[str, Any]:
         out: dict[str, Any] = {"turn_id": turn_id, "status": "done", "reply": rec.reply}
+        if rec.reply_meta and rec.reply_meta.get("first_text_ms") is not None:
+            out["first_text_ms"] = rec.reply_meta["first_text_ms"]
         if rec.reply_meta and rec.reply_meta.get("rewritten"):
             out["reply_meta"] = {"rewritten": True, "sanitized": True}
         if rec.reply_meta and rec.reply_meta.get("context"):

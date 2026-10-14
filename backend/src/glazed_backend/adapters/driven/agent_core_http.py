@@ -2,11 +2,14 @@
 
 Mapping: Core tenant = store_id; Core session_id = case_id (stored as case.core_conversation_id),
 so a Core tool that knows its session id can send it as X-Glazed-Case.
-Routes used: POST /turns (202), GET /turns/{id}, GET /admin/conversations/{session_id} (role admin).
+Routes used: POST /turns (202), GET /turns/{id}, GET /turns/{id}/events (SSE, P5),
+GET /admin/conversations/{session_id} (role admin).
 """
 from __future__ import annotations
 
+import json
 import time
+from collections.abc import Iterator
 from typing import Any
 
 import httpx
@@ -69,6 +72,34 @@ class AgentCoreHttp:
 
     def get_turn(self, turn_id: str, store_id: str) -> dict[str, Any]:
         return self._call("GET", f"/turns/{turn_id}", store_id).json()
+
+    STREAM_TIMEOUT = httpx.Timeout(10.0, read=60.0)  # Core sends a keepalive comment on a quiet stream
+
+    def stream_turn(self, turn_id: str, store_id: str) -> Iterator[tuple[str, dict[str, Any]]]:
+        """The turn's Server-Sent Events as (event, data) pairs, until the server closes the stream. Comments
+        (keepalives) are skipped; an HTTP error raises CoreError (the caller then polls)."""
+        headers = {**self._headers(store_id), "Accept": "text/event-stream"}
+        try:
+            with self._c.stream("GET", f"/turns/{turn_id}/events", headers=headers,
+                                timeout=self.STREAM_TIMEOUT) as resp:
+                if resp.status_code >= 400:
+                    raise CoreError(f"Agent-Core {resp.status_code} on GET /turns/{turn_id}/events")
+                event, data = "message", []
+                for line in resp.iter_lines():
+                    if not line:
+                        if data:
+                            yield event, json.loads("\n".join(data))
+                        event, data = "message", []
+                    elif line.startswith(":"):
+                        continue
+                    elif line.startswith("event:"):
+                        event = line[6:].strip()
+                    elif line.startswith("data:"):
+                        data.append(line[5:].strip())
+                if data:
+                    yield event, json.loads("\n".join(data))
+        except httpx.HTTPError as exc:
+            raise CoreError(f"Agent-Core stream unreachable: {exc}") from exc
 
     def list_transcript(self, conversation_id: str, store_id: str) -> list[dict[str, Any]]:
         entries: list[dict[str, Any]] = []
