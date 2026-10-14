@@ -14,8 +14,9 @@ before and after a change (baseline -> Phase 3 deploy -> Phase 5).
   `GET /api/v1/cases/{id}/turns/{turn_id}` every second until `done|failed|waiting_approval` (timeout 900 s),
   then `GET /api/v1/trace?case_id=` for the turn's tool calls and peer asks.
 
-Per turn it records: total latency, first-progress latency (first poll that shows a specialist consulted; the
-backend streams no text, so `first_text_s` stays null), status, tool calls by name, peer asks and peers, policy
+Per turn it records: total latency, first-progress latency (first poll that shows a specialist consulted),
+first-text latency `first_text_s` (the backend's `first_text_ms`: since P5 it follows Core's SSE feed; null on a
+build that streams nothing, or with `GLAZED_CORE_STREAM=false`), status, tool calls by name, peer asks and peers, policy
 denials, sanitizer fragments and rewrite, token/cost fields when the API exposes them (it does not today), errors,
 expectation checks (`proposal_pending`, `refusal`, `multi_peer`) and quality flags:
 
@@ -24,8 +25,8 @@ expectation checks (`proposal_pending`, `refusal`, `multi_peer`) and quality fla
 | `think_tags` | `<think>` tags leaked into the reply |
 | `foreign_script` / `garbled` | non-Latin script characters or replacement characters |
 | `non_spanish` | English stopwords dominate |
-| `internal_names` | snake_case identifiers (agents, tools, fields) or words like orchestrator/peer/backend |
-| `untraceable_numbers` | a number (>10 or decimal) absent from the turn's tool results and peer answers |
+| `internal_names` | snake_case identifiers (agents, tools, fields) or words like orchestrator/peer/backend; two Spanish function words a model joined with `_` (`de_no`) are a typo, not a name |
+| `untraceable_numbers` | a number (>10 or decimal) absent from the tool results and peer answers of this turn AND the earlier turns of the same conversation (a follow-up repeats figures it already fetched) |
 
 The number check needs the tool results. When the trace does not carry them (the live build only records the
 calls) or a result is clipped, misses go to `unverified_numbers` and do not raise the flag.

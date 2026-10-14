@@ -88,6 +88,19 @@ _NUMBER = re.compile(r"(?<![\w.,])-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?")
 _SMALL_INT = 10
 
 
+def _spanish_typo(token: str) -> bool:
+    """`de_no`, `de_la`: Spanish function words a model joined with an underscore (L13), not a field name."""
+    return all(part in _ES for part in token.split("_"))
+
+
+def conversation_sources(earlier: list[dict[str, Any]], current: dict[str, Any]) -> tuple[list[str], bool]:
+    """What a turn's numbers may be traced to: its own tool results and peer texts plus those of the EARLIER turns of
+    the same conversation (a follow-up repeats figures it already fetched, L13). Complete only when every one is."""
+    turns = [*earlier, current]
+    sources = [str(x) for t in turns for x in (*t.get("tool_results", []), *t.get("peer_texts", []))]
+    return sources, all(t.get("results_complete", True) is not False for t in turns)
+
+
 def looks_like_refusal(text: str) -> bool:
     return bool(_REFUSAL.search(text or ""))
 
@@ -142,7 +155,8 @@ def quality(reply: str, tool_results: list[str], question: str = "", complete: b
     en, es = sum(w in _EN for w in words), sum(w in _ES for w in words)
     if en >= 3 and en > es:
         flags.append("non_spanish")
-    internal = sorted(set(_SNAKE.findall(text)) | {m.group(0) for m in _INTERNAL_WORDS.finditer(text)})
+    snake = {t for t in _SNAKE.findall(text) if not _spanish_typo(t)}
+    internal = sorted(snake | {m.group(0) for m in _INTERNAL_WORDS.finditer(text)})
     if internal:
         flags.append("internal_names")
     numbers = extract_numbers(text)
@@ -204,8 +218,18 @@ def percentile(values: list[float], p: float) -> float | None:
     return vals[rank - 1]
 
 
+def first_text_seconds(turn: dict[str, Any]) -> float | None:
+    """Seconds from sending the turn to its first streamed text, from the backend's `first_text_ms` (P5: the backend
+    follows Core's SSE feed). None when the backend did not report it (an older build, or no text streamed)."""
+    ms = turn.get("first_text_ms")
+    if isinstance(ms, bool) or not isinstance(ms, (int, float)):
+        return None
+    return round(ms / 1000, 2)
+
+
 def aggregate(turns: list[dict[str, Any]]) -> dict[str, Any]:
     lat = [t["latency_s"] for t in turns if t.get("latency_s") is not None]
+    first = [t["first_text_s"] for t in turns if t.get("first_text_s") is not None]
     failed = [t for t in turns if t.get("status") not in ("done", "waiting_approval")]
     flags: dict[str, int] = {}
     for t in turns:
@@ -223,6 +247,9 @@ def aggregate(turns: list[dict[str, Any]]) -> dict[str, Any]:
         "latency_p50_s": percentile(lat, 50),
         "latency_p95_s": percentile(lat, 95),
         "latency_max_s": max(lat) if lat else None,
+        "first_text_turns": len(first),
+        "first_text_p50_s": percentile(first, 50),
+        "first_text_p95_s": percentile(first, 95),
         "tool_calls_total": sum(t.get("tool_calls") or 0 for t in turns),
         "peer_asks_total": sum(t.get("peer_asks") or 0 for t in turns),
         "flag_counts": dict(sorted(flags.items())),
@@ -261,8 +288,8 @@ def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
         rows.append(row)
     ab, aa = before.get("aggregate") or {}, after.get("aggregate") or {}
     agg = {}
-    for name in ("latency_p50_s", "latency_p95_s", "latency_max_s", "failure_rate", "tool_calls_total",
-                 "peer_asks_total"):
+    for name in ("latency_p50_s", "latency_p95_s", "latency_max_s", "first_text_p50_s", "first_text_p95_s",
+                 "failure_rate", "tool_calls_total", "peer_asks_total"):
         b, a = ab.get(name), aa.get(name)
         agg[name] = {"before": b, "after": a,
                      "delta": round(a - b, 3) if isinstance(a, (int, float)) and isinstance(b, (int, float)) else None}
@@ -295,6 +322,8 @@ def render_markdown(run: dict[str, Any]) -> str:
               f"- turns: {agg['turns']}, failed: {agg['failed']} (failure rate {_fmt(agg['failure_rate'])})",
               f"- latency p50 {_fmt(agg['latency_p50_s'])} s, p95 {_fmt(agg['latency_p95_s'])} s, "
               f"max {_fmt(agg['latency_max_s'])} s",
+              f"- first text p50 {_fmt(agg.get('first_text_p50_s'))} s, p95 {_fmt(agg.get('first_text_p95_s'))} s "
+              f"({_fmt(agg.get('first_text_turns'))} turns streamed text)",
               f"- tool calls {agg['tool_calls_total']}, peer asks {agg['peer_asks_total']}",
               f"- flags: {json.dumps(agg['flag_counts'], ensure_ascii=False) if agg['flag_counts'] else 'none'}",
               f"- burst: {json.dumps(agg['burst']) if agg.get('burst') else 'none'}", ""]

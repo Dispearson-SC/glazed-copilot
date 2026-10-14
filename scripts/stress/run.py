@@ -79,7 +79,8 @@ def new_case(api: Api, b: battery.Battery, label: str, case_id: str) -> str:
 
 def ask(api: Api, backend_case: str, text: str, timeout: float, poll: float) -> dict[str, Any]:
     """One turn, timed from the POST to the terminal poll. first_progress_s = first poll that shows a specialist
-    being consulted (the backend exposes no streamed text, so there is no first-text latency)."""
+    being consulted; first_text_s = the backend's `first_text_ms` (it follows Core's SSE feed, P5), or the first poll
+    that showed a `partial_reply` when the backend reports no time (None on a build that streams nothing)."""
     t0 = time.monotonic()
     out: dict[str, Any] = {"first_text_s": None, "first_progress_s": None, "polls": 0}
     try:
@@ -107,6 +108,11 @@ def ask(api: Api, backend_case: str, text: str, timeout: float, poll: float) -> 
         elapsed = time.monotonic() - t0
         if turn.get("progress") and out["first_progress_s"] is None:
             out["first_progress_s"] = round(elapsed, 2)
+        reported = battery.first_text_seconds(turn)
+        if reported is not None:
+            out["first_text_s"] = reported
+        elif turn.get("partial_reply") and out["first_text_s"] is None:
+            out["first_text_s"] = round(elapsed, 2)
         if turn.get("status") in TERMINAL:
             break
         if elapsed > timeout:
@@ -123,7 +129,9 @@ def ask(api: Api, backend_case: str, text: str, timeout: float, poll: float) -> 
 
 
 def finish_turn(api: Api, case: battery.Case, idx: int, question: str, backend_case: str,
-                res: dict[str, Any], burst: bool) -> dict[str, Any]:
+                res: dict[str, Any], burst: bool, earlier: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """`earlier`: the trace metrics of the conversation's previous turns (appended to here), so a follow-up's numbers
+    are traced against everything the conversation fetched (L13)."""
     events: list[dict[str, Any]] = []
     if res.get("turn_id"):
         try:
@@ -140,7 +148,10 @@ def finish_turn(api: Api, case: battery.Case, idx: int, question: str, backend_c
         checks["refusal"] = battery.looks_like_refusal(reply)
     if case.expect.get("min_peer_asks"):
         checks["multi_peer"] = m["peer_asks"] >= int(case.expect["min_peer_asks"])
-    q = battery.quality(reply, m["tool_results"] + m["peer_texts"], question, complete=m["results_complete"])
+    sources, complete = battery.conversation_sources(earlier or [], m)
+    if earlier is not None:
+        earlier.append(m)
+    q = battery.quality(reply, sources, question, complete=complete)
     return {"case_id": case.id, "kind": case.kind, "turn_index": idx, "burst": burst, "question": question,
             "backend_case_id": backend_case, **{k: v for k, v in res.items()},
             "tool_calls": m["tool_calls"], "peer_asks": m["peer_asks"], "tools": m["tools"], "peers": m["peers"],
@@ -179,10 +190,11 @@ def run(args: argparse.Namespace) -> Path:
 
     for case in [c for c in cases if c.kind != "burst"]:
         backend_case = new_case(api, b, args.label, case.id)
+        history: list[dict[str, Any]] = []
         for idx, q in enumerate(case.turns):
             log(f"{case.id}[{idx}] asking")
             res = ask(api, backend_case, q, args.timeout, args.poll)
-            t = finish_turn(api, case, idx, q, backend_case, res, burst=False)
+            t = finish_turn(api, case, idx, q, backend_case, res, burst=False, earlier=history)
             record["turns"].append(t)
             save()
             log(f"{case.id}[{idx}] {t['status']} {t['latency_s']}s tools={t['tool_calls']} peers={t['peer_asks']} "

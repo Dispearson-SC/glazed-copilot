@@ -187,3 +187,68 @@ def test_tool_calls_without_results_make_the_sources_incomplete():
 def test_incomplete_sources_report_unverified_numbers_without_the_flag():
     q = battery.quality("Vendiste 4,321 USD.", tool_results=[], complete=False)
     assert q["flags"] == [] and q["unverified_numbers"] == ["4,321"] and q["untraceable_numbers"] == []
+
+
+# ---- L13 false positives ----
+
+def test_two_spanish_words_joined_by_an_underscore_are_a_typo_not_an_internal_name():
+    """L13: the phase3 run flagged `de_no` ("problema de_no poder surtir"): a model typo joining two Spanish
+    words. A snake_case token made only of Spanish function words is not an internal name."""
+    q = battery.quality("Así que no hay problema de_no poder surtir por muy poco producto.", tool_results=[])
+    assert q["internal_names"] == [] and "internal_names" not in q["flags"]
+
+
+def test_a_field_name_with_one_spanish_looking_part_is_still_internal():
+    q = battery.quality("El campo do_nothing y el on_hand de_la tienda.", tool_results=[])
+    assert {"do_nothing", "on_hand"} <= set(q["internal_names"])
+    assert "de_la" not in q["internal_names"]
+
+
+def test_a_follow_up_traces_its_numbers_against_the_earlier_turns_of_the_conversation():
+    """L13: a tool-less follow-up repeats a figure an earlier turn's tools returned; it is traceable."""
+    first = {"tool_results": ['{"waste_usd": 812.4}'], "peer_texts": [], "results_complete": True}
+    follow_up = {"tool_results": [], "peer_texts": [], "results_complete": True}
+
+    sources, complete = battery.conversation_sources([first], follow_up)
+    q = battery.quality("Como te dije, la merma fue de 812.40 USD.", sources, complete=complete)
+
+    assert q["untraceable_numbers"] == [] and "untraceable_numbers" not in q["flags"]
+
+
+def test_the_current_turn_alone_still_flags_a_number_no_turn_returned():
+    first = {"tool_results": ['{"waste_usd": 812.4}'], "peer_texts": ["el analista dijo 30"], "results_complete": True}
+    current = {"tool_results": ['{"qty": 20}'], "peer_texts": [], "results_complete": True}
+
+    sources, complete = battery.conversation_sources([first], current)
+    q = battery.quality("Pide 20, la merma fue 812.40 y el ahorro 999.", sources, complete=complete)
+
+    assert complete is True and q["untraceable_numbers"] == ["999"]
+
+
+def test_an_earlier_turn_with_incomplete_sources_makes_the_follow_up_check_incomplete():
+    first = {"tool_results": [], "peer_texts": [], "results_complete": False}
+    current = {"tool_results": [], "peer_texts": [], "results_complete": True}
+    assert battery.conversation_sources([first], current)[1] is False
+
+
+# ---- P5: first-text latency ----
+
+def test_first_text_comes_from_the_backends_first_text_ms():
+    assert battery.first_text_seconds({"status": "pending", "first_text_ms": 1534}) == 1.53
+    assert battery.first_text_seconds({"status": "done"}) is None
+    assert battery.first_text_seconds({"first_text_ms": "x"}) is None
+
+
+def test_aggregate_and_compare_report_first_text_latency():
+    turns = [{"case_id": "a", "turn_index": 0, "status": "done", "latency_s": 10.0, "first_text_s": 2.0},
+             {"case_id": "b", "turn_index": 0, "status": "done", "latency_s": 12.0, "first_text_s": 4.0},
+             {"case_id": "c", "turn_index": 0, "status": "done", "latency_s": 12.0, "first_text_s": None}]
+    agg = battery.aggregate(turns)
+    assert agg["first_text_p50_s"] == 2.0 and agg["first_text_p95_s"] == 4.0 and agg["first_text_turns"] == 2
+
+    before = {"label": "b", "turns": [], "aggregate": battery.aggregate([])}
+    after = {"label": "a", "turns": turns, "aggregate": agg}
+    cmp = battery.compare(before, after)
+    assert cmp["aggregate"]["first_text_p50_s"] == {"before": None, "after": 2.0, "delta": None}
+    md = battery.render_markdown({"label": "a", "turns": turns, "aggregate": agg})
+    assert "first text p50 2 s" in md
