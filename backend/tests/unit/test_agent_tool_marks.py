@@ -206,10 +206,24 @@ def test_the_snapshot_does_not_move_when_only_the_public_api_changes() -> None:
     assert served_divergence(served_after, snapshot) == []
 
 
+def _snapshot() -> dict[str, Any]:
+    return json.loads(SNAPSHOT.read_text(encoding="utf-8"))
+
+
+def _served_diverges(monkeypatch, export) -> None:  # type: ignore[no-untyped-def]
+    """`_current` is the committed snapshot and the served document differs from it at /kpis:
+    no test builds the real application unless it means to (gm3 advisory, export:96)."""
+    served = _snapshot()
+    served["paths"][PREFIX + "/kpis"]["get"]["x-agent-name"] = "renamed_tool"
+    monkeypatch.setattr(export, "_current", _snapshot)
+    monkeypatch.setattr(export, "_served", lambda: served)
+
+
 def test_check_mode_with_no_snapshot_fails_and_says_so(tmp_path: Path, monkeypatch, capsys) -> None:
     import scripts.export_internal_openapi as export
 
     monkeypatch.setattr(export, "SNAPSHOT", tmp_path / "absent" / "internal_openapi.json")
+    _served_diverges(monkeypatch, export)
 
     assert export.main(["--check"]) == 1
     assert "missing" in capsys.readouterr().err
@@ -224,6 +238,7 @@ def test_check_mode_reports_a_stale_snapshot_without_rewriting_it(
     stale = tmp_path / "internal_openapi.json"
     stale.write_text("{}\n", encoding="utf-8")
     monkeypatch.setattr(export, "SNAPSHOT", stale)
+    _served_diverges(monkeypatch, export)
 
     assert export.main(["--check"]) == 1
     assert "stale" in capsys.readouterr().err
@@ -242,3 +257,120 @@ def test_check_mode_fails_when_the_served_document_diverges(monkeypatch, capsys)
     assert export.main(["--check"]) == 1
     err = capsys.readouterr().err
     assert "served" in err and PREFIX + "/kpis" in err
+
+
+def test_check_mode_names_a_missing_or_stale_snapshot_before_any_served_divergence(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    """gm3 advisory (export:94-102): the served comparison is made against the COMMITTED snapshot,
+    so a snapshot that is missing or stale is reported as such, never as a served divergence."""
+    import scripts.export_internal_openapi as export
+
+    _served_diverges(monkeypatch, export)
+    monkeypatch.setattr(export, "SNAPSHOT", tmp_path / "internal_openapi.json")
+
+    assert export.main(["--check"]) == 1
+    assert "missing" in capsys.readouterr().err
+    (tmp_path / "internal_openapi.json").write_text("{}\n", encoding="utf-8")
+    assert export.main(["--check"]) == 1
+    err = capsys.readouterr().err
+    assert "stale" in err and "served" not in err
+
+
+def test_check_mode_passes_when_snapshot_and_served_document_agree(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    import scripts.export_internal_openapi as export
+
+    current = tmp_path / "internal_openapi.json"
+    current.write_text(SNAPSHOT.read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.setattr(export, "SNAPSHOT", current)
+    monkeypatch.setattr(export, "_current", _snapshot)
+    monkeypatch.setattr(export, "_served", _snapshot)
+
+    assert export.main(["--check"]) == 0
+    assert capsys.readouterr().err == ""
+
+
+def test_rewrite_mode_writes_the_snapshot_even_when_the_served_document_diverges(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    """gm3 advisory (export:94-102): only `--check` compares with the served document (the module
+    docstring). Rewrite mode regenerates the snapshot from the internal router and succeeds; it
+    never reads the served document."""
+    import scripts.export_internal_openapi as export
+
+    target = tmp_path / "out" / "internal_openapi.json"
+    monkeypatch.setattr(export, "SNAPSHOT", target)
+    monkeypatch.setattr(export, "_current", _snapshot)
+
+    def _served_is_not_read() -> dict[str, Any]:
+        raise AssertionError("rewrite mode read the served document")
+
+    monkeypatch.setattr(export, "_served", _served_is_not_read)
+
+    assert export.main([]) == 0
+    assert json.loads(target.read_text(encoding="utf-8")) == _snapshot()
+    assert capsys.readouterr().err == ""
+
+
+def _with_component(spec: dict[str, Any], name: str, schema: dict[str, Any]) -> dict[str, Any]:
+    out = json.loads(json.dumps(spec))
+    out.setdefault("components", {}).setdefault("schemas", {})[name] = schema
+    return out
+
+
+def _one_operation(schema: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "paths": {
+            PREFIX + "/thing": {
+                "get": {"responses": {"200": {"content": {"application/json": {"schema": schema}}}}}
+            }
+        }
+    }
+
+
+def test_a_ref_with_sibling_keys_resolves_whatever_the_schema_is_named() -> None:
+    """gm3 advisory (export:50-55): FastAPI may qualify a schema's name in the served document, and
+    a `$ref` can sit next to other keys (`description`). Resolved, both sides are the same."""
+    from scripts.export_internal_openapi import served_divergence
+
+    body = {"type": "object", "properties": {"qty": {"type": "integer"}}}
+    snapshot = _with_component(
+        _one_operation({"$ref": "#/components/schemas/Thing", "description": "the thing"}),
+        "Thing",
+        body,
+    )
+    served = _with_component(
+        _one_operation({"$ref": "#/components/schemas/internal__Thing", "description": "the thing"}),
+        "internal__Thing",
+        body,
+    )
+    changed = _with_component(
+        _one_operation({"$ref": "#/components/schemas/internal__Thing", "description": "other"}),
+        "internal__Thing",
+        body,
+    )
+
+    assert served_divergence(served, snapshot) == []
+    assert served_divergence(changed, snapshot) == [PREFIX + "/thing"]
+
+
+def test_a_self_referencing_schema_resolves_whatever_it_is_named() -> None:
+    """A cycle is compared by its shape (how far up it points), not by the schema's name."""
+    from scripts.export_internal_openapi import served_divergence
+
+    def tree(name: str, leaf: str = "string") -> dict[str, Any]:
+        node = {
+            "type": "object",
+            "properties": {
+                "label": {"type": leaf},
+                "children": {"type": "array", "items": {"$ref": f"#/components/schemas/{name}"}},
+            },
+        }
+        return _with_component(_one_operation({"$ref": f"#/components/schemas/{name}"}), name, node)
+
+    assert served_divergence(tree("internal__Node"), tree("Node")) == []
+    assert served_divergence(tree("internal__Node", "integer"), tree("Node")) == [
+        PREFIX + "/thing"
+    ]
