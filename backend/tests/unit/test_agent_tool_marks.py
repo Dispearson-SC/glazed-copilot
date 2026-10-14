@@ -267,14 +267,20 @@ def test_check_mode_names_a_missing_or_stale_snapshot_before_any_served_divergen
     import scripts.export_internal_openapi as export
 
     _served_diverges(monkeypatch, export)
-    monkeypatch.setattr(export, "SNAPSHOT", tmp_path / "internal_openapi.json")
+    served_reads: list[None] = []
+    divergent = export._served
+    monkeypatch.setattr(export, "_served", lambda: served_reads.append(None) or divergent())
+    snapshot = tmp_path / "internal_openapi.json"
+    monkeypatch.setattr(export, "SNAPSHOT", snapshot)
 
     assert export.main(["--check"]) == 1
-    assert "missing" in capsys.readouterr().err
-    (tmp_path / "internal_openapi.json").write_text("{}\n", encoding="utf-8")
+    assert capsys.readouterr().err.startswith("snapshot missing: ")
+    snapshot.write_text("{}\n", encoding="utf-8")
     assert export.main(["--check"]) == 1
-    err = capsys.readouterr().err
-    assert "stale" in err and "served" not in err
+    # gm4 advisory (:277): "served" not in err passed only because tmp_path's name does not contain
+    # the word; the message is matched by its start, and the served document is never even read.
+    assert capsys.readouterr().err.startswith("snapshot stale: ")
+    assert served_reads == []
 
 
 def test_check_mode_passes_when_snapshot_and_served_document_agree(
