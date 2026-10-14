@@ -101,12 +101,22 @@ Not checked: a start against the live database and backend (needs this deploy).
 ## Rollback
 
 1. Stop the new Core: `docker compose -f infra/docker-compose.yml --env-file .env stop core core-peer-worker`.
-2. Restore the dumps of deploy step 3 (the schema was migrated forward):
+2. Restore the dumps of deploy step 3 into recreated databases. The schema was migrated forward,
+   and `pg_restore --clean` only drops objects the dump contains, so tables and columns added by
+   the new migrations would survive it. Drop and recreate each database instead (nothing else may
+   be connected; the core services are stopped in step 1):
 
    ```
-   docker exec -i glazed-db pg_restore -U postgres --clean --if-exists -d agent_core < agent_core-pre-g7.dump
-   docker exec -i glazed-db pg_restore -U postgres --clean --if-exists -d <dbos database> < dbos-pre-g7.dump
+   for db in agent_core "<dbos database>"; do
+     docker exec glazed-db dropdb -U postgres --if-exists --force "$db"
+     docker exec glazed-db createdb -U postgres "$db"
+   done
+   docker exec -i glazed-db pg_restore -U postgres -d agent_core < agent_core-pre-g7.dump
+   docker exec -i glazed-db pg_restore -U postgres -d <dbos database> < dbos-pre-g7.dump
    ```
+
+   Check the restore: `docker exec glazed-db psql -U postgres -d agent_core -c '\dt'` lists no
+   table the pre-G7 schema did not have (for example `addons`, `addon_migrations`).
 3. Put the deploy checkout back on the revision before this change (its compose file builds Core from
    `../Agent-Core/Core` with `GLAZED_BACKEND_URL`), restore the old images and start them unbuilt:
 
