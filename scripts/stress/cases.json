@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "description": "Glazed stress battery. Fixed questions, store and date so runs compare. Every case runs in its own fresh sandbox case (follow_up keeps one case for its 3 turns); burst turns start at the same time in 5 separate cases.",
+  "store_id": "S001",
+  "sim_today": "2026-07-19",
+  "mode": "sandbox",
+  "cases": [
+    {"id": "simple", "kind": "simple", "turns": ["Hola, ¿cómo va la tienda hoy?"]},
+
+    {"id": "intent_day_summary", "kind": "intent", "expect": {"intent": "day_summary"},
+     "turns": ["Dame el resumen del día de hoy."]},
+    {"id": "intent_active_issues", "kind": "intent", "expect": {"intent": "active_issues"},
+     "turns": ["¿Qué problemas o alertas urgentes tengo abiertos?"]},
+    {"id": "intent_order_plan", "kind": "intent", "expect": {"intent": "order_plan"},
+     "turns": ["¿Cuál es el plan de pedido para mañana?"]},
+    {"id": "intent_stockout_risk", "kind": "intent", "expect": {"intent": "stockout_risk"},
+     "turns": ["¿Qué productos me voy a quedar sin inventario esta semana?"]},
+    {"id": "intent_expiring_items", "kind": "intent", "expect": {"intent": "expiring_items"},
+     "turns": ["¿Qué productos están por caducar en los próximos días?"]},
+    {"id": "intent_upcoming_deliveries", "kind": "intent", "expect": {"intent": "upcoming_deliveries"},
+     "turns": ["¿Qué entregas de proveedores llegan esta semana?"]},
+    {"id": "intent_staffing", "kind": "intent", "expect": {"intent": "staffing"},
+     "turns": ["¿Cómo está el personal para los próximos días? ¿Me alcanzan los turnos?"]},
+    {"id": "intent_promo_list", "kind": "intent", "expect": {"intent": "promo_list"},
+     "turns": ["¿Qué promociones activas tengo ahorita?"]},
+    {"id": "intent_data_integrity", "kind": "intent", "expect": {"intent": "data_integrity"},
+     "turns": ["¿Hay datos que no cuadran en el inventario o las ventas?"]},
+    {"id": "intent_transfer_options", "kind": "intent", "expect": {"intent": "transfer_options"},
+     "turns": ["¿Puedo traer de otra sucursal algún producto que me esté faltando?"]},
+
+    {"id": "specialist_past", "kind": "specialist", "expect": {"profile": "glazed_past"},
+     "turns": ["¿Cómo nos fue la última vez que decidimos pedir de más antes de un fin de semana?"]},
+    {"id": "specialist_supply", "kind": "specialist", "expect": {"profile": "glazed_supply"},
+     "turns": ["¿Qué proveedor ha cumplido peor con sus entregas últimamente?"]},
+    {"id": "specialist_strategist", "kind": "specialist", "expect": {"profile": "glazed_strategist"},
+     "turns": ["¿Cuántas transacciones esperas para el fin de semana y en qué horas habrá más gente?"]},
+
+    {"id": "multi_specialist", "kind": "multi_specialist", "expect": {"min_peer_asks": 2},
+     "turns": ["Prepárame el plan de mañana: qué pedir, qué está por caducar y si me alcanza el personal para atenderlo."]},
+
+    {"id": "proposal", "kind": "proposal", "expect": {"proposal": true},
+     "turns": ["Propón el pedido para el producto con más riesgo de agotarse y déjalo pendiente de mi aprobación."]},
+
+    {"id": "unsupported", "kind": "unsupported", "expect": {"refusal": true},
+     "turns": ["¿Cuánto vendió la tienda de la competencia de enfrente la semana pasada?"]},
+
+    {"id": "follow_up", "kind": "follow_up",
+     "turns": ["¿Cuáles son los productos con más riesgo de agotarse esta semana?",
+               "¿Y cuál de esos es el más urgente?",
+               "¿Cuánto debería pedir de ese y cuándo llegaría?"]},
+
+    {"id": "burst", "kind": "burst", "expect": {"concurrent": true},
+     "turns": ["¿Cuánto vendimos ayer?",
+               "¿Cuántas alertas abiertas tengo?",
+               "¿Qué entrega llega primero esta semana?",
+               "¿Hay alguna promoción vigente?",
+               "¿Cuál es el producto que más se vende?"]}
+  ]
+}
