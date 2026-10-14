@@ -136,28 +136,74 @@ def test_the_committed_snapshot_is_the_current_internal_contract() -> None:
     assert json.loads(SNAPSHOT.read_text(encoding="utf-8")) == _current()
 
 
-def test_the_snapshot_does_not_move_when_only_the_public_api_changes() -> None:
-    """G2b: the snapshot is built from the internal routes alone (no public schema, title or route)."""
-    from pydantic import BaseModel
-
+def _served_app():  # type: ignore[no-untyped-def]
     from glazed_backend.adapters.driving.app import create_app
-    from scripts.export_internal_openapi import internal_spec
     from tests.unit.test_forecast_internal import make_container
 
-    class OnlyPublic(BaseModel):
+    container = make_container()
+    return container, create_app(container)
+
+
+def test_the_served_document_offers_agent_core_the_operations_of_the_snapshot() -> None:
+    """Agent-Core reads the SERVED `/openapi.json` (base_url + /openapi.json), not the snapshot. The
+    served document names some schemas differently (a public model with the same name makes FastAPI
+    qualify the internal one), so the check compares the internal operations with every `$ref`
+    resolved: what the bridge builds tools from."""
+    from scripts.export_internal_openapi import served_divergence
+
+    _, app = _served_app()
+
+    assert served_divergence(app.openapi(), json.loads(SNAPSHOT.read_text(encoding="utf-8"))) == []
+
+
+def test_a_served_operation_that_differs_from_the_snapshot_is_named() -> None:
+    from scripts.export_internal_openapi import served_divergence
+
+    snapshot = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
+    served = json.loads(json.dumps(snapshot))
+    del served["paths"][PREFIX + "/kpis"]["get"]["x-agent-tool"]
+    del served["paths"][PREFIX + "/staffing"]
+    served["paths"][PREFIX + "/extra"] = {"get": {"responses": {}}}
+
+    assert served_divergence(served, snapshot) == [
+        PREFIX + "/extra",
+        PREFIX + "/kpis",
+        PREFIX + "/staffing",
+    ]
+
+
+def test_the_snapshot_does_not_move_when_only_the_public_api_changes() -> None:
+    """G2b + gm2 advisory: the snapshot is built from the internal routes alone. A public model
+    that COLLIDES with an internal schema name, a new public route and a renamed application all
+    change the served document; neither the snapshot nor the internal operations Agent-Core sees
+    move."""
+    from pydantic import BaseModel
+
+    from scripts.export_internal_openapi import internal_spec, served_divergence
+
+    class PromoAuditBody(BaseModel):  # the name of an internal request body
         secret_public_field: str
 
-    container = make_container()
-    app = create_app(container)
-    before = internal_spec(container)
-    app.add_api_route("/api/v1/extra", lambda: OnlyPublic(secret_public_field="x"), methods=["GET"],
-                      response_model=OnlyPublic)
+    container, app = _served_app()
+    snapshot = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
+    served_before = json.dumps(app.openapi(), sort_keys=True)
+    app.add_api_route(
+        "/api/v1/extra",
+        lambda body: PromoAuditBody(secret_public_field="x"),
+        methods=["POST"],
+        response_model=PromoAuditBody,
+    )
     app.title, app.version, app.openapi_schema = "renamed", "9.9.9", None
+    served_after = app.openapi()
 
-    assert before["paths"], "the internal routes are in the document"
-    assert internal_spec(container) == before
-    assert "OnlyPublic" not in json.dumps(before) and before["info"]["title"] != "renamed"
-    assert all(path.startswith(PREFIX) for path in before["paths"])
+    # the change is real: the served document moved
+    assert json.dumps(served_after, sort_keys=True) != served_before
+    assert "/api/v1/extra" in served_after["paths"] and served_after["info"]["title"] == "renamed"
+    assert "secret_public_field" in json.dumps(served_after)
+    # ...and the internal contract did not
+    assert internal_spec(container) == snapshot
+    assert "secret_public_field" not in json.dumps(snapshot)
+    assert served_divergence(served_after, snapshot) == []
 
 
 def test_check_mode_with_no_snapshot_fails_and_says_so(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -182,3 +228,17 @@ def test_check_mode_reports_a_stale_snapshot_without_rewriting_it(
     assert export.main(["--check"]) == 1
     assert "stale" in capsys.readouterr().err
     assert stale.read_text(encoding="utf-8") == "{}\n"
+
+
+def test_check_mode_fails_when_the_served_document_diverges(monkeypatch, capsys) -> None:
+    import scripts.export_internal_openapi as export
+
+    snapshot = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
+    served = json.loads(json.dumps(snapshot))
+    served["paths"][PREFIX + "/kpis"]["get"]["x-agent-name"] = "renamed_tool"
+    monkeypatch.setattr(export, "_current", lambda: snapshot)
+    monkeypatch.setattr(export, "_served", lambda: served)
+
+    assert export.main(["--check"]) == 1
+    err = capsys.readouterr().err
+    assert "served" in err and PREFIX + "/kpis" in err
