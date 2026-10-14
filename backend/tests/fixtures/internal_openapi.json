@@ -1,0 +1,3114 @@
+{
+ "components": {
+  "schemas": {
+   "ClassifyBody": {
+    "properties": {
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "kind",
+     "text"
+    ],
+    "title": "ClassifyBody",
+    "type": "object"
+   },
+   "EventBody": {
+    "description": "Either a trace event (from/to/kind/payload) or the Core `record_event` tool shape\n(type/date_from/date_to/note), attributed to the calling agent.",
+    "properties": {
+     "date_from": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date From"
+     },
+     "date_to": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date To"
+     },
+     "from_agent": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "From Agent"
+     },
+     "kind": {
+      "default": "message",
+      "title": "Kind",
+      "type": "string"
+     },
+     "note": {
+      "default": "",
+      "title": "Note",
+      "type": "string"
+     },
+     "payload": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Payload",
+      "type": "object"
+     },
+     "to_agent": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "To Agent"
+     },
+     "type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Type"
+     }
+    },
+    "title": "EventBody",
+    "type": "object"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "title": "Detail",
+      "type": "array"
+     }
+    },
+    "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "ProposalBody": {
+    "description": "The agent names an option; action_type/params/tier below are legacy fields that are ignored.",
+    "properties": {
+     "action_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Action Type"
+     },
+     "issue_id": {
+      "title": "Issue Id",
+      "type": "string"
+     },
+     "option_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Option Id"
+     },
+     "params": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Params",
+      "type": "object"
+     },
+     "rationale": {
+      "default": "",
+      "title": "Rationale",
+      "type": "string"
+     },
+     "tier": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tier"
+     }
+    },
+    "required": [
+     "issue_id"
+    ],
+    "title": "ProposalBody",
+    "type": "object"
+   },
+   "TransferProposalBody": {
+    "properties": {
+     "option_id": {
+      "title": "Option Id",
+      "type": "string"
+     },
+     "rationale": {
+      "default": "",
+      "title": "Rationale",
+      "type": "string"
+     }
+    },
+    "required": [
+     "option_id"
+    ],
+    "title": "TransferProposalBody",
+    "type": "object"
+   },
+   "ValidationError": {
+    "properties": {
+     "ctx": {
+      "title": "Context",
+      "type": "object"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "title": "Location",
+      "type": "array"
+     },
+     "msg": {
+      "title": "Message",
+      "type": "string"
+     },
+     "type": {
+      "title": "Error Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError",
+    "type": "object"
+   },
+   "glazed_backend__adapters__driving__internal_api__NoteBody": {
+    "description": "A manager note. Store and as-of come from the case; the code decides what is written where.",
+    "properties": {
+     "category": {
+      "default": "eventos",
+      "title": "Category",
+      "type": "string"
+     },
+     "date_from": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date From"
+     },
+     "date_to": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date To"
+     },
+     "impact": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Impact"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "title": "NoteBody",
+    "type": "object"
+   },
+   "glazed_backend__adapters__driving__internal_api__PromoAuditBody": {
+    "description": "A proposed promotion template: department plus discount percentage.",
+    "properties": {
+     "department": {
+      "title": "Department",
+      "type": "string"
+     },
+     "discount_pct": {
+      "title": "Discount Pct",
+      "type": "number"
+     }
+    },
+    "required": [
+     "department",
+     "discount_pct"
+    ],
+    "title": "PromoAuditBody",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "title": "glazed-backend",
+  "version": "0.1.0"
+ },
+ "openapi": "3.1.0",
+ "paths": {
+  "/internal/v1/briefing": {
+   "get": {
+    "description": "Precomputed snapshot plus code-computed headline facts: answers simple questions without a specialist.",
+    "operationId": "briefing_internal_v1_briefing_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Briefing",
+    "x-agent-description": "The precomputed briefing of the case. Call it FIRST on every question.\n\nReturns `snapshot` (kpis, top_issues with options, integrity, order_plan, suppliers,\npending_proposals, recent_decisions), `headline` (up to 5 facts computed by code, each\nwith value, unit and source) and `suggested_focus` (issue_ids worth the manager's\nattention). Use the issue_id and option_id of `top_issues` to propose.\nA field may be absent; never estimate it yourself.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_briefing",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/classify": {
+   "post": {
+    "description": "Free text -> closed label (Jev). No case needed: nothing here reads store data.",
+    "operationId": "classify_internal_v1_classify_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ClassifyBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Classify",
+    "x-agent-description": "Classify free text with Jev into a fixed label set.\n\n`kind` is `rejection_reason` (why the manager rejected a proposal) or\n`deviation_cause` (why a decision was not carried out as planned). Returns\n{label, confidence, model, calibrated, adapter} plus `warning` when an earlier\nclassifier failed. The label is `needs_review` (rejection_reason) or `no_match`\n(deviation_cause) when nothing fits or confidence is under 0.4. `confidence` only\nmeasures how well the text fits the label; it is not the confidence of a\nrecommendation, and `calibrated` false means a fallback model answered. Quote the\nlabel as returned; never invent a category.",
+    "x-agent-effect": "read",
+    "x-agent-name": "classify_text",
+    "x-agent-replay": "interrupted",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/compliance": {
+   "get": {
+    "operationId": "compliance_internal_v1_compliance_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "decision_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Decision Id"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Compliance",
+    "x-agent-description": "Whether approved decisions were carried out, as measured by the backend.\n\nWithout `decision_id` it covers all approved decisions of the case, otherwise only\nthat one. Returns the checked decisions; each has `decision_id`, `execution_status`\n(executed, not_executed or partial) and, once the horizon passed, a `diagnosis`:\n`not_executed`, `within_range`, `external_event` (a registered event overlaps the\nhorizon) or `forecast_error`, with the observed vs simulated figures (label\n`backtest`). Only order-quantity actions are measurable; a field may be absent; never\nestimate it yourself. An empty list means there is nothing to check.",
+    "x-agent-effect": "read",
+    "x-agent-name": "check_compliance",
+    "x-agent-row-limit": 1000,
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/day-summary": {
+   "get": {
+    "operationId": "day_summary_internal_v1_day_summary_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "date",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Day Summary",
+    "x-agent-description": "Summary of one day (ISO date) for the store: sales, traffic, waste, incidents.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_day_summary",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/deliveries": {
+   "get": {
+    "description": "Open purchase orders and scheduled supplier slots; the same use case as the public route.",
+    "operationId": "deliveries_internal_v1_deliveries_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Days"
+      }
+     },
+     {
+      "in": "query",
+      "name": "store_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Store Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Deliveries",
+    "x-agent-description": "The delivery calendar of the next `days` (1-14, default 7): which supplier comes when.\n\nReturns `days`, one entry per date with its `deliveries`: open purchase orders (kind\nopen_po, with po_id, expected_date, lines and value_usd) and scheduled supplier slots\n(kind scheduled, no lines). Use it to answer when a supplier arrives; never guess a\ndelivery date.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_deliveries",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/events": {
+   "post": {
+    "operationId": "post_event_internal_v1_events_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EventBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Post Event",
+    "x-agent-description": "Record an operational event (holiday, outage, promo...) over a date range.",
+    "x-agent-effect": "write",
+    "x-agent-name": "record_event",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/experiences": {
+   "get": {
+    "operationId": "experiences_internal_v1_experiences_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "query",
+      "required": false,
+      "schema": {
+       "default": "",
+       "title": "Query",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 5,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Experiences",
+    "x-agent-description": "Recall past experiences of this store from long-term memory (Backboard).\n\nReturns entries with text, kind, created_at and optionally decision_id and score. They\nare leads, not facts: re-verify any number with get_history or evaluate_promo using the\ndecision_id before citing it. A `warning` means memory is unavailable: use history only.",
+    "x-agent-effect": "read",
+    "x-agent-name": "recall_experiences",
+    "x-agent-tool": true,
+    "x-agent-warning": true
+   }
+  },
+  "/internal/v1/expiring": {
+   "get": {
+    "description": "Lots about to expire (inferred ages) with waste as a USD range; the same use case as the public route.",
+    "operationId": "expiring_internal_v1_expiring_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Days"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Limit"
+      }
+     },
+     {
+      "in": "query",
+      "name": "store_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Store Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Expiring",
+    "x-agent-description": "Items about to expire in the next `days` (1-30, default 7) and the waste they imply.\n\nReturns `items` (the largest lots first: sku, product_name, expiring_units,\nexpiry_date, `waste_usd` as {low, mid, high} - a range, quote all three), `by_day`\n(the waste_usd range per expiry date), `total_items` and `total_waste_usd`. Lot ages\nare inferred, not measured. Use it for any question about expiry or waste to come.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_expiring",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/forecast": {
+   "get": {
+    "description": "Store forecast series of one metric (net_sales, transactions, footfall, avg_ticket, conversion); the same\nuse case as the public /cases/{id}/forecast?metric=.",
+    "operationId": "forecast_series_internal_v1_forecast_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "metric",
+      "required": false,
+      "schema": {
+       "default": "net_sales",
+       "title": "Metric",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "level",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": "store",
+       "title": "Level"
+      }
+     },
+     {
+      "in": "query",
+      "name": "from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "store_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Store Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Forecast Series"
+   }
+  },
+  "/internal/v1/forecast/demand": {
+   "get": {
+    "description": "p50 and quantiles of one SKU's units on a future day (> the case date), from the forecast model.",
+    "operationId": "forecast_demand_internal_v1_forecast_demand_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "sku",
+      "required": true,
+      "schema": {
+       "title": "Sku",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "target_date",
+      "required": true,
+      "schema": {
+       "format": "date",
+       "title": "Target Date",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "store_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Store Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Forecast Demand",
+    "x-agent-description": "Forecast demand of one SKU on a FUTURE date, from the backend's model.\n\nUse it for any question about future demand; never estimate a forecast yourself.\n`target_date` must be after the case's current date. Returns `qty` (the p50),\n`qty_range` {p10, p50, p90} (quote the range, never only the point), optional\n`quantiles`, `censored_share` (share of history with stockouts), `weather_kind`\n(\"observed\"), `model`, `model_version` and `forecast_origin`. If `forecast_available`\nis false the forecast is unavailable: say so.",
+    "x-agent-effect": "read",
+    "x-agent-name": "forecast_demand",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/forecast/flow": {
+   "get": {
+    "description": "Store transactions, footfall and average ticket on a future day (> the case date).",
+    "operationId": "forecast_flow_internal_v1_forecast_flow_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "target_date",
+      "required": true,
+      "schema": {
+       "format": "date",
+       "title": "Target Date",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "store_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Store Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Forecast Flow",
+    "x-agent-description": "Forecast the store's transactions and average ticket on a FUTURE date (daily).\n\nUse it for any question about future traffic; never estimate a forecast yourself.\n`target_date` must be after the case's current date. Returns `transactions`\n{p10, p50, p90}, `footfall` (null when there is no data), `avg_ticket`\n{p10, p50, p90}, `granularity` (\"daily\"), `model` and `forecast_origin`. Quote the\nrange and the model. If `forecast_available` is false the forecast is unavailable.",
+    "x-agent-effect": "read",
+    "x-agent-name": "forecast_daily_flow",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/history": {
+   "get": {
+    "operationId": "history_internal_v1_history_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "weeks",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Weeks"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "History",
+    "x-agent-description": "Past decisions and recorded events for the store, as the backend stores them.\n\nA decision's measured result is only present once the backend has measured it; it may\nbe absent; never estimate it yourself, say the result is not available yet.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_history",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/inventory": {
+   "get": {
+    "description": "Stock, cover, turnover and slow movers; the same use case as the public /cases/{id}/inventory.",
+    "operationId": "inventory_internal_v1_inventory_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Sort"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Limit"
+      }
+     },
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Days"
+      }
+     },
+     {
+      "in": "query",
+      "name": "store_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Store Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Inventory",
+    "x-agent-description": "Stock status per SKU: on hand, days_of_cover, status and the next delivery.\n\n`sort` is \"days_of_cover\" (emptiest shelf first, the default), \"turnover\" (fastest\nfirst) or \"slow\" (slow movers with the most money tied up first); `limit` is 1-50.\nEach item has `days_of_cover`, `status` (critical when the cover ends before the next\ndelivery, watch or ok) with `status_reason`, `next_delivery_date`,\n`projected_stockout_date` and `forecast_outflow_units`. A field may be absent; never\nestimate it yourself. Use it for any question about what is running out or what is\ncovered until the next delivery.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_inventory_status",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/inventory/projection": {
+   "get": {
+    "operationId": "projection_internal_v1_inventory_projection_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "sku",
+      "required": true,
+      "schema": {
+       "title": "Sku",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "horizon",
+      "required": false,
+      "schema": {
+       "default": 7,
+       "title": "Horizon",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Projection",
+    "x-agent-description": "Projected stock of one SKU for the next `horizon` days (1-30), from the backend.\n\nIncludes the projected stockout date when there is one. Fields may be absent; never\nestimate it yourself.",
+    "x-agent-effect": "read",
+    "x-agent-name": "project_inventory",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/issues": {
+   "get": {
+    "description": "Default: operational issues only (integrity never crowds out alerts). `kind=` filters by kind;\n`category=integrity` returns integrity issues only; `category=all` returns both, ranked by\nseverity_usd (operational) / exposure_usd (integrity).",
+    "operationId": "issues_internal_v1_issues_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 5,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "kind",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Kind"
+      }
+     },
+     {
+      "in": "query",
+      "name": "category",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Category"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Issues",
+    "x-agent-description": "Active issues for the store relevant to your role, most urgent first.\n\n`category` is \"operational\" (the backend default when omitted), \"integrity\"\n(data-quality issues, with `exposure_usd`) or \"all\"; `kind` narrows to one issue kind.\n\nEach issue has: issue_id, kind, sku?, supplier_id?, store_display_name, as_of,\nseverity_usd, `evidence` [{metric, value, unit, period, source}], `data_caveats` [str]\nand `options` (up to 4, always including `do_nothing` with its cost). Each option has:\noption_id, action_type, params, expected_benefit_usd {low, mid, high}, cost_usd,\nnet_usd_mid, loss_impact {waste_usd_delta, lost_sales_usd_delta}, confidence {score\n0-1, n_backtest, method}, tier (N0-N3, computed by the backend), tier_reasons, urgency\n{deadline_date?, reason}, risk, if_act and if_not. Present only these options.\nOptional fields (sku, supplier_id, deadline_date, if_act, if_not) are absent when the\nbackend has no value: a field may be absent; never estimate it yourself.\nAn empty list means there are no issues.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_issues",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/issues/{issue_id}/analysis": {
+   "get": {
+    "description": "Deterministic Spanish analysis of one issue; the same use case as the public route.",
+    "operationId": "issue_analysis_internal_v1_issues__issue_id__analysis_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "issue_id",
+      "required": true,
+      "schema": {
+       "title": "Issue Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Issue Analysis",
+    "x-agent-description": "The deterministic analysis of one issue (use an issue_id from get_issues).\n\nReturns the `recommendation` (option_id, label), its `pros` and `cons`, `confidence`\n{score, calibrated}, `tier`, `deadline`, `impact_usd` {low, mid, high}, `problem` and\n`dialog`: `why`, `if_accept`, `if_not_act` (the do_nothing case) and `alternatives`\nwith their net_usd_mid. Always give the confidence and the do_nothing comparison with\na recommendation.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_issue_analysis",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/kpis": {
+   "get": {
+    "operationId": "kpis_internal_v1_kpis_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date To"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Kpis",
+    "x-agent-description": "KPIs for the store over a date window (`date_from` to `date_to`, ISO dates).\n\nOne call covers the whole window: use it once instead of one call per day.\n\nReturns sales and traffic figures plus the two losses in USD: `waste_usd` and\n`lost_sales_usd`, the latter as {low, mid, high} (a range, never a point value; quote\nall three). `lost_sales_usd` may be absent; never estimate it yourself.\nResults carry `store_display_name`: use it, never the store code.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_kpis",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/metrics/explain": {
+   "get": {
+    "operationId": "explain_internal_v1_metrics_explain_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "metric",
+      "required": true,
+      "schema": {
+       "title": "Metric",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Explain",
+    "x-agent-description": "How a metric is defined and computed (not its value). Use before explaining one.",
+    "x-agent-effect": "read",
+    "x-agent-name": "explain_metric",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/notes": {
+   "post": {
+    "description": "The manager's note about upcoming demand, events or suppliers: a memory, an experience and an event.",
+    "operationId": "post_note_internal_v1_notes_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/glazed_backend__adapters__driving__internal_api__NoteBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Post Note",
+    "x-agent-description": "Save a note the manager asked to record (a closure, an event, supplier news...).\n\nCall it when the manager asks to note, remember or record something, or states a fact\nabout future operations. `text` is the manager's own words; `category` defaults to\n`eventos`; `date_from` / `date_to` (ISO dates) bound the period it applies to;\n`impact` is a short free label when the manager gave one. Returns {saved, memory_id,\nevent_id, category, date_from, date_to}. Only say it was saved when `saved` is true.\nA write of the manager's own words, done by backend code; it changes no store data.",
+    "x-agent-effect": "write",
+    "x-agent-name": "save_manager_note",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/order-plan": {
+   "get": {
+    "operationId": "order_plan_internal_v1_order_plan_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Order Plan",
+    "x-agent-description": "The order plan (draft) computed by the backend, one line per SKU.\n\nLines carry the quantity plus: service_level_target, order_deadline,\nprojected_stockout_date, stockout_risk_without_order, vs_current_practice\n{received_to_sold, qty_delta} and min_order_warning.\nAny of these may be absent; never estimate it yourself.\nIf one is absent, say it is not available. Results carry `store_display_name`.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_order_plan",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/outlook": {
+   "get": {
+    "description": "Next days: sales, transactions, ticket, expected waste and lost sales as ranges; same use case as the public route.",
+    "operationId": "outlook_internal_v1_outlook_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Days"
+      }
+     },
+     {
+      "in": "query",
+      "name": "past_days",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Past Days"
+      }
+     },
+     {
+      "in": "query",
+      "name": "store_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Store Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Outlook",
+    "x-agent-description": "Outlook for the next `days` (1-7, default 2: tomorrow and the day after).\n\nEach day has `net_sales`, `transactions` and `avg_ticket` as {low, mid, high},\n`expected_waste_usd` and `expected_lost_sales_usd` as {low, mid, high} ranges (quote\nall three), `weather` (null without a feed) and `weather_note`. Every day is a\nprojection. Use it for any question about today, tomorrow or the next days.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_outlook",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/promos": {
+   "get": {
+    "description": "Promotions (active, upcoming, past) with audit verdict and evaluation; the same use case as the public route.",
+    "operationId": "promos_internal_v1_promos_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Days"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Limit"
+      }
+     },
+     {
+      "in": "query",
+      "name": "store_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Store Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Promos",
+    "x-agent-description": "Promotions with their audit verdict and evaluation.\n\n`status` is \"active\", \"upcoming\" or \"past\" (all when omitted); `days` (1-365, default\n14) is the window around the case date. Each item has `audit_verdict` (block, allow or\ninsufficient_evidence) and, only for promos that already ended, an `evaluation`\n(uplift_pct, expected_uplift_pct, confidence). A promo without evaluation has no result\nyet: never claim an uplift.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_promos",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/promos/audit": {
+   "post": {
+    "operationId": "promo_audit_internal_v1_promos_audit_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/glazed_backend__adapters__driving__internal_api__PromoAuditBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Promo Audit",
+    "x-agent-description": "Audit a promotion idea against past evidence BEFORE recommending it.\n\nReturns {verdict, recommendation, similar, alternative, reasons, noise_floor_pct}.\n`verdict` is `block` (do not recommend it), `allow` or `insufficient_evidence`.\n`similar` lists comparable past promos (each may carry this store's\n`store_evaluation`), `alternative` a better idea when there is one and `reasons` the\nevidence. On `block`, recommend `do_nothing`. A field may be absent; never estimate\nit yourself.",
+    "x-agent-effect": "read",
+    "x-agent-name": "audit_promo",
+    "x-agent-replay": "interrupted",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/promos/{promo_id}/evaluation": {
+   "get": {
+    "operationId": "promo_internal_v1_promos__promo_id__evaluation_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "promo_id",
+      "required": true,
+      "schema": {
+       "title": "Promo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Promo",
+    "x-agent-description": "Backend-computed evaluation (uplift, cost, verdict) of a promotion.\n\nFields may be absent; never estimate it yourself.",
+    "x-agent-effect": "read",
+    "x-agent-name": "evaluate_promo",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/proposals": {
+   "post": {
+    "operationId": "post_proposal_internal_v1_proposals_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     },
+     {
+      "in": "header",
+      "name": "idempotency-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProposalBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Post Proposal",
+    "x-agent-description": "Propose one option of an issue. NOTHING is executed: the manager decides.\n\nSend only the `issue_id` and `option_id` returned by get_issues, and a short\n`rationale` in prose. The backend copies action_type, params and tier from the stored\noption; you cannot set or change them. Returns the pending proposal (or an error). The\ncall carries an `Idempotency-Key` (case + issue + option), so repeating it after a\ntimeout does not create a second proposal.",
+    "x-agent-effect": "write",
+    "x-agent-idempotency": [
+     "issue_id",
+     "option_id"
+    ],
+    "x-agent-name": "propose_action",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/snapshot": {
+   "get": {
+    "description": "Everything a specialist usually needs in one call (KPIs, top issues, order plan, suppliers, decisions).",
+    "operationId": "snapshot_internal_v1_snapshot_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Snapshot",
+    "x-agent-description": "Everything a specialist usually needs, in one call. Call it FIRST.\n\nReturns store_display_name, as_of, window {from, to}, `kpis` (net_sales, transactions,\nwaste_usd, lost_sales_usd {low, mid, high}, tx_per_staff_hour), `top_issues` (up to 5\nIssues with options), `integrity` (up to 3 {kind, exposure_usd, summary}), `order_plan`\n{due_today, due_tomorrow, top_lines}, `suppliers` (on_time_pct, fill_pct,\nnext_delivery), pending_proposals, recent_decisions and cache_age_s.\nA field may be absent; never estimate it yourself. Do not re-fetch this data.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_snapshot",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/staffing": {
+   "get": {
+    "description": "Recommended staff hours per future day from the flow forecast; the same use case as the public route.",
+    "operationId": "staffing_internal_v1_staffing_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Days"
+      }
+     },
+     {
+      "in": "query",
+      "name": "store_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Store Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Staffing",
+    "x-agent-description": "Recommended staff hours per future day (daily only; there is no hourly staffing).\n\n`days` is 1-14, default 7. Each day has `forecast_transactions` and\n`recommended_staff_hours` as {low, mid, high}; `planned_staff_hours` and `gap_hours`\nare null because there is no roster in the data. `benchmark` gives the format's\ntransactions per staff hour. Say plainly that the data is daily when asked about hours.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_staffing",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/suppliers/performance": {
+   "get": {
+    "operationId": "suppliers_internal_v1_suppliers_performance_get",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Suppliers",
+    "x-agent-description": "Supplier lead times and delays for the store, as computed by the backend.\n\nFields may be absent; never estimate it yourself.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_supplier_performance",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/transfers/options": {
+   "get": {
+    "description": "Surplus here against same-region deficits, computed by code from data up to the case date.",
+    "operationId": "transfer_options_internal_v1_transfers_options_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "sku",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Sku"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Limit"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Transfer Options",
+    "x-agent-description": "Transfer options between stores, computed by the backend (optionally for one `sku`).\n\nReturns `options`: {option_id, sku, product_name, from_store, to_store, to_store_name,\nqty, surplus_units, deficit_units, transfer_cost_usd, waste_avoided_usd,\nlost_sales_avoided_usd, net_usd, confidence, expires_on, rationale_es}, plus\n`do_nothing` and `assumptions` (the cost assumptions). Quote the confidence, the cost\nassumptions and the do-nothing comparison. A field may be absent; never estimate it.",
+    "x-agent-effect": "read",
+    "x-agent-name": "get_transfer_options",
+    "x-agent-tool": true
+   }
+  },
+  "/internal/v1/transfers/proposals": {
+   "post": {
+    "operationId": "post_transfer_proposal_internal_v1_transfers_proposals_post",
+    "parameters": [
+     {
+      "in": "header",
+      "name": "x-glazed-agent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Agent"
+      }
+     },
+     {
+      "in": "header",
+      "name": "idempotency-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-glazed-case",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Glazed-Case"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TransferProposalBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Post Transfer Proposal",
+    "x-agent-description": "Propose one transfer option. NOTHING is executed: the manager approves or rejects.\n\nSend only an `option_id` returned by get_transfer_options and a short `rationale`. The\nbackend copies the transfer from the stored option and creates a pending proposal. The\ncall carries an `Idempotency-Key` (case + option), so a retry after a timeout does not\ncreate a second proposal.",
+    "x-agent-effect": "write",
+    "x-agent-idempotency": [
+     "option_id"
+    ],
+    "x-agent-name": "propose_transfer",
+    "x-agent-tool": true
+   }
+  }
+ }
+}

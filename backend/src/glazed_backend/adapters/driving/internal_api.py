@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from ... import application as uc
 from ...application import copilot as uc_copilot, forecast as uc_forecast, manager as uc_manager, notes as uc_notes, sentinel, transfers as uc_transfers
+from .agent_tools import AGENT_TOOLS
 from .store_names import StoreNames
 from ...domain import Case, DomainError, canonical_agent_id, case_id_from_session
 
@@ -91,36 +92,36 @@ def build_internal_router(c: Any) -> APIRouter:
 
     Ctx = Annotated[Case, Depends(case_ctx)]
 
-    @r.get("/kpis")
+    @r.get("/kpis", openapi_extra=AGENT_TOOLS["get_kpis"])
     def kpis(case: Ctx, date_from: date | None = None, date_to: date | None = None):
         return names.tag(uc_manager.kpis_vs_normal(c.metrics, case, date_from, date_to), case.store_id)
 
-    @r.get("/snapshot")
+    @r.get("/snapshot", openapi_extra=AGENT_TOOLS["get_snapshot"])
     def snapshot(case: Ctx):
         """Everything a specialist usually needs in one call (KPIs, top issues, order plan, suppliers, decisions)."""
         return jsonable_encoder(c.briefings.snapshot(case))
 
-    @r.get("/briefing")
+    @r.get("/briefing", openapi_extra=AGENT_TOOLS["get_briefing"])
     def briefing(case: Ctx):
         """Precomputed snapshot plus code-computed headline facts: answers simple questions without a specialist."""
         return jsonable_encoder(c.briefings.briefing(case))
 
-    @r.get("/metrics/explain")
+    @r.get("/metrics/explain", openapi_extra=AGENT_TOOLS["explain_metric"])
     def explain(case: Ctx, metric: str):
         return uc.ExplainMetric(c.cases, c.metrics).execute(case.case_id, metric)
 
-    @r.get("/day-summary")
+    @r.get("/day-summary", openapi_extra=AGENT_TOOLS["get_day_summary"])
     def day_summary(case: Ctx, date: date | None = None):
         return names.tag(uc.GetDaySummary(c.cases, c.metrics).execute(case.case_id, date), case.store_id)
 
-    @r.get("/issues")
+    @r.get("/issues", openapi_extra=AGENT_TOOLS["get_issues"])
     def issues(case: Ctx, limit: int = 5, kind: str | None = None, category: str | None = None):
         """Default: operational issues only (integrity never crowds out alerts). `kind=` filters by kind;
         `category=integrity` returns integrity issues only; `category=all` returns both, ranked by
         severity_usd (operational) / exposure_usd (integrity)."""
         return uc_manager.select_issues(c.metrics, names, c.served, case, limit, kind, category)
 
-    @r.get("/issues/{issue_id}/analysis")
+    @r.get("/issues/{issue_id}/analysis", openapi_extra=AGENT_TOOLS["get_issue_analysis"])
     def issue_analysis(case: Ctx, issue_id: str):
         """Deterministic Spanish analysis of one issue; the same use case as the public route."""
         return uc_copilot.IssueAnalysis(c.cases, c.alerts, c.metrics, c.served, names).execute(case, issue_id)
@@ -143,78 +144,78 @@ def build_internal_router(c: Any) -> APIRouter:
         return uc_forecast.StoreMetricForecast(c.cases, c.metrics, c.forecasters, c.flow_forecaster, names).execute(
             case.case_id, metric, date_from, date_to, level)
 
-    @r.get("/forecast/demand")
+    @r.get("/forecast/demand", openapi_extra=AGENT_TOOLS["forecast_demand"])
     def forecast_demand(case: Ctx, sku: str, target_date: date, store_id: str | None = None, as_of: date | None = None):
         """p50 and quantiles of one SKU's units on a future day (> the case date), from the forecast model."""
         own_case(case, store_id, as_of)
         return uc_forecast.DemandForecast(c.metrics, c.forecasters).execute(case, sku, target_date)
 
-    @r.get("/forecast/flow")
+    @r.get("/forecast/flow", openapi_extra=AGENT_TOOLS["forecast_daily_flow"])
     def forecast_flow(case: Ctx, target_date: date, store_id: str | None = None, as_of: date | None = None):
         """Store transactions, footfall and average ticket on a future day (> the case date)."""
         own_case(case, store_id, as_of)
         return uc_forecast.FlowForecast(c.metrics, c.flow_forecaster).execute(case, target_date)
 
-    @r.get("/inventory")
+    @r.get("/inventory", openapi_extra=AGENT_TOOLS["get_inventory_status"])
     def inventory(case: Ctx, sort: str | None = None, limit: int | None = None, days: int | None = None,
                   store_id: str | None = None, as_of: date | None = None):
         """Stock, cover, turnover and slow movers; the same use case as the public /cases/{id}/inventory."""
         own_case(case, store_id, as_of)
         return uc_manager.InventoryView(c.metrics, names, c.forecasters).execute(case, sort, limit, days)
 
-    @r.get("/expiring")
+    @r.get("/expiring", openapi_extra=AGENT_TOOLS["get_expiring"])
     def expiring(case: Ctx, days: int | None = None, limit: int | None = None, store_id: str | None = None,
                  as_of: date | None = None):
         """Lots about to expire (inferred ages) with waste as a USD range; the same use case as the public route."""
         own_case(case, store_id, as_of)
         return uc_manager.ExpiringView(c.metrics, names).execute(case, days, limit)
 
-    @r.get("/deliveries")
+    @r.get("/deliveries", openapi_extra=AGENT_TOOLS["get_deliveries"])
     def deliveries(case: Ctx, days: int | None = None, store_id: str | None = None, as_of: date | None = None):
         """Open purchase orders and scheduled supplier slots; the same use case as the public route."""
         own_case(case, store_id, as_of)
         return uc_manager.DeliveriesView(c.metrics, names).execute(case, days)
 
-    @r.get("/staffing")
+    @r.get("/staffing", openapi_extra=AGENT_TOOLS["get_staffing"])
     def staffing(case: Ctx, days: int | None = None, store_id: str | None = None, as_of: date | None = None):
         """Recommended staff hours per future day from the flow forecast; the same use case as the public route."""
         own_case(case, store_id, as_of)
         return uc_manager.StaffingView(c.metrics, names, c.flow_forecaster).execute(case, days)
 
-    @r.get("/outlook")
+    @r.get("/outlook", openapi_extra=AGENT_TOOLS["get_outlook"])
     def outlook(case: Ctx, days: int | None = None, past_days: int | None = None, store_id: str | None = None, as_of: date | None = None):
         """Next days: sales, transactions, ticket, expected waste and lost sales as ranges; same use case as the public route."""
         own_case(case, store_id, as_of)
         return uc_manager.OutlookView(c.metrics, names, c.forecasters, c.flow_forecaster).execute(case, days, past_days)
 
-    @r.get("/inventory/projection")
+    @r.get("/inventory/projection", openapi_extra=AGENT_TOOLS["project_inventory"])
     def projection(case: Ctx, sku: str, horizon: int = 7):
         return uc_manager.inventory_projection(c.metrics, case, sku, horizon)
 
-    @r.get("/order-plan")
+    @r.get("/order-plan", openapi_extra=AGENT_TOOLS["get_order_plan"])
     def order_plan(case: Ctx):
         return names.tag(c.metrics.order_plan(case.store_id, case.sim_today), case.store_id)
 
-    @r.get("/suppliers/performance")
+    @r.get("/suppliers/performance", openapi_extra=AGENT_TOOLS["get_supplier_performance"])
     def suppliers(case: Ctx):
         return c.metrics.supplier_performance(case.store_id, case.sim_today)
 
-    @r.get("/promos")
+    @r.get("/promos", openapi_extra=AGENT_TOOLS["get_promos"])
     def promos(case: Ctx, status: str | None = None, days: int | None = None, limit: int | None = None,
                store_id: str | None = None, as_of: date | None = None):
         """Promotions (active, upcoming, past) with audit verdict and evaluation; the same use case as the public route."""
         own_case(case, store_id, as_of)
         return uc_manager.PromosView(c.metrics, names).execute(case, status, days, limit)
 
-    @r.get("/promos/{promo_id}/evaluation")
+    @r.get("/promos/{promo_id}/evaluation", openapi_extra=AGENT_TOOLS["evaluate_promo"])
     def promo(case: Ctx, promo_id: str):
         return c.metrics.promo_evaluation(case.store_id, case.sim_today, promo_id)
 
-    @r.post("/promos/audit")
+    @r.post("/promos/audit", openapi_extra=AGENT_TOOLS["audit_promo"])
     def promo_audit(case: Ctx, b: PromoAuditBody):
         return c.metrics.promo_audit(case.store_id, case.sim_today, b.department, b.discount_pct)
 
-    @r.post("/classify")
+    @r.post("/classify", openapi_extra=AGENT_TOOLS["classify_text"])
     def classify(b: ClassifyBody):
         """Free text -> closed label (Jev). No case needed: nothing here reads store data."""
         from ..driven.classifiers import ChainClassifier
@@ -228,17 +229,17 @@ def build_internal_router(c: Any) -> APIRouter:
         clf = getattr(c, "classifier", None) or ChainClassifier([])
         return clf.classify(b.kind, b.text).as_dict()
 
-    @r.get("/compliance")
+    @r.get("/compliance", openapi_extra=AGENT_TOOLS["check_compliance"])
     def compliance(case: Ctx, decision_id: str | None = None):
         chk = sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace, c.outcomes)
         return jsonable_encoder(chk.one(case.case_id, decision_id) if decision_id else chk.for_case(case.case_id))
 
-    @r.get("/history")
+    @r.get("/history", openapi_extra=AGENT_TOOLS["get_history"])
     def history(case: Ctx, weeks: int | None = None):
         chk = sentinel.CheckCompliance(c.cases, c.proposals, c.executions, c.metrics, c.trace, c.outcomes)
         return uc_manager.case_history(c.metrics, chk, case, weeks)
 
-    @r.get("/experiences")
+    @r.get("/experiences", openapi_extra=AGENT_TOOLS["recall_experiences"])
     def experiences(case: Ctx, response: Response, query: str = "", limit: int = 5):
         from ...application.scope import experience_visible
         found, warning = uc.RecallExperiences(getattr(c, "memory", None)).execute(
@@ -272,7 +273,7 @@ def build_internal_router(c: Any) -> APIRouter:
                         "case_id": n["case_id"], "same_case": n["case_id"] == case.case_id})
         return out[:max(1, min(limit, 20))]
 
-    @r.post("/proposals", status_code=201)
+    @r.post("/proposals", status_code=201, openapi_extra=AGENT_TOOLS["propose_action"])
     def post_proposal(case: Ctx, b: ProposalBody, response: Response,
                       x_glazed_agent: Annotated[str | None, Header()] = None,
                       idempotency_key: Annotated[str | None, Header()] = None):
@@ -283,12 +284,12 @@ def build_internal_router(c: Any) -> APIRouter:
             response.status_code = 200  # replay of an earlier request: the original proposal
         return jsonable_encoder(proposal)
 
-    @r.get("/transfers/options")
+    @r.get("/transfers/options", openapi_extra=AGENT_TOOLS["get_transfer_options"])
     def transfer_options(case: Ctx, sku: str | None = None, limit: int | None = None):
         """Surplus here against same-region deficits, computed by code from data up to the case date."""
         return jsonable_encoder(uc_transfers.TransferOptions(c.metrics).execute(case, sku, limit))
 
-    @r.post("/transfers/proposals", status_code=201)
+    @r.post("/transfers/proposals", status_code=201, openapi_extra=AGENT_TOOLS["propose_transfer"])
     def post_transfer_proposal(case: Ctx, b: TransferProposalBody, response: Response,
                                x_glazed_agent: Annotated[str | None, Header()] = None,
                                idempotency_key: Annotated[str | None, Header()] = None):
@@ -298,13 +299,13 @@ def build_internal_router(c: Any) -> APIRouter:
             response.status_code = 200
         return jsonable_encoder(proposal)
 
-    @r.post("/notes", status_code=201)
+    @r.post("/notes", status_code=201, openapi_extra=AGENT_TOOLS["save_manager_note"])
     def post_note(case: Ctx, b: NoteBody):
         """The manager's note about upcoming demand, events or suppliers: a memory, an experience and an event."""
         return uc_notes.ManagerNotes(c.cases, c.trace, c.decision_memories, c.memory, c.clock).add(
             case, b.text, b.category, b.date_from, b.date_to, b.impact)
 
-    @r.post("/events", status_code=201)
+    @r.post("/events", status_code=201, openapi_extra=AGENT_TOOLS["record_event"])
     def post_event(case: Ctx, b: EventBody, x_glazed_agent: Annotated[str | None, Header()] = None):
         payload = dict(b.payload)
         if b.type:  # Core record_event tool shape
