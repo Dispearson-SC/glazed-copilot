@@ -227,6 +227,36 @@ def test_a_finished_reply_being_rewritten_is_never_shown_as_partial(world):
     assert "partial_reply" not in out
 
 
+def _partial(world, text):
+    world.get.execute(world.case.case_id, world.tid)
+    world.streams.feed(world.tid, "delta", {"turn_id": world.tid, "text": text})
+    return world.get.execute(world.case.case_id, world.tid)
+
+
+def test_a_partial_the_final_guard_would_rewrite_is_never_exposed(world):
+    """Slice gm6: the partial reply passes the SAME quality guard as the final one; a draft the final
+    reply would send back for a rewrite (meta talk, restarts) is withheld, the turn stays pending."""
+    out = _partial(world, "No tengo acceso a los datos. Let me think about the order.")
+
+    assert out["status"] == "pending"
+    assert "partial_reply" not in out
+    assert out["first_text_ms"] is not None, "the first-text time is a measurement, not text"
+
+
+def test_a_partial_still_reasoning_inside_an_open_think_block_is_never_exposed(world):
+    """The final sanitizer keeps the text of an unclosed think block (the model forgot to close it);
+    mid-stream it is reasoning that has not ended yet, so nothing is shown."""
+    out = _partial(world, "<think>el gerente quiere saber las ventas, reviso get_kpis")
+
+    assert out["status"] == "pending" and "partial_reply" not in out
+
+
+def test_a_clean_partial_is_exposed_cleaned_as_before(world):
+    out = _partial(world, "Hoy vendiste 12 cajas de glaseadas")
+
+    assert out["partial_reply"] == "Hoy vendiste 12 cajas de glaseadas"
+
+
 # ---- wiring ----
 
 def test_the_public_api_follows_the_turn_and_exposes_the_partial_reply():

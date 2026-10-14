@@ -9,7 +9,7 @@ from typing import Any
 from ..domain import (Alert, AlertState, BacktestRun, Case, DecisionMemory, DomainError, Execution, Experience, FutureDate, InvalidTransition, NotFound,
                       Proposal, TraceEvent, TurnRecord, alert_type_for_kind, canonical_agent_id, case_id_from_session, new_id, utcnow)
 from ..domain.models import public_agent_id
-from .reply_sanitizer import clean_reply, role_name_es, sanitize_reply  # noqa: F401 - sanitize_reply stays importable from here
+from .reply_sanitizer import clean_partial, clean_reply, role_name_es, sanitize_reply  # noqa: F401 - sanitize_reply stays importable from here
 from ..ports import (AlertRepository, BacktestRepository, CaseRepository, Clock, CorePort,
                      ExecutionRepository, ExperienceMemoryPort, MetricsPort, ProposalRepository, TracePort,
                      TurnRepository)
@@ -227,7 +227,9 @@ class GetTurn:
             out["first_text_ms"] = meta["first_text_ms"] = round(
                 (state.first_text_at - started).total_seconds() * 1000)
         if out.get("status") == "pending" and state.live and state.text:  # never a finished (maybe rewriting) reply
-            out["partial_reply"] = clean_reply(state.text).text
+            partial = clean_partial(state.text)  # the final reply's guard: a draft it would rewrite is never shown
+            if partial is not None:
+                out["partial_reply"] = partial
         if out.get("status") in ("done", "failed"):
             self.streams.forget(turn_id)
 

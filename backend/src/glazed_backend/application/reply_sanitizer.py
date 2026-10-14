@@ -250,6 +250,22 @@ def clean_reply(text: str) -> ReplyCleaning:
     return ReplyCleaning(text, removed, score, reasons)
 
 
+def clean_partial(text: str) -> str | None:
+    """The partial (streamed, unfinished) reply as the manager may see it, or None to show nothing yet.
+
+    The SAME guard as the final reply (`clean_reply`): a draft the final reply would be sent back to rewrite
+    (`contaminated`) is withheld, never shown and then replaced. One more rule only a partial needs: an open
+    think block with no closer is reasoning still streaming (the final sanitizer keeps such text, because a
+    finished reply that forgot the closer is still the answer), so nothing is shown until it closes."""
+    normalized = _ESCAPED_TAG.sub(lambda m: f"<{m.group(1)}{m.group(2)}>", text)
+    if len(_OPEN_TAG.findall(normalized)) > len(_CLOSE_TAG.findall(normalized)):
+        return None
+    cleaning = clean_reply(text)
+    if cleaning.contaminated or not cleaning.text.strip():
+        return None
+    return cleaning.text
+
+
 def sanitize_reply(text: str) -> tuple[str, list[str]]:
     """`(clean_text, removed_fragments)`; kept for the callers that only need the cleaned text."""
     out = clean_reply(text)
