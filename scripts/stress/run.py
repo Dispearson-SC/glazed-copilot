@@ -24,7 +24,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import httpx
+try:
+    import httpx
+except ModuleNotFoundError:  # `compare` needs no network; `run` reports the missing dependency
+    httpx = None  # type: ignore[assignment]
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -153,6 +156,8 @@ def llm_calls_estimate(turns: list[dict[str, Any]]) -> int:
 
 
 def run(args: argparse.Namespace) -> Path:
+    if httpx is None:
+        raise SystemExit("run needs httpx: set PYTHONPATH to the backend .deps")
     b = battery.load_cases(args.cases)
     only = set(args.only.split(",")) if args.only else None
     cases = [c for c in b.cases if only is None or c.id in only]
