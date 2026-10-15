@@ -5,6 +5,10 @@ One `StreamState` per turn the backend started: the reply text the turn has stre
 turn's text counts: a peer's deltas never reach the manager. The stream is a speedup, never the authority: the
 final reply is still read once from `GET /turns/{id}` (sanitizing, rewrite) and any failure of the stream marks it
 `broken`, which sends `GetTurn` back to plain polling.
+
+A delta's `detail` is the Core's chunk identity `<run>:<response>:<index>`: a chunk of another run or response starts
+the text over (the model answered again after a tool call, a retried step, or the Core taking a cut draft back with
+ONE empty chunk before the turn falls back, P11). The first-text time stays the first chunk's.
 """
 from __future__ import annotations
 
@@ -26,6 +30,7 @@ class StreamState:
     finished: bool = False  # the root turn ended (or the whole tree settled): read the final reply once
     broken: bool = False  # the stream failed or ended early: poll instead
     checked_at: datetime | None = None  # the last time GetTurn asked the Core for the status itself
+    chunk: tuple[str, str] | None = None  # (run, response) of the text held; None: unknown (start, after a snapshot)
 
     @property
     def live(self) -> bool:
@@ -99,13 +104,14 @@ class TurnStreams:
         if kind == "snapshot":
             for turn in data.get("turns") or []:
                 if isinstance(turn, dict) and turn.get("turn_id") == turn_id:
-                    if isinstance(turn.get("reply_text"), str) and turn["reply_text"]:
+                    if isinstance(turn.get("reply_text"), str):  # the whole text so far, a withdrawn "" included
                         self._text(state, turn["reply_text"], replace=True)
+                        state.chunk = None
                     if turn.get("state") in _TERMINAL_STATES:
                         state.finished = True
         elif kind == "delta":
-            if data.get("turn_id") == turn_id and isinstance(data.get("text"), str) and data["text"]:
-                self._text(state, data["text"], replace=False)
+            if data.get("turn_id") == turn_id and isinstance(data.get("text"), str):
+                self._text(state, data["text"], replace=self._starts_over(state, data.get("detail")))
         elif kind in _TERMINAL_STATES:
             if data.get("turn_id") == turn_id:
                 state.finished = True
@@ -114,7 +120,20 @@ class TurnStreams:
         elif kind == "error":
             state.broken = True
 
+    @staticmethod
+    def _starts_over(state: StreamState, detail: Any) -> bool:
+        """Whether a delta's chunk replaces the text held: it belongs to another (run, response). After a snapshot
+        (which holds the latest response whole) a later chunk of it appends; a first chunk of a new one replaces."""
+        parts = detail.split(":") if isinstance(detail, str) else []
+        if len(parts) != 3 or not parts[2].isdigit():
+            return False  # not a chunk identity: append, as before
+        which = (parts[0], parts[1])
+        known, state.chunk = state.chunk, which
+        if known is None:
+            return int(parts[2]) == 0
+        return which != known
+
     def _text(self, state: StreamState, text: str, replace: bool) -> None:
         state.text = text if replace else state.text + text
-        if state.first_text_at is None:
+        if state.first_text_at is None and text:
             state.first_text_at = self.clock.now()

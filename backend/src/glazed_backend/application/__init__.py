@@ -230,6 +230,8 @@ class GetTurn:
             partial = clean_partial(state.text)  # the final reply's guard: a draft it would rewrite is never shown
             if partial is not None:
                 out["partial_reply"] = partial
+        elif out.get("status") == "pending" and state.live:  # the Core took its draft back (P11): clear it
+            out["partial_reply"] = ""
         if out.get("status") in ("done", "failed"):
             self.streams.forget(turn_id)
 

@@ -6,9 +6,15 @@ raise or a stream that closes early marks it broken. While a stream is live, Get
 cleaned `partial_reply` and `first_text_ms` without asking the Core more often than `core_check_s`; once it finished
 GetTurn reads the final reply from `GET /turns/{id}` as before and keeps `first_text_ms` (also on stored reads); a
 broken stream, or no stream at all, is plain polling exactly as before.
+
+P11 (Core's chunk identity). A delta's `detail` is `<run>:<response>:<index>`: a chunk of another run or response
+starts the text over (the model answered again after a tool call, the step was retried, or the Core took a cut
+draft back with ONE empty chunk before the turn fell back). A withdrawn text keeps the first-text time and GetTurn
+answers `partial_reply: ""` so the client clears the draft it shows. A delta without a `detail` still appends.
 """
 from __future__ import annotations
 
+import json
 from datetime import date, timedelta
 
 import httpx
@@ -83,6 +89,58 @@ def test_the_stream_keeps_only_the_root_turns_text_and_when_it_first_arrived():
     assert state.live
     streams.feed("t1", "finished", {"turn_id": "t1"})
     assert state.finished and not state.live
+
+
+def _chunk(turn_id: str, detail: str, text: str) -> dict:
+    return {"turn_id": turn_id, "detail": detail, "text": text}
+
+
+def test_a_chunk_of_a_new_response_or_run_starts_the_text_over():
+    clock = FakeClock()
+    streams = TurnStreams(None, clock)
+    streams.begin("t1")
+    streams.feed("t1", "delta", _chunk("t1", "r1:0:0", "Déjame revisar. "))
+    first = streams.state("t1").first_text_at
+    streams.feed("t1", "delta", _chunk("t1", "r1:0:1", "Un momento."))
+    assert streams.state("t1").text == "Déjame revisar. Un momento."
+    clock._now = clock._now + timedelta(seconds=3)
+    streams.feed("t1", "delta", _chunk("t1", "r1:1:0", "Hoy vendiste 12. "))  # after a tool call
+    assert streams.state("t1").text == "Hoy vendiste 12. "
+    streams.feed("t1", "delta", _chunk("t1", "r2:0:0", "Hoy vendiste 12 cajas."))  # a retried step
+    assert streams.state("t1").text == "Hoy vendiste 12 cajas."
+    assert streams.state("t1").first_text_at == first, "the first text time is the first chunk's"
+
+
+def test_the_cores_empty_chunk_takes_a_cut_draft_back():
+    clock = FakeClock()
+    streams = TurnStreams(None, clock)
+    streams.begin("t1")
+    streams.feed("t1", "delta", _chunk("t1", "r1:0:0", "Producto A tiene 3. "))
+    first = streams.state("t1").first_text_at
+    streams.feed("t1", "delta", _chunk("t1", "r1:1:0", ""))
+    state = streams.state("t1")
+    assert state.text == "" and state.first_text_at == first and state.live
+    streams.feed("t1", "delta", _chunk("t1", "r9:0:0", "Respuesta completa."))
+    assert state.text == "Respuesta completa."
+
+
+def test_an_empty_chunk_as_the_first_text_is_no_first_text():
+    streams = TurnStreams(None, FakeClock())
+    streams.begin("t1")
+    streams.feed("t1", "delta", _chunk("t1", "r1:1:0", ""))
+    assert streams.state("t1").text == "" and streams.state("t1").first_text_at is None
+
+
+def test_after_a_snapshot_the_rest_of_its_response_appends_and_a_new_one_starts_over():
+    streams = TurnStreams(None, FakeClock())
+    streams.begin("t1")
+    streams.feed("t1", "snapshot", _snapshot("t1", "Hoy vendiste"))
+    streams.feed("t1", "delta", _chunk("t1", "r1:0:3", " 12 cajas."))
+    assert streams.state("t1").text == "Hoy vendiste 12 cajas."
+    streams.feed("t1", "delta", _chunk("t1", "r1:1:0", ""))
+    assert streams.state("t1").text == ""
+    streams.feed("t1", "snapshot", _snapshot("t1", ""))  # a reconnect after the withdrawal
+    assert streams.state("t1").text == ""
 
 
 def test_a_reconnect_snapshot_replaces_the_text_and_a_settled_tree_ends_the_stream():
@@ -246,6 +304,18 @@ def test_a_live_stream_answers_pending_with_the_partial_reply_and_first_text_tim
     assert world.core.gets == gets, "a live stream does not poll the Core within core_check_s"
 
 
+def test_a_withdrawn_draft_answers_an_empty_partial_reply_so_the_client_clears_it(world):
+    world.get.execute(world.case.case_id, world.tid)
+    _later(world, 1.0)
+    world.streams.feed(world.tid, "delta", _chunk(world.tid, "r1:0:0", "Producto A tiene 3."))
+    assert world.get.execute(world.case.case_id, world.tid)["partial_reply"] == "Producto A tiene 3."
+    world.streams.feed(world.tid, "delta", _chunk(world.tid, "r1:1:0", ""))
+
+    out = world.get.execute(world.case.case_id, world.tid)
+
+    assert out["status"] == "pending" and out["partial_reply"] == "" and out["first_text_ms"] == 1000
+
+
 def test_a_live_stream_still_asks_the_core_after_core_check_s(world):
     world.get.execute(world.case.case_id, world.tid)
     gets = world.core.gets
@@ -358,6 +428,60 @@ def test_the_public_api_follows_the_turn_and_exposes_the_partial_reply():
     t = client.get(f"/api/v1/cases/{case['case_id']}/turns/{tid}").json()
 
     assert t["status"] == "pending" and t["partial_reply"] == "Hola, gerente" and t["first_text_ms"] == 0
+
+
+def test_end_to_end_a_routed_turn_streamed_by_a_fake_core_sse_carries_first_text_ms():
+    """P11, offline end to end: the real Core adapter over HTTP (a fake Core: POST /turns, the SSE feed, GET
+    /turns/{id}), the real stream registry and the public API. The Core streams a routed turn's draft, takes it
+    back, streams the fallback reply and finishes; the manager's turn read carries `first_text_ms` from the first
+    chunk (2.3 s after the message was sent) and the final reply from GET /turns/{id}."""
+    from fastapi.testclient import TestClient
+
+    from glazed_backend.adapters.driving.app import Container, create_app
+    from tests.fakes import (FakeMetrics, InMemoryAlerts, InMemoryBacktests, InMemoryExecutions, InMemoryProposals,
+                             InMemoryTrace)
+
+    clock = FakeClock()
+    tid = "00000000-0000-4000-8000-0000000000aa"
+    frames = [
+        ("snapshot", {"root_turn_id": tid, "turns": [{"turn_id": tid, "state": "running", "reply_text": ""}]}),
+        ("delta", {"turn_id": tid, "detail": "r1:0:0", "text": "Producto A tiene 3. "}),
+        ("delta", {"turn_id": tid, "detail": "r1:1:0", "text": ""}),
+        ("delta", {"turn_id": tid, "detail": "r2:0:0", "text": "Tienes 2 unidades de glaseadas."}),
+        ("finished", {"turn_id": tid}),
+        ("end", {}),
+    ]
+    body = "".join(f"event: {kind}\ndata: {json.dumps(data)}\n\n" for kind, data in frames).encode()
+    seen: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(f"{req.method} {req.url.path}")
+        if req.method == "POST" and req.url.path == "/turns":
+            return httpx.Response(200, json={"turn_id": tid})
+        if req.url.path == f"/turns/{tid}/events":
+            clock._now = clock._now + timedelta(seconds=2.3)  # the first chunk arrives 2.3 s after the send
+            return httpx.Response(200, content=body, headers={"content-type": "text/event-stream"})
+        if req.url.path == f"/turns/{tid}":
+            return httpx.Response(200, json={"turn_id": tid, "status": "finished",
+                                             "text": "Tienes 2 unidades de glaseadas."})
+        return httpx.Response(404)
+
+    core = AgentCoreHttp("http://core", max_streams=4,
+                         client=httpx.Client(transport=httpx.MockTransport(handler), base_url="http://core"))
+    streams = TurnStreams(core, clock, spawn=lambda fn: fn())  # consume the feed at once, in order
+    c = Container(metrics=FakeMetrics(), core=core, cases=InMemoryCases(), alerts=InMemoryAlerts(),
+                  proposals=InMemoryProposals(), executions=InMemoryExecutions(), backtests=InMemoryBacktests(),
+                  trace=InMemoryTrace(), clock=clock, turn_streams=streams)
+    client = TestClient(create_app(c))
+    case = client.post("/api/v1/cases", json={"store_id": "S030", "sim_today": "2026-03-10"}).json()
+    sent = client.post(f"/api/v1/cases/{case['case_id']}/messages", json={"text": "¿cuántas glaseadas tengo?"})
+    assert sent.json()["turn_id"] == tid and f"GET /turns/{tid}/events" in seen
+
+    t = client.get(f"/api/v1/cases/{case['case_id']}/turns/{tid}").json()
+
+    assert t["status"] == "done" and t["reply"] == "Tienes 2 unidades de glaseadas."
+    assert t["first_text_ms"] == 2300
+    assert "partial_reply" not in t
 
 
 @pytest.mark.parametrize("env, on", [({}, True), ({"GLAZED_CORE_STREAM": "false"}, False),
