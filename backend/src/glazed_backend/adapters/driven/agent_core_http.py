@@ -59,9 +59,10 @@ class AgentCoreHttp:
                 "X-Roles": f"{roles},admin" if admin else roles}
 
     def _call(self, method: str, url: str, store_id: str, admin: bool = False, service: bool = False,
-              **kw: Any) -> httpx.Response:
+              extra_headers: dict[str, str] | None = None, **kw: Any) -> httpx.Response:
+        headers = {**self._headers(store_id, admin, service), **(extra_headers or {})}
         try:
-            resp = self._c.request(method, url, headers=self._headers(store_id, admin, service), **kw)
+            resp = self._c.request(method, url, headers=headers, **kw)
         except httpx.HTTPError as exc:
             raise CoreError(f"Agent-Core unreachable: {exc}") from exc
         if resp.status_code == 404:
@@ -83,9 +84,13 @@ class AgentCoreHttp:
     def create_conversation(self, case_id: str, store_id: str) -> str:
         return case_id  # the Core creates the session lazily on the first turn
 
-    def send_turn(self, conversation_id: str, store_id: str, text: str, service: bool = False) -> str:
+    def send_turn(self, conversation_id: str, store_id: str, text: str, service: bool = False,
+                  data_version: str | None = None) -> str:
+        """`data_version` (the case's as_of date) travels as X-Data-Version: the Core's fast path answer cache keys a
+        remembered reply by it, so a reply is never reused for another day of the case (Agent-Core S10)."""
         body = {"session_id": conversation_id, "profile_id": self.profile_id, "text": text}
-        return self._call("POST", "/turns", store_id, service=service, json=body).json()["turn_id"]
+        extra = {"X-Data-Version": data_version} if data_version else None
+        return self._call("POST", "/turns", store_id, service=service, extra_headers=extra, json=body).json()["turn_id"]
 
     def get_turn(self, turn_id: str, store_id: str) -> dict[str, Any]:
         return self._call("GET", f"/turns/{turn_id}", store_id).json()

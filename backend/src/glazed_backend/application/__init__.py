@@ -142,7 +142,8 @@ class AskAgent:
             self.cases.update(case)
         if voice:
             sent = VOICE_TAG + sent
-        turn_id = self.core.send_turn(case.core_conversation_id, case.store_id, sent)
+        turn_id = self.core.send_turn(case.core_conversation_id, case.store_id, sent,
+                                      data_version=case.sim_today.isoformat())
         if self.tracker and self.clock:
             self.tracker.started(turn_id, self.clock.now())
         if self.turns is not None and self.clock:

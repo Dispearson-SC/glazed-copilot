@@ -168,6 +168,7 @@ class FakeCore:
     def __init__(self) -> None:
         self.created: list[str] = []
         self.sent: list[tuple[str, str, str]] = []
+        self.data_versions: list[str | None] = []
         self.turns: dict[str, dict[str, Any]] = {}
         self.transcript: list[dict[str, Any]] = []
 
@@ -175,8 +176,9 @@ class FakeCore:
         self.created.append(case_id)
         return f"conv-{case_id}"
 
-    def send_turn(self, conversation_id, store_id, text):
+    def send_turn(self, conversation_id, store_id, text, data_version=None):
         self.sent.append((conversation_id, store_id, text))
+        self.data_versions.append(data_version)
         tid = f"turn-{len(self.sent)}"
         self.turns[tid] = {"turn_id": tid, "status": "finished", "text": f"echo: {text}"}
         return tid

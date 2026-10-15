@@ -53,3 +53,12 @@ def test_message_without_context_is_unchanged():
     tid = ask(client, cid, text="hola").json()["turn_id"]
     assert client.container.core.sent[-1][2] == "hola"
     assert "context" not in (client.get(f"/api/v1/cases/{cid}/turns/{tid}").json().get("reply_meta") or {})
+
+
+def test_a_message_tells_the_core_the_case_date_as_its_data_version():
+    """P12 (Agent-Core S10 answer cache): the case's simulated day is the version of the data the question is about,
+    so a remembered composite reply is never reused after the case advances a day."""
+    client, cid, _ = with_issues()
+    ask(client, cid, text="hola")
+    case = client.get(f"/api/v1/cases/{cid}").json()
+    assert client.container.core.data_versions[-1] == case["sim_today"]

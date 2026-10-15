@@ -108,3 +108,17 @@ def test_health_raises_core_error_when_unreachable():
 
     with pytest.raises(CoreError):
         make(h).health()
+
+
+def test_send_turn_sends_the_data_version_header_only_when_given():
+    seen = []
+
+    def h(req):
+        seen.append(req.headers)
+        return httpx.Response(202, json={"turn_id": "t1"})
+
+    client = make(h)
+    client.send_turn("c1", "S030", "hola", data_version="2026-10-15")
+    client.send_turn("c1", "S030", "hola")
+    assert seen[0]["x-data-version"] == "2026-10-15"
+    assert "x-data-version" not in seen[1]
