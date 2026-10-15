@@ -151,3 +151,36 @@ def test_foreign_fixes_skip_code_and_urls():
 def test_the_integrity_auditor_is_presented_as_centinela():
     out = sanitize_reply("Consulté al Auditor de Integridad y el auditor de datos confirma la diferencia.")[0]
     assert "uditor" not in out and out.count("Centinela") == 2
+
+
+@pytest.mark.parametrize("raw, expected", [
+    # Live P14 replies (the model glued a Spanish function word to the number after it).
+    ("Como el quiebre se proyecta también el21, el pedido llega justo.",
+     "Como el quiebre se proyecta también el 21, el pedido llega justo."),
+    ("Vendiste 12 piezas del19 al 22 con58,90 kg de merma.",
+     "Vendiste 12 piezas del 19 al 22 con 58,90 kg de merma."),
+    ("Las11 entregas llegan en14 días, por130.50 en total.",
+     "Las 11 entregas llegan en 14 días, por 130.50 en total."),
+    ("Sube al100 % para el2026 y de11 a 15 cajas.",
+     "Sube al 100 % para el 2026 y de 11 a 15 cajas."),
+])
+def test_a_function_word_glued_to_a_number_is_spaced(raw, expected):
+    out = clean_reply(raw)
+    assert out.text == expected and out.score == 0
+
+
+def test_full_width_punctuation_becomes_ascii():
+    out = clean_reply("Hay stock，pide hoy：12 cajas（croissant）；listo。¿Algo más？")
+    assert out.text == "Hay stock, pide hoy: 12 cajas (croissant); listo. ¿Algo más?"
+    assert out.score == 0
+
+
+@pytest.mark.parametrize("text", [
+    "SKU-AAA1, lote A12, IPA2 y P2 siguen igual; Hotel21 y Gel10 son nombres.",
+    "El 21 llega en 14 días, del 19 al 22, con 58,90 kg.",
+    "Revisa `el21` y https://x.io/del19 para ver.",
+    "EL21 es el código del pasillo y Q4 el trimestre.",
+])
+def test_codes_names_and_already_spaced_numbers_are_untouched(text):
+    out = clean_reply(text)
+    assert out.text == text and not out.removed and out.score == 0

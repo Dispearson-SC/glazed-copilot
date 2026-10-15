@@ -128,6 +128,25 @@ def _fix_glue(text: str, hits: list[str]) -> str:
     return "".join(p if i % 2 else _glue(p, hits) for i, p in enumerate(parts))
 
 
+# --- a Spanish function word glued to the number after it ("el21", "del19", "Las11"): the model drops
+# the space under long context. Only these words, lowercase or capitalised, starting a word: "Hotel21",
+# "IPA2", "A12" or "EL21" are names and codes and stay as they are. ---
+_NUMBER_GLUE = re.compile(
+    r"\b((?:[Ee]l|[Ll]as?|[Ll]os|[Ee]n|[Dd]el?|[Aa]l|[Cc]on|[Pp]or|[Pp]ara|[Hh]asta|[Dd]esde|[Ss]obre|[Ee]ntre"
+    r"|[Uu]nos?|[Uu]nas?|[Cc]ada|[Ss]on|[Hh]ay|[Qq]uedan?|[Ff]altan?))(?=\d)"
+)
+
+
+def _fix_number_glue(text: str) -> str:
+    parts = _CODE.split(text)
+    return "".join(p if i % 2 else _NUMBER_GLUE.sub(r"\1 ", p) for i, p in enumerate(parts))
+
+
+# Full-width (CJK) punctuation the model sometimes writes inside Spanish prose.
+_FULL_WIDTH = str.maketrans({"，": ", ", "、": ", ", "；": "; ", "：": ": ", "。": ". ", "？": "? ", "！": "! ",
+                             "（": " (", "）": ") "})
+
+
 # --- foreign tokens leaked by the model inside Spanish prose (conservative: lowercase, curated, outside code) ---
 _VERB_FORMS = ("tengas tienes tiene puedes puede quieres quiere necesitas necesita sabes sabe haces hace debes debe "
                "aplicas aplica pides pide buscas busca prefieres prefiere sirve sirven revisas revisa ordenas ordena "
@@ -218,6 +237,7 @@ def clean_reply(text: str) -> ReplyCleaning:
     garbage = [m.group(0) for m in _GARBLE.finditer(text)]
     text = _GARBLE.sub("", text)
     removed += garbage
+    text = _fix_number_glue(text.translate(_FULL_WIDTH))
     glued: list[str] = []
     text = _fix_glue(text, glued)
     leaks: list[str] = []
