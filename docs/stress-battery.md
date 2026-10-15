@@ -53,6 +53,32 @@ the first admin, and sends the session as a Bearer token. Nothing secret is prin
 Results land in `scripts/stress/results/<label>-<timestamp>.json` (written after every turn) and `.md`.
 Each run makes real LLM calls: run it once per stage.
 
+### Comparing two modes through provider drift (P13)
+
+Two single runs an hour apart differ mostly by the model provider's speed (P12: the turns that run the same code in
+shadow and on slowed from a median 15.4 to 24.9 s between the runs). Switching the Core's fast-path mode needs a
+container recreate, so the two modes cannot alternate turn by turn. Instead:
+
+```bash
+python3 scripts/stress/run.py run --label p13-shadow --repeat 3     # every case 3 times, round after round
+# recreate core + core-peer-worker with AGENT_CORE_FAST_PATH=on, then
+python3 scripts/stress/run.py run --label p13-on --repeat 3
+# the backend does not expose the fast-path verdict: export it from the Core audit and tag each result
+docker exec glazed-db psql -U postgres -d agent_core -Atc "select json_agg(json_build_object('turn_id', turn_id, \
+  'fast_path', fast_path)) from audit_turn_routes where fast_path is not null" > /tmp/decisions.json
+python3 scripts/stress/run.py tag scripts/stress/results/p13-shadow-<ts>.json /tmp/decisions.json
+python3 scripts/stress/run.py tag scripts/stress/results/p13-on-<ts>.json /tmp/decisions.json
+python3 scripts/stress/run.py compare scripts/stress/results/p13-shadow-<ts>.json scripts/stress/results/p13-on-<ts>.json
+```
+
+Compare pairs turns by (case, turn, repeat) and adds a **Per path (median)** table: `composite` (the turns the fast
+path answers) against `other` (turns every mode runs the same way). A change on `other` between the two runs is
+drift; judge the fast path by `composite` measured against it. Files without repeats or verdicts compare as before.
+
+The `garbled` flag counts glued words (`dela`, `hoyusted`, an article run into a possessive such as `lasuya`, a
+number run into a lower-case word such as `en1`), stray English, full-width punctuation and markdown debris. Codes
+(`A100`, `y2k`, an id like `a8d5f01e08dc`), `***bold italic***` and a `***` rule are not flagged.
+
 ## Tests
 
 ```bash

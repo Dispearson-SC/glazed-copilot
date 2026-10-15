@@ -5,8 +5,18 @@ then reads GET /api/v1/trace?case_id= for tool calls and peer asks.
 Safety: every case is a fresh `sandbox` case; the runner never calls a decision/approve endpoint.
 
 Usage (from the repository root):
-  python3 scripts/stress/run.py run --label baseline [--api http://localhost:8100] [--only simple,burst]
+  python3 scripts/stress/run.py run --label baseline [--api http://localhost:8100] [--only simple,burst] [--repeat N]
+  python3 scripts/stress/run.py tag scripts/stress/results/A.json decisions.json
   python3 scripts/stress/run.py compare scripts/stress/results/A.json scripts/stress/results/B.json
+
+`--repeat N` (P13) asks every case N times, round after round (a fresh sandbox case each time), so provider drift
+spreads over every case; each turn records its `repeat`, and compare pairs (case, turn, repeat). The Core's fast-path
+verdict per turn is not exposed by the backend: export it from the Core audit and `tag` the result with it
+(decisions.json is a list of {turn_id, fast_path} or a {turn_id: fast_path} map), e.g.
+  psql "$AGENT_CORE_DB" -Atc "select json_agg(json_build_object('turn_id', turn_id, 'fast_path', fast_path))
+                              from audit_turn_routes where fast_path is not null" > decisions.json
+compare then reports per-path medians: `composite` turns against `other` turns (the path every mode runs the same
+way, so a change there between two runs is provider drift).
 
 Auth: when /api/v1 answers 401 the runner logs in with GLAZED_STRESS_EMAIL + GLAZED_STRESS_PASSWORD if set,
 otherwise with the demo login as the first admin of /api/v1/auth/demo-users. Credentials are never printed.
@@ -124,6 +134,8 @@ def ask(api: Api, backend_case: str, text: str, timeout: float, poll: float) -> 
                 "sanitized_fragments": len(turn.get("sanitized_fragments") or []),
                 "rewritten": bool((turn.get("reply_meta") or {}).get("rewritten")),
                 "progress": turn.get("progress") or [],
+                # P13: the Core's fast-path verdict, when the backend exposes it (else `tag` adds it from the audit)
+                **({"fast_path": turn["fast_path"]} if turn.get("fast_path") else {}),
                 "usage": {k: turn[k] for k in ("usage", "cost", "tokens") if k in turn} or None})
     return out
 
@@ -188,33 +200,37 @@ def run(args: argparse.Namespace) -> Path:
             record["llm_calls_estimate"] = llm_calls_estimate(record["turns"])
             path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    for case in [c for c in cases if c.kind != "burst"]:
-        backend_case = new_case(api, b, args.label, case.id)
-        history: list[dict[str, Any]] = []
-        for idx, q in enumerate(case.turns):
-            log(f"{case.id}[{idx}] asking")
-            res = ask(api, backend_case, q, args.timeout, args.poll)
-            t = finish_turn(api, case, idx, q, backend_case, res, burst=False, earlier=history)
-            record["turns"].append(t)
-            save()
-            log(f"{case.id}[{idx}] {t['status']} {t['latency_s']}s tools={t['tool_calls']} peers={t['peer_asks']} "
-                f"flags={t['quality']['flags']} checks={t['checks']}")
-
-    for case in [c for c in cases if c.kind == "burst"]:
+    record["repeat"] = args.repeat
+    ordered = [c for c in cases if c.kind != "burst"] + [c for c in cases if c.kind == "burst"]
+    for rep, case in battery.schedule(ordered, args.repeat):
+        tag = f"{case.id}" + (f" r{rep}" if args.repeat > 1 else "")
+        if case.kind != "burst":
+            backend_case = new_case(api, b, args.label, case.id)
+            history: list[dict[str, Any]] = []
+            for idx, q in enumerate(case.turns):
+                log(f"{tag}[{idx}] asking")
+                res = ask(api, backend_case, q, args.timeout, args.poll)
+                t = {**finish_turn(api, case, idx, q, backend_case, res, burst=False, earlier=history), "repeat": rep}
+                record["turns"].append(t)
+                save()
+                log(f"{tag}[{idx}] {t['status']} {t['latency_s']}s tools={t['tool_calls']} peers={t['peer_asks']} "
+                    f"flags={t['quality']['flags']} checks={t['checks']}")
+            continue
         backend_cases = [new_case(api, b, args.label, f"{case.id}-{i}") for i in range(len(case.turns))]
         barrier = threading.Barrier(len(case.turns))
 
-        def one(i: int) -> dict[str, Any]:
+        def one(i: int, case: battery.Case = case, backend_cases: list[str] = backend_cases,
+                barrier: threading.Barrier = barrier) -> dict[str, Any]:
             local = Api(args.api, headers=dict(api.http.headers))
             barrier.wait()
             res = ask(local, backend_cases[i], case.turns[i], args.timeout, args.poll)
             return finish_turn(local, case, i, case.turns[i], backend_cases[i], res, burst=True)
 
-        log(f"{case.id}: {len(case.turns)} simultaneous turns")
+        log(f"{tag}: {len(case.turns)} simultaneous turns")
         with ThreadPoolExecutor(len(case.turns)) as pool:
             for t in pool.map(one, range(len(case.turns))):
-                record["turns"].append(t)
-                log(f"{case.id}[{t['turn_index']}] {t['status']} {t['latency_s']}s flags={t['quality']['flags']}")
+                record["turns"].append({**t, "repeat": rep})
+                log(f"{tag}[{t['turn_index']}] {t['status']} {t['latency_s']}s flags={t['quality']['flags']}")
         save()
 
     record["finished_at"] = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -222,6 +238,21 @@ def run(args: argparse.Namespace) -> Path:
     path.with_suffix(".md").write_text(battery.render_markdown(record), encoding="utf-8")
     log(f"wrote {path} and {path.with_suffix('.md')}")
     return path
+
+
+def tag(args: argparse.Namespace) -> None:
+    """Add the audited fast-path verdicts to a result file (by turn id) and rewrite its aggregate and summary."""
+    path = Path(args.result)
+    record = json.loads(path.read_text(encoding="utf-8"))
+    raw = json.loads(Path(args.decisions).read_text(encoding="utf-8")) or {}
+    decisions = raw if isinstance(raw, dict) else {str(r["turn_id"]): str(r["fast_path"]) for r in raw
+                                                   if r.get("turn_id") and r.get("fast_path")}
+    record["turns"] = battery.tag_decisions(record.get("turns", []), decisions)
+    record["aggregate"] = battery.aggregate(record["turns"])
+    path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    path.with_suffix(".md").write_text(battery.render_markdown(record), encoding="utf-8")
+    tagged = sum(1 for t in record["turns"] if t.get("fast_path"))
+    log(f"tagged {tagged} of {len(record['turns'])} turns in {path}")
 
 
 def compare(args: argparse.Namespace) -> None:
@@ -233,7 +264,7 @@ def compare(args: argparse.Namespace) -> None:
     print(md)
 
 
-def main(argv: list[str] | None = None) -> None:
+def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run", help="run the battery against a live backend")
@@ -244,12 +275,21 @@ def main(argv: list[str] | None = None) -> None:
     r.add_argument("--only", help="comma-separated case ids")
     r.add_argument("--timeout", type=float, default=900.0, help="seconds per turn")
     r.add_argument("--poll", type=float, default=1.0, help="poll interval seconds")
+    r.add_argument("--repeat", type=int, default=1,
+                   help="ask every case this many times, round after round (P13: spreads provider drift)")
+    t = sub.add_parser("tag", help="add audited fast-path verdicts (by turn id) to a result file")
+    t.add_argument("result")
+    t.add_argument("decisions", help="JSON: [{turn_id, fast_path}] or {turn_id: fast_path}")
     c = sub.add_parser("compare", help="compare two result files")
     c.add_argument("before")
     c.add_argument("after")
     c.add_argument("--out", help="also write the Markdown here")
-    args = p.parse_args(argv)
-    run(args) if args.cmd == "run" else compare(args)
+    return p
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = parser().parse_args(argv)
+    {"run": run, "tag": tag, "compare": compare}[args.cmd](args)
 
 
 if __name__ == "__main__":

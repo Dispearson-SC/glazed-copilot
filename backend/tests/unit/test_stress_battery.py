@@ -301,3 +301,118 @@ def test_garbled_fragments_are_counted_per_turn_in_aggregates_and_compare():
     assert cmp["aggregate"]["garbled_fragments_total"] == {"before": 2, "after": 1, "delta": -1}
     assert "garbled fragments" in battery.render_markdown(after)
     assert "garbled_fragments_total" in battery.render_compare_markdown(cmp)
+
+
+# ---- garbled fragments, P13: glued possessives, and the false positives of the P12 detector ----
+
+
+@pytest.mark.parametrize(("reply", "fragment"), [
+    ("Revisa la alerta de merma; lasuya es la más cara.", "lasuya"),  # P12 battery, composite active_issues
+    ("El proveedor entrega losuyo el lunes.", "losuyo"),
+    ("Cada tienda revisa elsu inventario.", "elsu"),
+    ("Vendiste con58,90 de margen.", "con58,90"),  # P12 battery: a number glued to a word
+    ("Llega el21. de julio.", "el21."),
+])
+def test_glued_words_and_numbers_are_found(reply, fragment):
+    assert fragment in battery.garbled_fragments(reply)
+
+
+@pytest.mark.parametrize("reply", [
+    "La decisión a8d5f01e08dc quedó pendiente de tu aprobación.",  # an id starting with a letter (P12 shadow)
+    "Revisa el producto A100 y el Y2 de la línea de panadería.",  # upper-case product and line codes
+    "Usa el código y2k del lote a1 para el traspaso.",  # lower-case codes after `y`/`a`
+    "***Importante***: pide hoy la harina.",  # bold italic
+    "Resumen del día\n\n***\n\nMerma 30 piezas.",  # a horizontal rule
+    "La suya está bien; es la sucursal de su gerente y de sus clientes.",
+    "Porque la tienda contiene media charola de más; ellas y los demás lo saben.",
+    "Pide 10 de Better For You Breakfast Sandwich y 4 de Glazed Donut Box.",
+])
+def test_codes_ids_markdown_and_real_words_are_not_garbled(reply):
+    assert battery.garbled_fragments(reply) == []
+
+
+# ---- P13: repeated (interleaved) runs, the fast-path decision per turn, per-path medians ----
+
+
+def _cases(*ids):
+    return [battery.Case(i, "intent", ("q",)) for i in ids]
+
+
+def test_repeat_runs_every_case_once_per_round_interleaved():
+    plan = battery.schedule(_cases("a", "b"), repeat=3)
+    assert [(r, c.id) for r, c in plan] == [(0, "a"), (0, "b"), (1, "a"), (1, "b"), (2, "a"), (2, "b")]
+    assert [(r, c.id) for r, c in battery.schedule(_cases("a"), repeat=1)] == [(0, "a")]
+    with pytest.raises(battery.BatteryError):
+        battery.schedule(_cases("a"), repeat=0)
+
+
+def test_decisions_from_the_audit_tag_turns_by_turn_id():
+    turns = [{"turn_id": "t1"}, {"turn_id": "t2"}, {"turn_id": None}]
+    tagged = battery.tag_decisions(turns, {"t1": "composite", "t2": "defer:no_intent"})
+    assert [t.get("fast_path") for t in tagged] == ["composite", "defer:no_intent", None]
+    assert battery.path_of(tagged[0]) == "composite"
+    assert battery.path_of(tagged[1]) == "other"
+    assert battery.path_of(tagged[2]) == "unknown"
+
+
+def test_per_path_medians_separate_the_fast_path_from_the_unchanged_path():
+    turns = [{**_turn("a", 6), "fast_path": "composite", "first_text_s": 3},
+             {**_turn("a", 8), "fast_path": "composite", "first_text_s": 5},
+             {**_turn("b", 20), "fast_path": "pass:complex"},
+             {**_turn("c", 30)}]
+    paths = battery.path_medians(turns)
+    assert paths["composite"] == {"turns": 2, "latency_p50_s": 7.0, "first_text_p50_s": 4.0}
+    assert paths["other"] == {"turns": 1, "latency_p50_s": 20.0, "first_text_p50_s": None}
+    assert paths["unknown"]["turns"] == 1
+
+
+def test_compare_pairs_repeats_and_reports_per_path_medians():
+    before_turns = [{**_turn("a", 10), "repeat": 0, "fast_path": "composite"},
+                    {**_turn("a", 12), "repeat": 1, "fast_path": "composite"},
+                    {**_turn("b", 20), "repeat": 0, "fast_path": "defer:no_intent"}]
+    after_turns = [{**_turn("a", 6), "repeat": 0, "fast_path": "composite"},
+                   {**_turn("a", 8), "repeat": 1, "fast_path": "composite"},
+                   {**_turn("b", 30), "repeat": 0, "fast_path": "defer:no_intent"}]
+    cmp = battery.compare({"label": "shadow", "turns": before_turns, "aggregate": battery.aggregate(before_turns)},
+                          {"label": "on", "turns": after_turns, "aggregate": battery.aggregate(after_turns)})
+    rows = {(r["case_id"], r.get("repeat", 0)): r for r in cmp["rows"]}
+    assert rows[("a", 1)]["latency_delta_s"] == -4
+    assert cmp["paths"]["before"]["composite"]["latency_p50_s"] == 11.0
+    assert cmp["paths"]["after"]["composite"]["latency_p50_s"] == 7.0
+    assert cmp["paths"]["after"]["other"]["latency_p50_s"] == 30.0, "drift shows on the unchanged path"
+    md = battery.render_compare_markdown(cmp)
+    assert "## Per path (median)" in md
+    assert "| composite | 2 / 2 | 11 | 7 |" in md
+
+
+def test_compare_of_files_without_repeats_or_decisions_still_works():
+    before = {"label": "a", "turns": [_turn("x", 10)], "aggregate": battery.aggregate([_turn("x", 10)])}
+    after = {"label": "b", "turns": [_turn("x", 12)], "aggregate": battery.aggregate([_turn("x", 12)])}
+    cmp = battery.compare(before, after)
+    assert cmp["rows"][0]["latency_delta_s"] == 2
+    assert cmp["paths"]["before"]["unknown"]["turns"] == 1
+
+
+def test_the_runner_tags_a_result_file_with_audited_decisions_and_rewrites_its_summary(tmp_path):
+    import run as runner
+
+    result = tmp_path / "on-1.json"
+    turns = [{**_turn("a", 6), "turn_id": "t1"}, {**_turn("b", 20), "turn_id": "t2"}]
+    result.write_text(json.dumps({"label": "on", "started_at": "x", "store_id": "S001", "sim_today": "d",
+                                  "turns": turns, "aggregate": battery.aggregate(turns)}), encoding="utf-8")
+    decisions = tmp_path / "decisions.json"
+    decisions.write_text(json.dumps([{"turn_id": "t1", "fast_path": "composite"},
+                                     {"turn_id": "t2", "fast_path": "pass:complex"}]), encoding="utf-8")
+    runner.main(["tag", str(result), str(decisions)])
+    tagged = json.loads(result.read_text(encoding="utf-8"))
+    assert [t["fast_path"] for t in tagged["turns"]] == ["composite", "pass:complex"]
+    assert tagged["aggregate"]["paths"]["composite"]["turns"] == 1
+    assert result.with_suffix(".md").exists()
+
+
+def test_the_runner_accepts_a_repeat_count():
+    import run as runner
+
+    args = runner.parser().parse_args(["run", "--label", "x", "--repeat", "3"])
+    assert args.repeat == 3
+    assert runner.parser().parse_args(["run", "--label", "x"]).repeat == 1

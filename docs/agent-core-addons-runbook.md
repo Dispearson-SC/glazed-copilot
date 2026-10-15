@@ -217,7 +217,15 @@ docker exec glazed-db psql -U postgres -d agent_core -c "SELECT turn_id, fast_pa
 With `on`, each composite member is an `audit_turn_intents` row (`reply_mode = 'composite'`, or `'cache'` from the
 reply cache) and its reads are `audit_tool_calls` rows of `peer-agent` on behalf of the manager; a composite that
 fails (`planned` = `fallback:<reason>`) runs the orchestrator. Knobs: `AGENT_CORE_FAST_PATH_INTENT_THRESHOLD` (0.7
-here), `AGENT_CORE_FAST_PATH_CACHE_SECONDS` (0 = off; a remembered reply is keyed by case, case date and the exact
-question). The stress battery's `garbled` flag counts glued words, stray English and markdown debris per turn: run it
-in shadow and in on and compare (`python3 scripts/stress/run.py compare <shadow>.json <on>.json`).
+here), `AGENT_CORE_FAST_PATH_ROUTE_THRESHOLD` (0.7 default: a Jev route choice of an intent at or above it counts
+that intent as detected), `AGENT_CORE_FAST_PATH_CACHE_SECONDS` (0 = off; a remembered reply is keyed by case, case
+date, the caller and the exact question). The stress battery's `garbled` flag counts glued words, stray English and
+markdown debris per turn: run it in shadow and in on with `--repeat` and compare per path (docs/stress-battery.md).
+
+P13 (after the P12 shadow/on battery): Jev now also counts how many separate things a message asks for, and a
+message asking for more than the topics it detected runs the orchestrator (`fast_path = 'pass:uncovered'`) instead of
+a composite that would call the missing part "no disponible". day_summary got its own question and criteria (it was
+never detected at 0.7). On the routing benchmark (109 questions): intent sets exact 77% -> 94%, day_summary recall
+100%, combined questions answered by an exact composite 7/17 -> 19/21, coverage questions never a composite. The
+shipped default stays `shadow` until a repeated battery confirms it.
 

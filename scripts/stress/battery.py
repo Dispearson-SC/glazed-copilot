@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -141,20 +142,27 @@ def _traceable(token: str, values: list[float]) -> bool:
 # ---- garbled fragments (P12): text a model mangled ----
 
 # Glued words. Spanish has many real words made of two frequent ones (porque, contiene, media, demás, ellas), so
-# only pairs that are never a word count: a preposition run into an article (`dela`, `enel`, `conlos`), and `hoy` or
-# `usted` run into another word (`hoyusted`, `ustedtiene`).
+# only pairs that are never a word count: a preposition run into an article (`dela`, `enel`, `conlos`), an article
+# run into a possessive (`lasuya`, `losuyo`, `elsu`: P13, the P12 battery's composite active_issues reply), and `hoy`
+# or `usted` run into another word (`hoyusted`, `ustedtiene`).
 _GLUED_PAIR = re.compile(
-    r"\b(?:de|en|con|por|para|a|que|y)(?:el|la|los|las)\b|\bhoy[a-záéíóúñü]{3,}|[a-záéíóúñü]{2,}usted(?:es)?\b|"
-    r"\busted(?:es)?[a-záéíóúñü]{3,}")
+    r"\b(?:de|en|con|por|para|a|que|y)(?:el|la|los|las)\b|"
+    r"\b(?:el|la|lo|los|las|un|una)(?:su|sus|suy[oa]s?|nuestr[oa]s?)\b|"
+    r"\bhoy[a-záéíóúñü]{3,}|[a-záéíóúñü]{2,}usted(?:es)?\b|\busted(?:es)?[a-záéíóúñü]{3,}")
 _REAL_WORDS = frozenset({"ella", "ellas", "yla", "alas", "ala", "hoyos", "hoyo", "hoya"})  # real words the pattern hits
-_GLUED_DIGIT = re.compile(r"\b(?:a|al|con|de|del|el|en|la|las|los|para|por|un|una|y)\d+[\w.,]*", re.IGNORECASE)
+# A number run into a lower-case word (`en1`, `con58,90`, `el2026`). Case-sensitive, never after the one-letter `a` or
+# `y`, and the number must end the token: `A100`, `Y2`, `y2k`, `a1` and an id such as `a8d5f01e08dc` are codes (P13:
+# the P12 detector flagged them).
+_GLUED_DIGIT = re.compile(r"\b(?:al|con|de|del|el|en|la|las|los|para|por|un|una)\d+(?:[.,]\d+)*\.?(?![\w])")
 # English function words that do not exist in Spanish (so `no`, `a` and `es` are not among them), written in lower
 # case: product names are English but capitalised ("Better For You Breakfast Sandwich").
 _STRAY_EN = frozenset({"the", "and", "with", "which", "however", "also", "will", "should", "would", "your", "you",
                        "this", "that", "there", "here", "about", "from", "into", "but", "or", "of", "is", "are",
                        "today", "sales", "order", "orders", "store"})
 _FULL_WIDTH = re.compile(r"[，。：；！？（）、【】「」]")
-_MD_DEBRIS = re.compile(r"(?m)(?:^|\s)\*\*\s*:|\*{3,}\s*$|^\s*\*\*\s*$|^#{1,6}\s*$")
+# Markdown debris: `**:` with nothing bold before it, a lone `**` or `#`, a run of four or more stars. Three stars
+# are legitimate (`***bold italic***`, a `***` horizontal rule: the P12 detector flagged them).
+_MD_DEBRIS = re.compile(r"(?m)(?:^|\s)\*\*\s*:|\*{4,}|^[ \t]*\*\*[ \t]*$|^#{1,6}[ \t]*$")
 
 
 def garbled_fragments(reply: str) -> list[str]:
@@ -296,11 +304,58 @@ def aggregate(turns: list[dict[str, Any]]) -> dict[str, Any]:
         "burst": {"turns": len(burst), "failed": sum(1 for t in burst if t in failed),
                   "latency_max_s": max(burst_lat) if burst_lat else None,
                   "latency_p50_s": percentile(burst_lat, 50)} if burst else None,
+        "paths": path_medians(turns),
     }
 
 
-def _key(t: dict[str, Any]) -> tuple[str, int]:
-    return (str(t["case_id"]), int(t.get("turn_index", 0)))
+# ---- repeated runs and the fast-path decision per turn (P13) ----
+
+def schedule(cases: list[Case], repeat: int = 1) -> list[tuple[int, Case]]:
+    """The order a repeated run asks its cases in: every case once per round, round after round, so slow and fast
+    stretches of the model provider spread over every case instead of landing on a few (P12: a single run per mode
+    was drowned by provider drift)."""
+    if repeat < 1:
+        raise BatteryError(f"repeat must be at least 1, got {repeat}")
+    return [(r, c) for r in range(repeat) for c in cases]
+
+
+def tag_decisions(turns: list[dict[str, Any]], decisions: dict[str, str]) -> list[dict[str, Any]]:
+    """Each turn with the fast-path verdict the Core audited for it (`audit_turn_routes.fast_path`, by turn id), when
+    the decisions name it. The backend does not expose the verdict, so it comes from an audit export."""
+    out = []
+    for t in turns:
+        verdict = decisions.get(str(t.get("turn_id"))) if t.get("turn_id") else None
+        out.append({**t, "fast_path": verdict} if verdict is not None else dict(t))
+    return out
+
+
+def path_of(turn: dict[str, Any]) -> str:
+    """`composite` (the fast path answered), `other` (the path every mode runs) or `unknown` (no decision known)."""
+    verdict = turn.get("fast_path")
+    if not verdict:
+        return "unknown"
+    return "composite" if verdict == "composite" else "other"
+
+
+def _median(values: list[float]) -> float | None:
+    return round(float(statistics.median(values)), 2) if values else None
+
+
+def path_medians(turns: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Median latency and first text per path. The `other` path runs the same code in every fast-path mode, so a
+    change there between two runs is provider drift, not the fast path."""
+    out: dict[str, dict[str, Any]] = {}
+    for path in ("composite", "other", "unknown"):
+        mine = [t for t in turns if path_of(t) == path]
+        out[path] = {"turns": len(mine),
+                     "latency_p50_s": _median([t["latency_s"] for t in mine if t.get("latency_s") is not None]),
+                     "first_text_p50_s": _median([t["first_text_s"] for t in mine
+                                                  if t.get("first_text_s") is not None])}
+    return out
+
+
+def _key(t: dict[str, Any]) -> tuple[str, int, int]:
+    return (str(t["case_id"]), int(t.get("turn_index", 0)), int(t.get("repeat", 0)))
 
 
 def _flags(t: dict[str, Any]) -> list[str]:
@@ -315,11 +370,11 @@ def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     for t in before.get("turns", []):
         k = _key(t)
         o = a_turns.get(k)
-        row: dict[str, Any] = {"case_id": k[0], "turn_index": k[1], "before_s": t.get("latency_s"),
-                               "before_status": t.get("status")}
+        row: dict[str, Any] = {"case_id": k[0], "turn_index": k[1], "repeat": k[2], "before_s": t.get("latency_s"),
+                               "before_status": t.get("status"), "before_path": path_of(t)}
         if o is not None:
             b_lat, a_lat = t.get("latency_s"), o.get("latency_s")
-            row.update({"after_s": a_lat, "after_status": o.get("status"),
+            row.update({"after_s": a_lat, "after_status": o.get("status"), "after_path": path_of(o),
                         "latency_delta_s": round(a_lat - b_lat, 2) if None not in (a_lat, b_lat) else None,
                         "tool_calls": [t.get("tool_calls"), o.get("tool_calls")],
                         "peer_asks": [t.get("peer_asks"), o.get("peer_asks")],
@@ -335,6 +390,7 @@ def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
                      "delta": round(a - b, 3) if isinstance(a, (int, float)) and isinstance(b, (int, float)) else None}
     return {"before": before.get("label"), "after": after.get("label"), "rows": rows, "aggregate": agg,
             "flag_counts": {"before": ab.get("flag_counts", {}), "after": aa.get("flag_counts", {})},
+            "paths": {"before": path_medians(before.get("turns", [])), "after": path_medians(after.get("turns", []))},
             "burst": {"before": ab.get("burst"), "after": aa.get("burst")}}
 
 
@@ -367,7 +423,8 @@ def render_markdown(run: dict[str, Any]) -> str:
               f"- tool calls {agg['tool_calls_total']}, peer asks {agg['peer_asks_total']}",
               f"- flags: {json.dumps(agg['flag_counts'], ensure_ascii=False) if agg['flag_counts'] else 'none'}",
               f"- garbled fragments {_fmt(agg.get('garbled_fragments_total'))} in {_fmt(agg.get('garbled_turns'))} turns",
-              f"- burst: {json.dumps(agg['burst']) if agg.get('burst') else 'none'}", ""]
+              f"- burst: {json.dumps(agg['burst']) if agg.get('burst') else 'none'}",
+              f"- per path (median): {json.dumps(agg['paths']) if agg.get('paths') else 'none'}", ""]
     return "\n".join(lines)
 
 
@@ -377,13 +434,25 @@ def render_compare_markdown(cmp: dict[str, Any]) -> str:
              "|---|---|---|---|---|---|---|---|---|---|"]
     for r in cmp["rows"]:
         tc, pa = r.get("tool_calls") or ["-", "-"], r.get("peer_asks") or ["-", "-"]
-        lines.append(f"| {r['case_id']} | {r['turn_index']} | {_fmt(r.get('before_s'))} | {_fmt(r.get('after_s'))} | "
+        turn = f"{r['turn_index']}" + (f" r{r['repeat']}" if r.get("repeat") else "")
+        lines.append(f"| {r['case_id']} | {turn} | {_fmt(r.get('before_s'))} | {_fmt(r.get('after_s'))} | "
                      f"{_fmt(r.get('latency_delta_s'))} | {r.get('before_status')} -> {r.get('after_status', '-')} | "
                      f"{_fmt(tc[0])} -> {_fmt(tc[1])} | {_fmt(pa[0])} -> {_fmt(pa[1])} | "
                      f"{', '.join(r.get('new_flags') or []) or '-'} | {', '.join(r.get('fixed_flags') or []) or '-'} |")
     lines += ["", "## Aggregates", "", "| metric | before | after | delta |", "|---|---|---|---|"]
     for name, v in cmp["aggregate"].items():
         lines.append(f"| {name} | {_fmt(v['before'])} | {_fmt(v['after'])} | {_fmt(v['delta'])} |")
+    paths = cmp.get("paths")
+    if paths:
+        lines += ["", "## Per path (median)", "",
+                  "`composite`: the turns the fast path answered; `other`: the turns every mode runs the same way "
+                  "(a change there is provider drift); `unknown`: no decision recorded.", "",
+                  "| path | turns before / after | latency before s | latency after s | first text before s | "
+                  "first text after s |", "|---|---|---|---|---|---|"]
+        for name in ("composite", "other", "unknown"):
+            b, a = paths["before"][name], paths["after"][name]
+            lines.append(f"| {name} | {b['turns']} / {a['turns']} | {_fmt(b['latency_p50_s'])} | "
+                         f"{_fmt(a['latency_p50_s'])} | {_fmt(b['first_text_p50_s'])} | {_fmt(a['first_text_p50_s'])} |")
     lines += ["", f"- flags before: {json.dumps(cmp['flag_counts']['before'], ensure_ascii=False)}",
               f"- flags after: {json.dumps(cmp['flag_counts']['after'], ensure_ascii=False)}",
               f"- burst before: {json.dumps(cmp['burst']['before'])}",
