@@ -10,13 +10,17 @@ from __future__ import annotations
 import json
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
 
 import httpx
 
 from ...domain import NotFound
 from ...domain.models import CoreError
+
+
+class _TurnNotYetKnown(Exception):
+    """The events route answered 404 before any frame: the Core may not have the turn yet."""
 
 
 class AgentCoreHttp:
@@ -31,7 +35,7 @@ class AgentCoreHttp:
     def __init__(self, base_url: str, profile_id: str = "glazed_orchestrator", subject_id: str = "manager-1",
                  timeout: float = 30.0, client: httpx.Client | None = None, channel: str = "glazed",
                  roles: str = "glazed-manager", service_roles: str = "glazed-service",
-                 max_streams: int = DEFAULT_MAX_STREAMS) -> None:
+                 max_streams: int = DEFAULT_MAX_STREAMS, sleep: Callable[[float], None] = time.sleep) -> None:
         if max_streams < 0:
             raise ValueError(f"max_streams must be at least 0, got {max_streams}")
         self.profile_id, self.subject_id = profile_id, subject_id
@@ -39,6 +43,7 @@ class AgentCoreHttp:
         self.max_streams = max_streams
         self._streams = threading.BoundedSemaphore(max_streams) if max_streams else None
         self._c = client or httpx.Client(base_url=base_url, timeout=timeout)
+        self._sleep = sleep
 
     @classmethod
     def from_env(cls, base_url: str, env: dict[str, str]) -> "AgentCoreHttp":
@@ -86,6 +91,10 @@ class AgentCoreHttp:
         return self._call("GET", f"/turns/{turn_id}", store_id).json()
 
     STREAM_TIMEOUT = httpx.Timeout(10.0, read=60.0)  # Core sends a keepalive comment on a quiet stream
+    # Right after POST /turns the Core may not know the turn yet (its route step runs before the turn exists), so a
+    # 404 on the events route is retried after each of these waits before the turn falls back to polling (L18: without
+    # it every stream of the phase5 battery was refused and first_text was never measured). Other errors never retry.
+    STREAM_OPEN_RETRY_DELAYS_S: tuple[float, ...] = (0.15, 0.3, 0.6)
 
     def stream_turn(self, turn_id: str, store_id: str) -> Iterator[tuple[str, dict[str, Any]]]:
         """The turn's Server-Sent Events as (event, data) pairs, until the server closes the stream. Comments
@@ -99,10 +108,24 @@ class AgentCoreHttp:
             self._streams.release()
 
     def _events(self, turn_id: str, store_id: str) -> Iterator[tuple[str, dict[str, Any]]]:
+        for delay in self.STREAM_OPEN_RETRY_DELAYS_S:
+            try:
+                yield from self._events_once(turn_id, store_id)
+                return
+            except _TurnNotYetKnown:
+                self._sleep(delay)
+        try:
+            yield from self._events_once(turn_id, store_id)
+        except _TurnNotYetKnown as exc:
+            raise CoreError(f"Agent-Core 404 on GET /turns/{turn_id}/events") from exc
+
+    def _events_once(self, turn_id: str, store_id: str) -> Iterator[tuple[str, dict[str, Any]]]:
         headers = {**self._headers(store_id), "Accept": "text/event-stream"}
         try:
             with self._c.stream("GET", f"/turns/{turn_id}/events", headers=headers,
                                 timeout=self.STREAM_TIMEOUT) as resp:
+                if resp.status_code == 404:
+                    raise _TurnNotYetKnown(turn_id)
                 if resp.status_code >= 400:
                     raise CoreError(f"Agent-Core {resp.status_code} on GET /turns/{turn_id}/events")
                 event, data = "message", []

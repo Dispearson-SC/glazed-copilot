@@ -367,3 +367,48 @@ def test_streaming_is_on_by_default_and_off_with_glazed_core_stream_false(env, o
 
     streams = build_turn_streams(env, StreamingCore(), FakeClock())
     assert (streams is not None) is on
+
+
+# ---- opening a stream before the Core knows the turn (L18: first_text null on every turn) ----
+
+def _core_answering(*statuses: int, sleeps: list | None = None) -> tuple[AgentCoreHttp, list]:
+    body = b"event: delta\ndata: {\"turn_id\": \"t1\", \"text\": \"Hola\"}\n\nevent: end\ndata: {}\n\n"
+    answers, seen = list(statuses), []
+
+    def handler(req: httpx.Request):
+        seen.append(req.url.path)
+        status = answers.pop(0) if answers else 200
+        if status == 200:
+            return httpx.Response(200, content=body, headers={"content-type": "text/event-stream"})
+        return httpx.Response(status)
+
+    core = AgentCoreHttp("http://core", client=httpx.Client(transport=httpx.MockTransport(handler),
+                                                             base_url="http://core"),
+                         sleep=(sleeps.append if sleeps is not None else (lambda s: None)))
+    return core, seen
+
+
+def test_a_stream_opened_before_the_core_knows_the_turn_is_retried_briefly_on_404():
+    """Right after POST /turns the Core may not have the turn yet (its route step runs first): a 404
+    on the events route is retried a few times, quickly, before the turn falls back to polling."""
+    sleeps: list = []
+    core, seen = _core_answering(404, 404, sleeps=sleeps)
+
+    frames = list(core.stream_turn("t1", "S030"))
+
+    assert frames == [("delta", {"turn_id": "t1", "text": "Hola"}), ("end", {})]
+    assert seen == ["/turns/t1/events"] * 3
+    assert sleeps == list(AgentCoreHttp.STREAM_OPEN_RETRY_DELAYS_S[:2])
+    assert sum(AgentCoreHttp.STREAM_OPEN_RETRY_DELAYS_S) <= 2.0, "a short wait, then polling"
+
+
+def test_a_turn_still_unknown_after_the_retries_breaks_the_stream_and_other_errors_never_retry():
+    core, seen = _core_answering(*([404] * 10))
+    with pytest.raises(CoreError, match="404"):
+        list(core.stream_turn("t1", "S030"))
+    assert len(seen) == len(AgentCoreHttp.STREAM_OPEN_RETRY_DELAYS_S) + 1
+
+    core, seen = _core_answering(503)
+    with pytest.raises(CoreError, match="503"):
+        list(core.stream_turn("t1", "S030"))
+    assert seen == ["/turns/t1/events"]
