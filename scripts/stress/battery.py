@@ -150,10 +150,12 @@ _GLUED_PAIR = re.compile(
     r"\b(?:el|la|lo|los|las|un|una)(?:su|sus|suy[oa]s?|nuestr[oa]s?)\b|"
     r"\bhoy[a-záéíóúñü]{3,}|[a-záéíóúñü]{2,}usted(?:es)?\b|\busted(?:es)?[a-záéíóúñü]{3,}")
 _REAL_WORDS = frozenset({"ella", "ellas", "yla", "alas", "ala", "hoyos", "hoyo", "hoya"})  # real words the pattern hits
-# A number run into a lower-case word (`en1`, `con58,90`, `el2026`). Case-sensitive, never after the one-letter `a` or
-# `y`, and the number must end the token: `A100`, `Y2`, `y2k`, `a1` and an id such as `a8d5f01e08dc` are codes (P13:
-# the P12 detector flagged them).
-_GLUED_DIGIT = re.compile(r"\b(?:al|con|de|del|el|en|la|las|los|para|por|un|una)\d+(?:[.,]\d+)*\.?(?![\w])")
+# A number run into a lower-case word (`en1`, `con58,90`, `el2026`), or into one capitalised at a sentence start
+# (`En14`, `Del5`: P14). Never after the one-letter `a` or `y`, never an all-capital word, and the number must end the
+# token: `A100`, `Y2`, `EN14`, `AL5`, `y2k`, `a1` and an id such as `a8d5f01e08dc` are codes (P13: the P12 detector
+# flagged them).
+_GLUED_DIGIT = re.compile(r"\b(?:[Aa]l|[Cc]on|[Dd]el?|[Ee][ln]|[Ll]a|[Ll]as|[Ll]os|[Pp]ara|[Pp]or|[Uu]n|[Uu]na)"
+                          r"\d+(?:[.,]\d+)*\.?(?![\w])")
 # English function words that do not exist in Spanish (so `no`, `a` and `es` are not among them), written in lower
 # case: product names are English but capitalised ("Better For You Breakfast Sandwich").
 _STRAY_EN = frozenset({"the", "and", "with", "which", "however", "also", "will", "should", "would", "your", "you",
@@ -330,27 +332,46 @@ def tag_decisions(turns: list[dict[str, Any]], decisions: dict[str, str]) -> lis
 
 
 def path_of(turn: dict[str, Any]) -> str:
-    """`composite` (the fast path answered), `other` (the path every mode runs) or `unknown` (no decision known)."""
+    """`composite` (the fast path answered), `other` (any other verdict) or `unknown` (no decision known). Kept for
+    older result files; `bucket_of` splits `other`, which mixes the control with the turns a pass changes."""
     verdict = turn.get("fast_path")
     if not verdict:
         return "unknown"
     return "composite" if verdict == "composite" else "other"
 
 
+def bucket_of(turn: dict[str, Any]) -> str:
+    """P14. `composite`; `defer` (a `defer:*` verdict: the existing route runs in every mode, the true control, so a
+    change there between two runs is provider drift); `pass` (a `pass:*` verdict: in `on` the entry profile runs
+    instead of the route the router chose, so a change there is behaviour, not drift); `unknown` (no decision known
+    or an unrecognised verdict)."""
+    verdict = str(turn.get("fast_path") or "")
+    if verdict == "composite":
+        return "composite"
+    if verdict.startswith("defer:"):
+        return "defer"
+    if verdict.startswith("pass:"):
+        return "pass"
+    return "unknown"
+
+
 def _median(values: list[float]) -> float | None:
     return round(float(statistics.median(values)), 2) if values else None
 
 
+def _medians(mine: list[dict[str, Any]]) -> dict[str, Any]:
+    return {"turns": len(mine),
+            "latency_p50_s": _median([t["latency_s"] for t in mine if t.get("latency_s") is not None]),
+            "first_text_p50_s": _median([t["first_text_s"] for t in mine if t.get("first_text_s") is not None])}
+
+
 def path_medians(turns: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Median latency and first text per path. The `other` path runs the same code in every fast-path mode, so a
-    change there between two runs is provider drift, not the fast path."""
-    out: dict[str, dict[str, Any]] = {}
-    for path in ("composite", "other", "unknown"):
-        mine = [t for t in turns if path_of(t) == path]
-        out[path] = {"turns": len(mine),
-                     "latency_p50_s": _median([t["latency_s"] for t in mine if t.get("latency_s") is not None]),
-                     "first_text_p50_s": _median([t["first_text_s"] for t in mine
-                                                  if t.get("first_text_s") is not None])}
+    """Median latency and first text per bucket (`bucket_of`): `composite`, `defer` (the true control), `pass` and
+    `unknown`; `other` (`defer` and `pass` together, P13) stays for older readers."""
+    out: dict[str, dict[str, Any]] = {name: _medians([t for t in turns if bucket_of(t) == name])
+                                      for name in ("composite", "defer", "pass")}
+    for path in ("other", "unknown"):
+        out[path] = _medians([t for t in turns if path_of(t) == path])
     return out
 
 
@@ -445,13 +466,18 @@ def render_compare_markdown(cmp: dict[str, Any]) -> str:
     paths = cmp.get("paths")
     if paths:
         lines += ["", "## Per path (median)", "",
-                  "`composite`: the turns the fast path answered; `other`: the turns every mode runs the same way "
-                  "(a change there is provider drift); `unknown`: no decision recorded.", "",
+                  "`composite`: the turns the fast path answered; `defer`: the turns every mode runs the same way "
+                  "(the true control: a change there is provider drift); `pass`: the turns `on` sends to the entry "
+                  "profile instead of the router's route (a change there is behaviour); `unknown`: no decision "
+                  "recorded.", "",
                   "| path | turns before / after | latency before s | latency after s | first text before s | "
                   "first text after s |", "|---|---|---|---|---|---|"]
-        for name in ("composite", "other", "unknown"):
-            b, a = paths["before"][name], paths["after"][name]
-            lines.append(f"| {name} | {b['turns']} / {a['turns']} | {_fmt(b['latency_p50_s'])} | "
+        labels = {"defer": "defer (true control)"}
+        for name in ("composite", "defer", "pass", "unknown"):
+            b, a = paths["before"].get(name), paths["after"].get(name)
+            if b is None or a is None:
+                continue  # a result file older than P14 without the bucket
+            lines.append(f"| {labels.get(name, name)} | {b['turns']} / {a['turns']} | {_fmt(b['latency_p50_s'])} | "
                          f"{_fmt(a['latency_p50_s'])} | {_fmt(b['first_text_p50_s'])} | {_fmt(a['first_text_p50_s'])} |")
     lines += ["", f"- flags before: {json.dumps(cmp['flag_counts']['before'], ensure_ascii=False)}",
               f"- flags after: {json.dumps(cmp['flag_counts']['after'], ensure_ascii=False)}",

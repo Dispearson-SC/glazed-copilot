@@ -15,8 +15,8 @@ verdict per turn is not exposed by the backend: export it from the Core audit an
 (decisions.json is a list of {turn_id, fast_path} or a {turn_id: fast_path} map), e.g.
   psql "$AGENT_CORE_DB" -Atc "select json_agg(json_build_object('turn_id', turn_id, 'fast_path', fast_path))
                               from audit_turn_routes where fast_path is not null" > decisions.json
-compare then reports per-path medians: `composite` turns against `other` turns (the path every mode runs the same
-way, so a change there between two runs is provider drift).
+compare then reports per-path medians: `composite` turns, `defer` turns (the path every mode runs the same way, so a
+change there between two runs is provider drift) and `pass` turns (`on` runs the entry profile instead: behaviour).
 
 Auth: when /api/v1 answers 401 the runner logs in with GLAZED_STRESS_EMAIL + GLAZED_STRESS_PASSWORD if set,
 otherwise with the demo login as the first admin of /api/v1/auth/demo-users. Credentials are never printed.

@@ -72,12 +72,17 @@ python3 scripts/stress/run.py compare scripts/stress/results/p13-shadow-<ts>.jso
 ```
 
 Compare pairs turns by (case, turn, repeat) and adds a **Per path (median)** table: `composite` (the turns the fast
-path answers) against `other` (turns every mode runs the same way). A change on `other` between the two runs is
-drift; judge the fast path by `composite` measured against it. Files without repeats or verdicts compare as before.
+path answers), `defer (true control)` (a `defer:*` verdict: turns every mode runs the same way), `pass` (a `pass:*`
+verdict: `on` runs the entry profile instead of the router's route, so a change there is behaviour, not drift) and
+`unknown`. A change on `defer` between the two runs is drift; judge the fast path by `composite` measured against it,
+and read `pass` on its own (P14: P13 mixed both into `other`, which hid the `pass:uncovered` regression inside the
+control). The result JSON keeps `other` (`defer` plus `pass`) for older readers. Files without repeats or verdicts
+compare as before. Tests of the P14 changes: `pytest scripts/stress/test_battery_p14.py`.
 
 The `garbled` flag counts glued words (`dela`, `hoyusted`, an article run into a possessive such as `lasuya`, a
-number run into a lower-case word such as `en1`), stray English, full-width punctuation and markdown debris. Codes
-(`A100`, `y2k`, an id like `a8d5f01e08dc`), `***bold italic***` and a `***` rule are not flagged.
+number run into a lower-case word such as `en1`, or into one capitalised at a sentence start such as `En14`), stray
+English, full-width punctuation and markdown debris. Codes (`A100`, `EN14`, `y2k`, an id like `a8d5f01e08dc`),
+`***bold italic***` and a `***` rule are not flagged.
 
 ## Tests
 
