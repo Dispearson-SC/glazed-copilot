@@ -1,0 +1,4285 @@
+{
+  "label": "p13-on",
+  "started_at": "20261015T070943Z",
+  "api": "http://localhost:8100",
+  "store_id": "S001",
+  "sim_today": "2026-07-19",
+  "battery_version": 1,
+  "turns": [
+    {
+      "case_id": "simple",
+      "kind": "simple",
+      "turn_index": 0,
+      "burst": false,
+      "question": "Hola, ¿cómo va la tienda hoy?",
+      "backend_case_id": "1806500367f8",
+      "first_text_s": 2.8,
+      "first_progress_s": null,
+      "polls": 5,
+      "turn_id": "6cbc7230-0a3f-4100-a182-6bc6a32e07e5",
+      "status": "done",
+      "latency_s": 4.19,
+      "reply": "Hola. Hoy, domingo 2026-07-19, Harborview International Airport · Food Court – Full Counter 1 registra:\n\n- Ventas netas: 22900.91 USD, con 2713 transactions.\n- Lo que se tira: 928.08 USD.\n- Lo que se dejó de vender: entre 934.71 USD y 1620.21 USD.\n- Hay riesgo de quedarse sin Angus SteakSandwich y Southwest Veggie Powr Brkfst Sandwich; ambos tienen 0 unidades al cierre de hoy.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 7,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "22900.91",
+          "2713",
+          "928.08",
+          "934.71",
+          "1620.21"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {},
+      "repeat": 0,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_day_summary",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "Dame el resumen del día de hoy.",
+      "backend_case_id": "4273e3a4b353",
+      "first_text_s": 4.32,
+      "first_progress_s": null,
+      "polls": 7,
+      "turn_id": "14f6e447-299e-450f-bf7a-4391905e46be",
+      "status": "done",
+      "latency_s": 6.26,
+      "reply": "- **Harborview International Airport · Food Court – Full Counter 1**, domingo 2026-07-19: ventas netas de **22900.91 USD**, **2713** transacciones y **6.45** transacciones por hora de personal.\n- Lo que se dejó de vender se estima entre **934.71 USD** y **1620.21 USD**; la cifra central es **1398.28 USD**. Lo que se tira suma **928.08 USD**.\n- Hay riesgo de quedarse sin **Angus SteakSandwich** y **Southwest Veggie Powr Brkfst Sandwich** el **2026-07-21**. Ordenar los planes salvaría en promedio **207.66 USD** y **214.41 USD**, respectivamente, frente a no hacer nada; la seguridad es baja y estas decisiones las tomas tú.\n- También hay sobreinventario de **12 Croiss-Ant Donuts** y **6 Bacon Donuts**. Omitir el siguiente pedido ahorraría en promedio **58.9 USD** y **35.52 USD**, pero existe riesgo de quedarse sin producto.\n- Hay problemas de identificación de productos por un valor de **301950.59 USD** y por códigos que no existen por un valor de **14537.12 USD**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 16,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "22900.91",
+          "2713",
+          "6.45",
+          "934.71",
+          "1620.21",
+          "1398.28",
+          "928.08",
+          "207.66",
+          "214.41",
+          "12",
+          "58.9",
+          "35.52",
+          "301950.59",
+          "14537.12"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "day_summary"
+      },
+      "repeat": 0,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_active_issues",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué problemas o alertas urgentes tengo abiertos?",
+      "backend_case_id": "ba4af3af353a",
+      "first_text_s": 2.35,
+      "first_progress_s": null,
+      "polls": 6,
+      "turn_id": "275b78f7-e490-4bb5-aca6-62611cf0d502",
+      "status": "done",
+      "latency_s": 5.19,
+      "reply": "En **Harborview International Airport · Food Court – Full Counter 1**, las alertas urgentes son:\n\n- **Faltante de producto:** Angus SteakSandwich, Southwest Veggie Powr Brkfst Sandwich, Better For You Breakfast Sandwich y Spicy Omlet Flatbread. El riesgo de quedarse sin producto es de **100%**; las fechas proyectadas van del **2026-07-21** al **2026-07-22**. Los pedidos propuestos tienen poca certeza y requieren autorización de tu jefe.\n- **Merma por exceso de pedido:** 12 Croiss-Ant Donuts, 6 Bacon Donuts, 6 Donuts, Blueberry Coffee Cake Muffin y 6 Bacon Donuts. En los últimos 14 días, la merma fue de **417.35 USD**, **384.8 USD**, **135.73 USD** y **109.02 USD**, respectivamente. Saltarse los pedidos tiene una confianza **0.8309**, por lo que la decisión requiere aprobación.\n- **Corrección de datos:** hay una clave de producto mal escrita y códigos desconocidos. La exposición asciende a **301950.59 USD** y **14537.12 USD**; ambas correcciones tienen fecha límite **2026-07-19** y requieren que una persona intervenga.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_issues": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 14,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "100",
+          "12",
+          "14",
+          "417.35",
+          "384.8",
+          "135.73",
+          "109.02",
+          "0.8309",
+          "301950.59",
+          "14537.12"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "active_issues"
+      },
+      "repeat": 0,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_order_plan",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cuál es el plan de pedido para mañana?",
+      "backend_case_id": "b6655d468234",
+      "first_text_s": 3.24,
+      "first_progress_s": null,
+      "polls": 16,
+      "turn_id": "72f0dc4a-f2b1-446f-b00b-7e8da27b78cb",
+      "status": "done",
+      "latency_s": 15.58,
+      "reply": "**Plan de pedido para mañana (lunes 20 de julio): no hay pedidos programados para vencer mañana.**\n\nLo que dice el plan, según el resumen de hoy domingo 19:\n\n- **Pedidos que vencen hoy:** ninguno.\n- **Pedidos que vencen mañana:** ninguno.\n\nLo que sí está en el plan son **11 líneas con el plazo de pedido ya vencido** (ocho de ellas del proveedor Summit Frozen Foods, que entrega el martes 21). Son las queesting hoy para que alcancen esa entrega; si no se mandan a tiempo, la entrega se mueve y probablemente te quedes sin producto:\n\n| Producto | Cantidad | Costo estimado | Fecha en que se acaba |\n|---|---|---|---|\n| Angus SteakSandwich | 150 | $130.50 | lunes 21 |\n| Southwest Veggie Powr Brkfst Sandwich | 70 | $82.60 | lunes 21 |\n| Spicy Omlet Flatbread | 60 | $97.20 | martes 22 |\n| Better For You Breakfast Sandwich | 40 | $74.40 | martes 22 |\n| House Dblcssg Sand | 10 | $19.70 | jueves 23 |\n\nLos tres primeros tienen riesgo de quedarse sin producto antes de la próxima entrega, y Summit Frozen Foods llega con 90% de puntualidad, así que un día de retraso está contemplado. Ojo: la proyección tiene poca confianza (0.29) porque en casi la mitad de los días hubo quiebres de inventario, y hay una advertencia de integridad: el código SKU-100040 parece duplicar un producto ya existente, así que vale la pena confirmarlo antes de pedirlo.\n\nSobre los dos problemas de desperdicio (12 Croiss-Ant Donuts y 6 Bacon Donuts): la recomendación es no pedirles en el próximo ciclo, ahorrando alrededor de $59 y $36 por ciclo respectivamente, frente a $88 y $64 de merma si se sigue igual — pero hay que confirmar si el proveedor acepta menos de una caja completa.\n\n¿Quieres que proponga alguna de estas líneas como decisión pendiente, o prefieres revisar primero los quiebres del proveedor de Summit?",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_briefing": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 27,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "20",
+          "19",
+          "11",
+          "21",
+          "150",
+          "130.50",
+          "21",
+          "70",
+          "82.60",
+          "21",
+          "60",
+          "97.20",
+          "22",
+          "40",
+          "74.40",
+          "22",
+          "19.70",
+          "23",
+          "90",
+          "0.29",
+          "12",
+          "59",
+          "36",
+          "88",
+          "64"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "order_plan"
+      },
+      "repeat": 0,
+      "fast_path": "pass:complex"
+    },
+    {
+      "case_id": "intent_stockout_risk",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué productos me voy a quedar sin inventario esta semana?",
+      "backend_case_id": "e64846878ed0",
+      "first_text_s": 7.23,
+      "first_progress_s": null,
+      "polls": 10,
+      "turn_id": "8b7439f3-8d47-4291-9b04-1d6b3a385dd6",
+      "status": "done",
+      "latency_s": 9.33,
+      "reply": "Los siguientes ya están agotados y siguen riesgos durante la semana:\n\n- **Better For You Breakfast Sandwich**: se proyecta agotamiento el **2026-07-23**.\n- **Southwest Veggie Powr Brkfst Sandwich**: **2026-07-22**.\n- **Angus SteakSandwich**: **2026-07-22**.\n- **Sm Cold Brew Latte**: **2026-07-24**.\n- **3 Donut Holes**: **2026-07-21**.\n- **50 Donut Holes**: **2026-07-21**.\n- **Hummus (Mod)**: **2026-07-23**.\n\nTambién quedan con inventario muy bajo:\n\n- **Oatmeal W Brown Sugar And Fruit**: **12 unidades**, proyección de agotamiento el **2026-07-22**.\n- **2 Mffin 6Pc Hb**: **12 unidades**, proyección de agotamiento el **2026-07-22**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_inventory_status": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 6,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "50",
+          "12",
+          "12"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "stockout_risk"
+      },
+      "repeat": 0,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_expiring_items",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué productos están por caducar en los próximos días?",
+      "backend_case_id": "b4685b24a5e8",
+      "first_text_s": 2.45,
+      "first_progress_s": null,
+      "polls": 5,
+      "turn_id": "717a3801-473a-4a77-ad40-e8a0fcbe8932",
+      "status": "done",
+      "latency_s": 4.22,
+      "reply": "En **Harborview International Airport · Food Court – Full Counter 1** aparecen estos productos por caducar:\n\n- **20 de julio de 2026:** Bacon Roll Up.\n- **21 de julio de 2026:** Fall Lip Balm Pumpkin; Bagel W Butter; 8 Count Mini Chocolate Chip Cookie; Hm And Ew Western; Blueberry Coffee Cake Muffin; Cheesecake Square Cookie Crumb; Brownie.\n- **22 de julio de 2026:** Md Choc Stout C.B. Wsweet Cold Foam; Pancake Morning Wrap Bacon, Egg And Cheese.\n\nEl reporte señala **14 productos** en total, aunque solo muestra estos **10** con fecha de caducidad.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_expiring": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 10,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "20",
+          "2026",
+          "21",
+          "2026",
+          "22",
+          "2026",
+          "14"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "expiring_items"
+      },
+      "repeat": 0,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_upcoming_deliveries",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué entregas de proveedores llegan esta semana?",
+      "backend_case_id": "4e2ae1d64bfa",
+      "first_text_s": 2.94,
+      "first_progress_s": null,
+      "polls": 6,
+      "turn_id": "614cdd6c-dd85-4270-8ea7-4167f969ca03",
+      "status": "done",
+      "latency_s": 5.19,
+      "reply": "- **2026-07-20:** Northfield Bakery Partners, Coastal Beverage Distribution, Summit Frozen Foods, Riverbend Fresh & Dairy, Evergreen Coffee Roasters y Pioneer Merch & Packaging.\n- **2026-07-21:** Summit Frozen Foods y Pioneer Merch & Packaging; también hay entregas programadas de Northfield Bakery Partners y Riverbend Fresh & Dairy.\n- **2026-07-22:** Coastal Beverage Distribution y Evergreen Coffee Roasters; también hay entregas programadas de Northfield Bakery Partners, Riverbend Fresh & Dairy y Pioneer Merch & Packaging.\n- **2026-07-23:** Evergreen Coffee Roasters; también hay entregas programadas de Northfield Bakery Partners, Coastal Beverage Distribution, Riverbend Fresh & Dairy y Pioneer Merch & Packaging.\n- **2026-07-24:** Pioneer Merch & Packaging; también hay entregas programadas de Northfield Bakery Partners, Summit Frozen Foods y Riverbend Fresh & Dairy.\n- **2026-07-25:** Pioneer Merch & Packaging; también hay entregas programadas de Northfield Bakery Partners y Riverbend Fresh & Dairy.\n\nLa entrega más destacada es la del **2026-07-21**: **Mug Ceramic Pink/White 12 Count**, con **18 unidades**, por **152.46 USD**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_deliveries": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 3,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "12",
+          "18",
+          "152.46"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "upcoming_deliveries"
+      },
+      "repeat": 0,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_staffing",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cómo está el personal para los próximos días? ¿Me alcanzan los turnos?",
+      "backend_case_id": "ddcd364cd01e",
+      "first_text_s": 21.15,
+      "first_progress_s": 6.25,
+      "polls": 26,
+      "turn_id": "e16be13a-65bf-4316-a501-986b21f5b5d5",
+      "status": "done",
+      "latency_s": 25.78,
+      "reply": "**Personal para los próximos días**\n\nLo que sí está calculado son las **horas de personal recomendadas** por día (no hay horario cargado, así que no puedo decirte si hoy te alcanzan o sobran):\n\n| Día | Horas recomendadas (mín – máx) |\n|---|---|\n| lunes 20 jul | 57.4 – 76.2 h |\n| martes 21 | 56.1 – 71.5 h |\n| miércoles 22 | 54.1 – 66.0 h |\n| jueves 23 | 61.8 – 80.5 h |\n| viernes 24 | 62.1 – 76.5 h |\n| sábado 25 | 47.9 – 60.8 h |\n| domingo 26 | 62.0 – 83.3 h |\n\nPuntos clave:\n- **Hoy domingo 19 no hay pronóstico disponible**; la proyección arranca mañana lunes20.\n- **Los días que más requieren gente:** domingo 26 y viernes 24 / jueves 23.\n- **El día más liviano es sábado 25**, buen candidato para mover horas ahí si tienes que recortar.\n- Como referencia, la tienda viene en **6.45 transacciones por hora de personal** en los últimos 7 días, por encima del 5.72 del formato: es decir, tu gente está rindiendo bien.\n\nLo que **no** puedo decir: si hay déficit o sobras por día, porque no hay horario/roster cargado en los datos. Si me pasas las horas ya programadas de cada día, las cruzo con estas cifras y te digo exactamente dónde te falta o sobra gente.\n\nAparte, los turnos no son hoy el problema más caro: el mayor riesgo es de inventario — hay 4 líneas de pedido con fecha de entrega vencida y una merma de $928 en 7 días. ¿Quieres que attackemos eso?",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "strategist",
+          "display_name_es": "Estratega",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 1,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 1
+      },
+      "peers": [
+        "glazed_strategist"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 32,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "928"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "staffing"
+      },
+      "repeat": 0,
+      "fast_path": "pass:uncovered"
+    },
+    {
+      "case_id": "intent_promo_list",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué promociones activas tengo ahorita?",
+      "backend_case_id": "343d1c2606db",
+      "first_text_s": 2.75,
+      "first_progress_s": null,
+      "polls": 4,
+      "turn_id": "2d333f04-5a53-4653-8066-01fd248bf121",
+      "status": "done",
+      "latency_s": 3.17,
+      "reply": "- No tengo promociones activas registradas ahorita. La única registrada, **Summer Iced Coffee Week**, aparece como **pasada** y terminó el **2026-07-19**.",
+      "error": null,
+      "sanitized_fragments": 1,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_promos": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 0,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "promo_list"
+      },
+      "repeat": 0,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_data_integrity",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Hay datos que no cuadran en el inventario o las ventas?",
+      "backend_case_id": "e7240e1fb0d7",
+      "first_text_s": 33.93,
+      "first_progress_s": 21.6,
+      "polls": 37,
+      "turn_id": "7d703e80-914e-4e52-907b-aec33cc0cbc6",
+      "status": "done",
+      "latency_s": 37.0,
+      "reply": "Sí, hay dos problemas, y los dos son de códigos de producto, no de cantidades.\n\n**1. El sándwich \"Better For You Breakfast Sandwich\" aparece con dos nombres distintos**\nEn las ventas está como SKU-100040 y en el catálogo como SKU100040: es el mismo producto escrito de otra forma, no uno nuevo. Son 5,173 filas afectadas, con $20,360.04 de venta de esta tienda (y $301,950.59 acumulado en toda la cadena). Otras 206 llaves tienen el mismo problema, cada una por menos de $10,000.\nLo que pasa si no se corrige: esas ventas se quedan sin costo, sin categoría y sin orden de reordenación automática. La corrección es manual (alguien lo reporta a corporativo o ajusta el catálogo) y el plazo es hoy, 19 de julio.\n\n**2. Hay 309 códigos que no existen en el catálogo**\nNi siquiera después de normalizar el nombre aparecen. Suman $223.60 de venta en esta tienda y $14,537.12 en total de la cadena. Igual que el anterior: hay que reportarlos a corporativo hoy, y mientras tanto esas ventas no permiten calcular margen ni reordenación.\n\nNinguno de los dos significa que falte o sobre producto físico: es venta que no se puede clasificar. En los dos casos el auditor está totalmente seguro (confianza 1.0) y los dos requieren aprobación de tu jefe (N2). Si quieres, levanto las dos tareas de corrección como propuestas para que te den el visto bueno.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "sentinel",
+          "display_name_es": "Centinela",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 1,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 1
+      },
+      "peers": [
+        "glazed_auditor"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 12,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "5,173",
+          "20,360.04",
+          "301,950.59",
+          "10,000",
+          "14,537.12"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "data_integrity"
+      },
+      "repeat": 0,
+      "fast_path": "pass:uncovered"
+    },
+    {
+      "case_id": "intent_transfer_options",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Puedo traer de otra sucursal algún producto que me esté faltando?",
+      "backend_case_id": "a229c7c1e654",
+      "first_text_s": 36.42,
+      "first_progress_s": 21.52,
+      "polls": 40,
+      "turn_id": "3c2b4490-a827-41d1-b27f-4151f9c63b16",
+      "status": "done",
+      "latency_s": 40.05,
+      "reply": "Hoy no hay transferencias disponibles hacia tu tienda.\n\nLo revisé con el analista de traslados y la respuesta es clara: en ninguno de los cuatro productos que te están faltando hay alguna sucursal que vaya a tener unidades sin vender antes de que caduquen. Como no hay excedente real en ninguna otra sucursal, no hay nada que justifique mover mercancía hoy.\n\nEsto aplica a:\n- Angus SteakSandwich (cierre en 0)\n- Southwest Veggie Powr Brkfst Sandwich (cierre en 0)\n- Better For You Breakfast Sandwich (cierre en 0)\n- Spicy Omlet Flatbread (cierre en 55)\n\nDos advertencias importantes:\n\nLa confianza de este dato es baja (0.3) y no está calibrada, porque no hay historial de transferencias previas entre sucursales. Tómalo solo como referencia, no como certeza.\n\nLos tiempos de traslado serían de 1 día si fuera dentro del mismo sitio y 2 días si fuera de otro sitio, así que incluso si mañana apareciera algo, llegaría tarde para los productos que se agotan el 21 y 22 de julio.\n\nSi quieres, lo que sí tiene sentido hoy es pedir los productos que se están por agotar al proveedor, y de eso sí te puedo ayudar con las opciones y sus números.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "liaison",
+          "display_name_es": "Enlace entre sucursales",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 1,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 1
+      },
+      "peers": [
+        "glazed_liaison"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 9,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "21",
+          "22"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "transfer_options"
+      },
+      "repeat": 0,
+      "fast_path": "pass:complex"
+    },
+    {
+      "case_id": "specialist_past",
+      "kind": "specialist",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cómo nos fue la última vez que decidimos pedir de más antes de un fin de semana?",
+      "backend_case_id": "e91a48987354",
+      "first_text_s": 26.56,
+      "first_progress_s": 11.28,
+      "polls": 32,
+      "turn_id": "ed39f15d-9f9e-4933-895f-36892fda5b82",
+      "status": "done",
+      "latency_s": 32.02,
+      "reply": "No hay ninguna vez anterior registrada, así que te lo digo claro: **no existe un caso previo de pedir de más antes de un fin de semana con resultado medido** en Harborview International Airport · Food Court – Full Counter 1.\n\nLo que sí revisó el analista de pasado:\n\n- **Bitácora de decisiones:** vacía. Hay 13 semanas de ventas y merma, pero ninguna decisión registrada con resultado.\n- **Memoria de la tienda:** 9 entradas, todas de hoy (domingo 19 de julio de 2026), y ninguna tiene resultado asociado. Son aprobaciones o rechazos, entre ellas tu razón de \"prefiero no quedarme corto\". Eso es una intención, no un resultado.\n- **Notas tuyas para el 19 al 21 de julio:** \"Feria del barrio, más tráfico\" y \"hoy se venderá menos porque cerrarán la calle principal\". Ojo: apuntan en direcciones opuestas, así que no sirven para anticipar el fin de semana.\n\nLo que sí está medido hoy, por si te sirve para esta semana:\n\n- Lo que se tira de 12 Croiss-Ant Donuts en14 días: $417.35 (el mayor problema de la tienda), con 300 unidades recibidas en 28 días contra 126 vendidas.\n- Lo que se tira de 6 Bacon Donuts en 14 días: $384.80, con 336 unidades recibidas contra 77 vendidas.\n- Nota importante: no está confirmado si el proveedor acepta pedidos de menos de una caja completa, y tu proveedor con menor puntualidad es Pioneer Merch & Packaging, con 86.3%.\n\n¿Quieres que te proponga algo concreto para el fin de semana del 25 y 26 de julio, o prefieres primero ver el detalle de esos dos productos?",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "past",
+          "display_name_es": "Analista histórico",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 1,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 1
+      },
+      "peers": [
+        "glazed_past"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [
+          "garbled"
+        ],
+        "internal_names": [],
+        "numbers_checked": 20,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "417.35",
+          "28",
+          "126",
+          "14",
+          "384.80",
+          "336",
+          "77",
+          "86.3",
+          "25",
+          "26"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": [
+          "en14"
+        ]
+      },
+      "expect": {
+        "profile": "glazed_past"
+      },
+      "repeat": 0,
+      "fast_path": "pass:complex"
+    },
+    {
+      "case_id": "specialist_supply",
+      "kind": "specialist",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué proveedor ha cumplido peor con sus entregas últimamente?",
+      "backend_case_id": "6b29188a57d2",
+      "first_text_s": 1.9,
+      "first_progress_s": null,
+      "polls": 8,
+      "turn_id": "331ab20e-3c30-4d3c-b2a4-d5d356954fb2",
+      "status": "done",
+      "latency_s": 7.28,
+      "reply": "**Pioneer Merch & Packaging** es el proveedor con peor cumplimiento de entregas en los últimos 180 días:\n\n- **Puntualidad:** 86.3% (la más baja de los seis proveedores; el resto va de 90.0% a 94.5%)\n- **Cobertura de pedidos (fill rate):** 97.0% (también la más baja)\n- **Lead time medio:** 7.21 días, con percentil 90 de 8.0 días — el más largo de todos\n- Entrega programada siguiente: **2026-07-20**\n\naunque hay que ponerlo en contexto: su compromiso de contrato era 85.0% de puntualidad y 88.0% de cobertura, así que **cumple por encima de lo pactado**. El que más se aleja de su propio contrato es **Summit Frozen Foods** (90.0% real vs 90.0% pactado en puntualidad, pero cobertura real de 98.3% vs 92.0% pactado, también mejor); los que están por debajo de lo pactado son Riverbend Fresh & Dairy en cobertura (98.3% real vs 94.0% pactado — también mejor) y Evergreen Coffee Roasters (92.1% real vs 94.0% pactado de puntualidad, −1.9 pp).\n\nNota: el peor cumplimiento en puntualidad no es el proveedor que más afecta al negocio hoy. Los tres riesgos de quiebre de stock más urgentes (Angus SteakSandwich, Southwest Veggie Powr Brkfst Sandwich y Spicy Omlet Flatbread) vienen de Summit Frozen Foods, no de Pioneer.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1,
+        "get_supplier_performance": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 19,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "180",
+          "86.3",
+          "90.0",
+          "94.5",
+          "97.0",
+          "7.21",
+          "90",
+          "8.0",
+          "85.0",
+          "88.0",
+          "90.0",
+          "90.0",
+          "98.3",
+          "92.0",
+          "98.3",
+          "94.0",
+          "92.1",
+          "94.0",
+          "1.9"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "profile": "glazed_supply"
+      },
+      "repeat": 0,
+      "fast_path": "defer:no_intent"
+    },
+    {
+      "case_id": "specialist_strategist",
+      "kind": "specialist",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cuántas transacciones esperas para el fin de semana y en qué horas habrá más gente?",
+      "backend_case_id": "49523e1b400d",
+      "first_text_s": 18.8,
+      "first_progress_s": 8.31,
+      "polls": 21,
+      "turn_id": "65b8856c-721d-4401-8ed5-8ac3c3f44756",
+      "status": "done",
+      "latency_s": 20.7,
+      "reply": "Fin de semana en Harborview International Airport · Food Court – Full Counter 1:\n\n- Sábado 25: entre 274 y 348 transacciones (punto medio 288)\n- Domingo 26: entre 355 y 477 transacciones (punto medio 422)\n\nEl domingo se ve bastante más cargado que el sábado, con certeza moderada: los rangos son amplios, así que conviene planificar con el extremo alto.\n\nSobre las horas con más gente: no tengo ese dato. La información disponible es diaria, no por hora, así que no puedo decirte a qué hora habrá más clientes. Como referencia diaria, el domingo necesitarías unas 62 a 83 horas de personal (punto medio 74) frente a 48 a 61 el sábado (punto medio 50).",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "strategist",
+          "display_name_es": "Estratega",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 1,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 1
+      },
+      "peers": [
+        "glazed_strategist"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 15,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "profile": "glazed_strategist"
+      },
+      "repeat": 0,
+      "fast_path": "defer:no_intent"
+    },
+    {
+      "case_id": "multi_specialist",
+      "kind": "multi_specialist",
+      "turn_index": 0,
+      "burst": false,
+      "question": "Prepárame el plan de mañana: qué pedir, qué está por caducar y si me alcanza el personal para atenderlo.",
+      "backend_case_id": "d294f90088b8",
+      "first_text_s": 1.58,
+      "first_progress_s": 5.22,
+      "polls": 44,
+      "turn_id": "4f3e1522-080c-4cee-be17-9a5b4da39703",
+      "status": "done",
+      "latency_s": 44.25,
+      "reply": "Plan de mañana, lunes 20 de julio, en Harborview International Airport · Food Court – Full Counter 1.\n\n## 1) Qué pedir\n\nHoy no vence ningún pedido, pero las 11 líneas del plan ya tienen la fecha límite vencida. Lo urgente son los congelados de Summit Frozen Foods: **no hay ruta de Summit el lunes**, su próxima entrega es el martes 21.\n\n| Producto | Cantidad | Costo | Entrega | Ventaja neta | Si no haces nada |\n|---|---|---|---|---|---|\n| Southwest Veggie Powr Brkfst Sandwich | 70 u. (7 cajas) | $82.60 | 21/07 | **+$214.41** | −$301.93 |\n| Angus Steak Sandwich | 150 u. (15 cajas) | $130.50 | 21/07 | **+$207.66** | −$344.74 |\n| Spicy Omlet Flatbread | 60 u. (6 cajas) | $97.20 | 21/07 | **+$155.79** | −$264.42 |\n| Better For You Breakfast Sandwich | 40 u. (4 cajas) | $74.40 | 21/07 | — | −$171.64 |\n| House Dblcssg Sand | 10 u. (1 caja) | $19.70 | 21/07 | — | −$29.54 |\n\n- Los cuatro primeros tienen **cobertura 0 días**: hoy mismo quedaron agotados o casi (Angus 9.4 h sin stock, Veggie 9.8 h, Better For You 6.9 h).\n- **Confianza baja en todas estas líneas (0.29).** Ya está descontado que Summit llega tarde en ~10% de los pedidos y un día de retraso es un día sin venta.\n- Ninguna línea está por debajo del pedido mínimo: no hay aviso de cantidad mínima.\n- Si sólo puedes actuar sobre una cosa: **Southwest Veggie** y **Angus**, que son las de mayor ventaja y además quiebran el mismo día que llega el pedido.\n\nSobre el otro frente: **12 Croiss-Ant Donuts** y **6 Bacon Donuts** están sobrevendidos (en28 días se recibieron 300 y 336 u. y sólo se vendieron 126 y 77;417.35 y 384.80 USD de merma en 14 días). Saltarse ese pedido ahorra $58.90 y $35.52 por ciclo. Dato a confirmar: no sabemos si el proveedor acepta menos que una caja completa.\n\n## 2) Qué está por caducar\n\nMañana solo hay **un producto**: **Bacon Roll Up**, 10 unidades, $6.90 de merma estimada.\n\nEn los dos días siguientes hay 11 lotes por vencer con $27.07–$55.96 de merma (punto medio $37.56), casi todo el martes 21: Fall Lip Balm Pumpkin (10.56), Bagel W Butter (7.68), 8 Count Mini Chocolate Chip Cookie (6.17). No hay aviso de que el sistema muestre cuánto de eso tienes en bodega.\n\n## 3) Personal\n\nPronóstico para mañana: entre **328 y 436 transacciones** (punto medio 354.5), ticket promedio entre $8.32 y $9.25, afluencia entre 2,908 y 3,576 personas.\n\nHoras recomendadas: **57.4 h** (tráfico bajo), **62.0 h** (punto medio), **76.2 h** (tráfico alto).\n\nDos cosas que debes saber:\n- **No puedo decirte si te alcanza el personal**: no hay horario cargado en los datos, así que no se puede comparar lo programado contra lo que hace falta. Reparte unas 62 horas durante el día y el reparto por puestos lo decides tú.\n- **Planifica con el rango, no con el punto medio**: la dispersión es de ~33% entre extremos. El pronóstico no trae puntaje de confianza propio; se apoya en 1,075 días de tienda.\n- **Mañana llegan cinco proveedores** (Northfield, Riverbend, Coastal Beverage, Evergreen Coffee, Pioneer Merch): pon a alguien en recepción por la mañana.\n\n⚠️ Aparte: el código SKU-100040 está duplicado en el maestro de productos (exposición $301,950.59) y hay códigos que no existen (exposición $14,537.12). No cambia el plan de mañana, pero conviene depurar el maestro.\n\n¿Quieres que proponga las tres líneas de Summit Frozen Foods y el de los dos productos sobrados para que tú lo apruebes?",
+      "error": null,
+      "sanitized_fragments": 1,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "supply",
+          "display_name_es": "Analista de abastecimiento",
+          "state": "done"
+        },
+        {
+          "agent_id": "strategist",
+          "display_name_es": "Estratega",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 3,
+      "peer_asks": 2,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 2
+      },
+      "peers": [
+        "glazed_supply",
+        "glazed_strategist"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {
+        "multi_peer": true
+      },
+      "quality": {
+        "flags": [
+          "garbled"
+        ],
+        "internal_names": [],
+        "numbers_checked": 83,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "70",
+          "82.60",
+          "214.41",
+          "150",
+          "130.50",
+          "207.66",
+          "60",
+          "97.20",
+          "155.79",
+          "74.40",
+          "171.64",
+          "19.70",
+          "29.54",
+          "0.29",
+          "12",
+          "336",
+          "126",
+          "77",
+          "417.35",
+          "384.80",
+          "14",
+          "58.90",
+          "35.52",
+          "2,908",
+          "3,576",
+          "1,075",
+          "301,950.59",
+          "14,537.12"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": [
+          "en28"
+        ]
+      },
+      "expect": {
+        "min_peer_asks": 2
+      },
+      "repeat": 0,
+      "fast_path": "pass:complex"
+    },
+    {
+      "case_id": "proposal",
+      "kind": "proposal",
+      "turn_index": 0,
+      "burst": false,
+      "question": "Propón el pedido para el producto con más riesgo de agotarse y déjalo pendiente de mi aprobación.",
+      "backend_case_id": "e633806ad330",
+      "first_text_s": 1.52,
+      "first_progress_s": null,
+      "polls": 13,
+      "turn_id": "e154d4d7-87ce-4593-8ace-71d048950ef0",
+      "status": "done",
+      "latency_s": 12.36,
+      "reply": "Propuesta lista y **pendiente de tu aprobación** (nada se ha enviado al proveedor).\n\n**Producto con más riesgo de agotarse: Angus SteakSandwich** (SKU-100161, Summit Frozen Foods)\n\n| | |\n|---|---|\n| Inventario de cierre (19-jul) | **0 unidades** |\n| Agotamiento proyectado | **2026-07-21** — la misma fecha de la próxima entrega |\n| Venta perdida si no se pide | **$344.74** (rango $315–$374) |\n| Pedido propuesto | 150 unidades (15 cajas × 10) |\n| Costo estimado | $130.50 |\n| Beneficio neto esperado | **+$207.66** (rango $183–$226) |\n| Merma esperada | $12.35 |\n| Entrega estimada | 2026-07-21 |\n\nDos salvedades que debes tener presentes al aprobar:\n\n1. **La confianza es baja (0.29).** El 52% de los últimos días terminó sin stock, y por eso la demanda se corrigió al alza (limitada al percentil 90). El número de cajas es un plan, no un dato firme.\n2. **El plazo de pedido ya venció** — la entrega más temprana es el martes 21, y el proveedor se atrasa en el 10% de los pedidos. Si approve,depends de Summit Frozen Foods: llega el mismo día que se agota, sin margen de retraso.\n\nSobre el resto: los dos problemas más grandes del briefing en dólares no son de quiebre sino de sobreoferta — 12 Croiss-Ant Donuts ($417.35) y 6 Bacon Donuts ($384.80) de merma en 14 días, ambos con la opción de saltar el próximo pedido. Si quieres, armo esas propuestas también.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 0,
+      "tools": {
+        "get_briefing": 1,
+        "propose_action": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {
+        "proposal_pending": true
+      },
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 24,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "344.74",
+          "315",
+          "374",
+          "150",
+          "15",
+          "130.50",
+          "207.66",
+          "183",
+          "226",
+          "12.35",
+          "0.29",
+          "52",
+          "90",
+          "21",
+          "12",
+          "417.35",
+          "384.80",
+          "14"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "proposal": true
+      },
+      "repeat": 0,
+      "fast_path": "pass:action_request"
+    },
+    {
+      "case_id": "unsupported",
+      "kind": "unsupported",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cuánto vendió la tienda de la competencia de enfrente la semana pasada?",
+      "backend_case_id": "94b9052b6b1d",
+      "first_text_s": 9.39,
+      "first_progress_s": null,
+      "polls": 15,
+      "turn_id": "1fd54bd8-c6cb-4d24-bf4c-aa31bf84bdfd",
+      "status": "done",
+      "latency_s": 14.32,
+      "reply": "No tengo ese dato. Mi acceso cubre únicamente los datos de nuestra propia tienda; no existe ninguna fuente aquí con ventas de la competencia de enfrente, ni de ningún otro negocio externo.\n\nPor lo tanto, no puedo decirte cuánto vendió la semana pasada. Tampoco lo estimaría, porque sería inventar una cifra.\n\nLo que sí puedo ofrecerte, si te sirve para comparar el desempeño del negocio:\n\n- Las ventas de nuestra tienda la semana pasada (fecha exacta que me indiques) y su comparación con la semana anterior.\n- La proyección de ventas de los próximos días.\n- El desglose de pérdida por merma y por ventas no concretadas, que es donde normalmente se ve la diferencia real de desempeño.\n\nSi lo que necesitas es una referencia de mercado, eso tendría que venir de una fuente externa o de un estudio del sector, no de estos sistemas.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 0,
+      "peer_asks": 0,
+      "tools": {},
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": true,
+      "checks": {
+        "refusal": true
+      },
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 0,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": true,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "refusal": true
+      },
+      "repeat": 0,
+      "fast_path": "defer:no_intent"
+    },
+    {
+      "case_id": "follow_up",
+      "kind": "follow_up",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cuáles son los productos con más riesgo de agotarse esta semana?",
+      "backend_case_id": "d3839fdd115c",
+      "first_text_s": 5.71,
+      "first_progress_s": null,
+      "polls": 8,
+      "turn_id": "603227f0-4009-44c1-ad42-ed9267186c2b",
+      "status": "done",
+      "latency_s": 7.26,
+      "reply": "Los de mayor riesgo en **Harborview International Airport · Food Court – Full Counter 1** son:\n\n- **3 Donut Holes**, **50 Donut Holes**, **4 Donut Holes**, **6 Donuts** y **8 Donut Holes**: se projections? forecast stockout 2026-07-21. Los primeros dos ya están agotados; los otros se descartan al cierre.\n- **Angus SteakSandwich** y **Southwest Veggie Powr Brkfst Sandwich**: están agotados y su fecha proyectada de agotamiento es **2026-07-22**.\n- **Oatmeal W Brown Sugar And Fruit** y **2 Mffin 6Pc Hb**: tienen **12 unidades** y cubren solo **0.7 días**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_inventory_status": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 10,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "50",
+          "12",
+          "0.7"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {},
+      "repeat": 0,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "follow_up",
+      "kind": "follow_up",
+      "turn_index": 1,
+      "burst": false,
+      "question": "¿Y cuál de esos es el más urgente?",
+      "backend_case_id": "d3839fdd115c",
+      "first_text_s": 9.98,
+      "first_progress_s": null,
+      "polls": 20,
+      "turn_id": "609de608-1920-42d5-bf6e-716073132125",
+      "status": "done",
+      "latency_s": 19.52,
+      "reply": "## El más urgente: **Angus SteakSandwich** (SKU-100161)\n\nEs el que combina las tres señales más fuertes:\n\n| Señal | Valor |\n|---|---|\n| Severidad (venta perdida esperada sin pedido) | **$344.74** — la mayor de las 5 líneas del plan |\n| Fecha proyectada de agotamiento | **2026-07-21** (martes) — la más temprana |\n| Estado del inventario al cierre de hoy (19-jul) | **0 unidades** — ya está agotado |\n| Demanda media diaria (28d, corregida) | 61.79 u/día |\n| Riesgo de quiebre sin pedido | **100%** |\n\nEl siguiente es **Southwest Veggie Powr Brkfst Sandwich** (SKU-100101), también en cero, con agotamiento proyectado el21-jul y $301.93 de venta perdida. Después: **Spicy Omlet Flatbread** (SKU-100023) con 55 u en existencia y agotamiento el 22-jul.\n\n**Dos advertencias importantes:**\n- Las11 líneas del plan tienen y la fecha límite de pedido es `null` — no puedo confirmarte que hoy still haya tiempo de pedir. Eso lo tendrías que verificar con Summit Frozen Foods (90% de puntualidad).\n- La confianza de todas estas líneas está en **0.2939** (calibrada), porque estos SKUsSeveramente，。\n\n**El más urgente es el Angus SteakSandwich.** Es el único que acumula las tres señales críticas a la vez:\n\n- **Ya está agotado** (0 unidades al cierre del19-jul) y su fecha proyectada de quiebre es la más temprana: **martes 21-jul**.\n- Es el de mayor impacto económico: **$344.74** de venta perdida esperada si no se pide (rango $315–$374).\n- Demanda alta y sostenida: **61.79 unidades/día** en los últimos 28 días.\n\nLo sigue de cerca el **Southwest Veggie Powr Brkfst Sandwich** ($301.93, también agotado, quiebre el 21-jul), y después el **Spicy Omlet Flatbread** (aún con 55 unidades, pero quiebre el 22-jul).\n\n**Dos salvedades que debes tener en cuenta:**\n\n1. **El plazo de pedido ya venció** en las 11 líneas del plan (, ) y la entrega más temprana de Summit Frozen Foods es el 21-jul. No tengo datos para confirmar que hoy aún alcance a entrar un pedido, así que vale la pena llamar al proveedor antes de dar por hecho que se puede ordenar.\n2. **La confianza de estas estimaciones es baja: 0.2939.** En estos SKUs hubo quiebres en 52%, 50% y 45% de los días del período, lo que hace que la demanda estimada se haya corregido al alza. Los montos son la mejor estimación disponible, no un número firme.\n\nUna corrección a mi respuesta anterior: los productos de donas que mencioné **no aparecen en los datos del briefing de hoy**; no debo affirmar sus fechas sin confirmarlas.\n\n¿Quieres que prepare la propuesta de pedido del Angus SteakSandwich (150 u / 15 cajas, $130.50, beneficio neto estimado $207.66) para que la revises?",
+      "error": null,
+      "sanitized_fragments": 2,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_briefing": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [
+          "garbled"
+        ],
+        "internal_names": [],
+        "numbers_checked": 29,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "344.74",
+          "28",
+          "61.79",
+          "100",
+          "301.93",
+          "55",
+          "90",
+          "0.2939",
+          "344.74",
+          "315",
+          "374",
+          "61.79",
+          "28",
+          "301.93",
+          "55",
+          "11",
+          "0.2939",
+          "52",
+          "50",
+          "45",
+          "150",
+          "15",
+          "130.50",
+          "207.66"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": [
+          "el21",
+          "del19",
+          "，",
+          "。"
+        ]
+      },
+      "expect": {},
+      "repeat": 0,
+      "fast_path": "pass:depends_on_history"
+    },
+    {
+      "case_id": "follow_up",
+      "kind": "follow_up",
+      "turn_index": 2,
+      "burst": false,
+      "question": "¿Cuánto debería pedir de ese y cuándo llegaría?",
+      "backend_case_id": "d3839fdd115c",
+      "first_text_s": 5.07,
+      "first_progress_s": null,
+      "polls": 10,
+      "turn_id": "50deabef-4a20-480a-8206-546010bc3594",
+      "status": "done",
+      "latency_s": 9.39,
+      "reply": "Según el plan de pedidos de hoy, para el **Angus SteakSandwich** (SKU-100161):\n\n| Dato | Valor |\n|---|---|\n| Cantidad sugerida | **150 unidades = 15 cajas** (10 u por caja) |\n| Costo estimado | **$130.50** |\n| Proveedor | Summit Frozen Foods |\n| Fecha de entrega esperada | **martes 2026-07-21** |\n| Antigüedad de la entrega | 2 días |\n\n**Sobre la cantidad:** 150 unidades cubren unas2.4 días de la demanda media reciente de 61.79 u/día. Si llegara a entregarse el 21-jul, eso dejaría al producto cubierto aproximadamente hasta el 23-jul, antes de la siguiente entrega del proveedor (24-jul).\n\n**Dos advertencias:**\n- El **plazo para pedir ya venció** (pedidos con fecha límite vencida, sin fecha límite registrada), y el propio cálculo señala que la entrega más temprana posible es el 21-jul. Es posible que ese pedido ya no entre a tiempo. Te recomiendo confirmar con Summit Frozen Foods antes de darlo por viable.\n- La **confianza de esta recomendación es baja (0.2939)**. El producto estuvo agotado el 52% de los días del período, y la demanda se corrigió al alza por eso; además, el proveedor se retrasa en el 10% de sus pedidos, lo que ya está incluido en el cálculo (con un día de retraso, quedarían cerca de $12.35 de merma).\n\nEl beneficio neto estimado de pedir es **$207.66**, frente a **$344.74** de venta perdida esperada si no se pide.\n\n¿Quieres que envíe la propuesta de las 150 unidades a tu mesa para que la apruebes, o prefieres primero confirmar el plazo con el proveedor?",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 0,
+      "peer_asks": 0,
+      "tools": {},
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": true,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 14,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "150",
+          "15",
+          "130.50",
+          "150",
+          "61.79",
+          "0.2939",
+          "52",
+          "12.35",
+          "207.66",
+          "344.74",
+          "150"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {},
+      "repeat": 0,
+      "fast_path": "pass:depends_on_history"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 0,
+      "burst": true,
+      "question": "¿Cuánto vendimos ayer?",
+      "backend_case_id": "a20509d86841",
+      "first_text_s": 8.22,
+      "first_progress_s": null,
+      "polls": 9,
+      "turn_id": "0e73342f-5b8c-4551-85f2-f39cfa982a65",
+      "status": "done",
+      "latency_s": 8.72,
+      "reply": "Ayer vendimos **22900.91 USD** netos.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 1,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "22900.91"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 0,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 1,
+      "burst": true,
+      "question": "¿Cuántas alertas abiertas tengo?",
+      "backend_case_id": "d1bda7885fd8",
+      "first_text_s": 6.26,
+      "first_progress_s": null,
+      "polls": 7,
+      "turn_id": "06194c9a-5e8c-402f-8bc6-725a5250266b",
+      "status": "done",
+      "latency_s": 6.74,
+      "reply": "El resultado no trae un total de alertas abiertas.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_issues": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 0,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 0,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 2,
+      "burst": true,
+      "question": "¿Qué entrega llega primero esta semana?",
+      "backend_case_id": "7e9ea7522c8f",
+      "first_text_s": 4.11,
+      "first_progress_s": null,
+      "polls": 6,
+      "turn_id": "759a12a9-600c-42b1-ad1e-fb2a4c02b34b",
+      "status": "done",
+      "latency_s": 5.69,
+      "reply": "La primera entrega programada es el **2026-07-20**. Ese día llegan **Northfield Bakery Partners**, **Coastal Beverage Distribution**, **Summit Frozen Foods**, **Riverbend Fresh & Dairy**, **Evergreen Coffee Roasters** y **Pioneer Merch & Packaging**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_deliveries": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 0,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 0,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 3,
+      "burst": true,
+      "question": "¿Hay alguna promoción vigente?",
+      "backend_case_id": "b1a6839d3631",
+      "first_text_s": 4.8,
+      "first_progress_s": null,
+      "polls": 8,
+      "turn_id": "50bb3f3b-8a06-4d10-a0c1-75c59bcb7369",
+      "status": "done",
+      "latency_s": 7.76,
+      "reply": "No. La única promoción registrada, “Summer Iced Coffee Week”, aparece como pasada; terminó el 2026-07-19.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_promos": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 0,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 0,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 4,
+      "burst": true,
+      "question": "¿Cuál es el producto que más se vende?",
+      "backend_case_id": "e6c3a4f75270",
+      "first_text_s": 3.09,
+      "first_progress_s": null,
+      "polls": 12,
+      "turn_id": "c31e3b02-a180-4823-933f-4f993f03a427",
+      "status": "done",
+      "latency_s": 11.8,
+      "reply": "**No puedo responder esa pregunta con los datos disponibles.** El resumen de tienda no incluye un ranking de ventas por producto (ni unidades vendidas ni importe de ventas por artículo para todo el catálogo), así que no existe una fuente que diga cuál es el producto que más se vende. No lo voy a estimar.\n\nLo único que hay son cifras sueltas de algunos artículos, que **no** constituyen un ranking:\n\n| Producto | Dato disponible | Periodo |\n|---|---|---|\n| 12 Croiss-Ant Donuts (SKU-100502) | 126 unidades vendidas / 300 recibidas | últimos 28 días |\n| 6 Bacon Donuts (SKU-100473) | 77 unidades vendidas / 336 recibidas | últimos 28 días |\n| Angus SteakSandwich (SKU-100161) | demanda promedio 61.79 unidades/día (no son ventas) | últimos 28 días |\n| Southwest Veggie Powr Brkfst Sandwich (SKU-100101) | demanda promedio 26.39 unidades/día | últimos 28 días |\n| Spicy Omlet Flatbread (SKU-100023) | demanda promedio 42.75 unidades/día | últimos 28 días |\n\nAviso sobre estos últimos tres: son **demanda estimada** (ya corregida por quiebres de inventario), no ventas observadas, yulletineszen que ese mismo producto tuvo quiebres en ~45-52 % de los días. Así que no sirven para decir qué se vende más.\n\nContexto de tienda (Harborview International Airport · Food Court – Full Counter 1, 13–19 jul 2026): venta neta 22,900.91 USD, 2,713 transacciones, merma 928.08 USD, ventas perdidas entre 934.71 y 1,620.21 USD (punto medio 1,398.28).\n\nDos vías para obtener la respuesta real, si la necesitas: pedir un desglose de ventas por artículo para el periodo, o cruzar el maestro de productos con el histórico de inventario por SKU. Dime cuál prefieres y lo pido.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 26,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "12",
+          "126",
+          "300",
+          "28",
+          "77",
+          "336",
+          "28",
+          "61.79",
+          "28",
+          "26.39",
+          "28",
+          "42.75",
+          "28",
+          "45",
+          "52",
+          "13",
+          "19",
+          "2026",
+          "22,900.91",
+          "2,713",
+          "928.08",
+          "934.71",
+          "1,620.21",
+          "1,398.28"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 0,
+      "fast_path": "defer:no_intent"
+    },
+    {
+      "case_id": "simple",
+      "kind": "simple",
+      "turn_index": 0,
+      "burst": false,
+      "question": "Hola, ¿cómo va la tienda hoy?",
+      "backend_case_id": "b6fd645c29bd",
+      "first_text_s": 4.29,
+      "first_progress_s": null,
+      "polls": 6,
+      "turn_id": "4984017b-ac5d-4156-a058-c49cf174bff4",
+      "status": "done",
+      "latency_s": 5.19,
+      "reply": "Hoy, domingo 2026-07-19, Harborview International Airport · Food Court – Full Counter 1 va bien en ventas:\n\n- Ventas netas: **22900.91 USD**\n- Transacciones: **2713**\n- Ventas que se dejaron de hacer: **1398.28 USD**\n- Lo que se tiró: **928.08 USD**\n\nEl punto débil son los productos que pueden agotarse antes del próximo pedido, especialmente **Angus SteakSandwich** y **Southwest Veggie Powr Brkfst Sandwich**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 5,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "22900.91",
+          "2713",
+          "1398.28",
+          "928.08"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {},
+      "repeat": 1,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_day_summary",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "Dame el resumen del día de hoy.",
+      "backend_case_id": "753c21319d2a",
+      "first_text_s": 2.96,
+      "first_progress_s": null,
+      "polls": 6,
+      "turn_id": "af7cf7a0-272e-4092-84d8-517d47b6d5f9",
+      "status": "done",
+      "latency_s": 5.23,
+      "reply": "- **Harborview International Airport · Food Court – Full Counter 1**, domingo **2026-07-19**: ventas netas de **22900.91 USD**, **2713** transacciones, **6.45** transacciones por hora de personal y merma de **928.08 USD**.\n- Se estima entre **934.71 USD** y **1620.21 USD** de ventas perdidas, con un punto medio de **1398.28 USD**.\n- Hay riesgo de quedarse sin **Angus SteakSandwich**, **Southwest Veggie Powr Brkfst Sandwich** y **Spicy Omlet Flatbread**; sus pedidos ya pasaron la fecha límite.\n- También hay exceso de inventario en **12 Croiss-Ant Donuts** y **6 Bacon Donuts**. Durante los últimos **14 días**, la merma fue de **417.35 USD** y **384.8 USD**, respectivamente.\n- El principal pendiente es revisar esos riesgos de faltante y el exceso de inventario.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 13,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "22900.91",
+          "2713",
+          "6.45",
+          "928.08",
+          "934.71",
+          "1620.21",
+          "1398.28",
+          "12",
+          "14",
+          "417.35",
+          "384.8"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "day_summary"
+      },
+      "repeat": 1,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_active_issues",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué problemas o alertas urgentes tengo abiertos?",
+      "backend_case_id": "1bd02b07a578",
+      "first_text_s": 2.06,
+      "first_progress_s": null,
+      "polls": 49,
+      "turn_id": "81a554e3-41e4-420c-b3cb-b82420e58b21",
+      "status": "done",
+      "latency_s": 49.23,
+      "reply": "## Alertas abiertas · Harborview International Airport (domingo 19 jul2026)\n\n**Lo primero: pedidos.** Hoy no vence ningún pedido, pero las **11 líneas del plan ya tienen la fecha de corte vencida**. La próxima entrega de Summit Frozen Foods es el martes 21; sin pedir hoy, quedan productos en cero.\n\n### 1. Riesgo de quiebre de stock (3 alertas, ~$911 de venta perdida)\n| Producto | Estado | Daño si no actúas | Acción recomendada | Neto |\n|---|---|---|---|---|\n| Angus Steak Sandwich | 0 en caja | $344.74 | Pedir 150 und (15 cajas), $130.50 | **+$207.66** |\n| Southwest Veggie Breakfast Sandwich | 0 en caja | $301.93 | Pedir 70 und (7 cajas), $82.60 | **+$214.41** |\n| Spicy Omlet Flatbread | 55 und | $264.42 | Pedir 60 und (6 cajas), $97.20 | **+$155.79** |\n\nLas tres tienen fecha de entrega21 jul; el problema es que el plazo ya venció y la entrega más temprana es ese día. **Advertencia:** la confianza de estas estimaciones es baja (0.29,228 pruebas) porque en la mitad de los días hubo quiebres, así que la demanda real se corrigió hacia arriba y el proveedor se atrasa en ~10% de los pedidos. Cada una deja un pequeño sobrante ($12–15).\n\n### 2. Sobreoferta / merma (2 alertas, ~$802)\n| Producto | Merma 14 días | Recibido 28d | Vendido 28d |\n|---|---|---|---|\n| 12 Croiss-Ant Donuts | $417.35 | 300 | 126 |\n| 6 Bacon Donuts | $384.80 | 336 | 77 |\n\nSe recibe casi el triple de lo que se vende. Lo recomendado es saltar el próximo pedido de cada uno: **+$58.90** y **+$35.52** respectively, con confianza 0.83 (272 pruebas) — bastante más confiable que los números de quiebre. Contra hacer nada: $88.38 y $64.01 de merma por ciclo. *Salvedad:* no está confirmado que el proveedor acepte menos de una caja completa.\n\n### 3. Integridad de datos — aquí está el número grande\n- **SKU-100040** no es un producto nuevo: es el mismo Better For You Breakfast Sandwich escrito con otro formato. **Exposición: $301,950.59.** Mientras no se corrija, los números de ese producto están mal contados.\n- **Códigos huérfanos SKU-** que no existen en el maestro de productos: **$14,537.12.**\n\n### Panorama del día\nVentas netas $22,900.91 · 2,713 tickets · merma 7 días $928.08 · venta perdida estimada $935–$1,620.\n\nProveedor menos puntual: Pioneer Merch & Packaging (86.3%).\n\nNo hay propuestas pendientes ni notas tuyas registradas.\n\n**¿Quieres que alguna de estas acciones pase a tu mesa para que la apruebes?**",
+      "error": null,
+      "sanitized_fragments": 1,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_briefing": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 58,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "19",
+          "11",
+          "21",
+          "911",
+          "344.74",
+          "150",
+          "15",
+          "130.50",
+          "207.66",
+          "301.93",
+          "70",
+          "82.60",
+          "214.41",
+          "55",
+          "264.42",
+          "60",
+          "97.20",
+          "155.79",
+          "0.29",
+          "12",
+          "15",
+          "802",
+          "14",
+          "28",
+          "28",
+          "12",
+          "417.35",
+          "300",
+          "126",
+          "384.80",
+          "336",
+          "77",
+          "58.90",
+          "35.52",
+          "0.83",
+          "272",
+          "88.38",
+          "64.01",
+          "301,950.59",
+          "14,537.12",
+          "22,900.91",
+          "2,713",
+          "928.08",
+          "935",
+          "1,620",
+          "86.3"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "active_issues"
+      },
+      "repeat": 1,
+      "fast_path": "pass:uncovered"
+    },
+    {
+      "case_id": "intent_order_plan",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cuál es el plan de pedido para mañana?",
+      "backend_case_id": "40d3894058d1",
+      "first_text_s": 3.94,
+      "first_progress_s": null,
+      "polls": 16,
+      "turn_id": "631edc8b-9a10-4163-9c29-e42352f794af",
+      "status": "done",
+      "latency_s": 15.37,
+      "reply": "## Plan de pedido para mañana (lunes 20 de julio)\n\n**No hay pedidos que venzan mañana.** Tampoco hay pedidos que venzan hoy (domingo 19). Eso no significa que no tengas que actuar: el plan tiene **11 líneas con la fecha de corte ya vencida**, y la próxima entrega de Summit Frozen Foods es el **martes 21**.\n\n### Lo que urge decidir (Summit Frozen Foods, entrega martes 21)\n\n| Producto | Cant. a pedir | Costo est. | Se acaba el... | Si no pides, dejas de vender |\n|---|---|---|---|---|\n| Angus SteakSandwich | 150 (15 cajas) | $130.50 | martes 21 | ~$345 |\n| Southwest Veggie Powr Brkfst Sandwich | 70 (7 cajas) | $82.60 | martes 21 | ~$302 |\n| Spicy Omlet Flatbread | 60 (6 cajas) | $97.20 | miércoles 22 | ~$264 |\n| Better For You Breakfast Sandwich | 40 (4 cajas) | $74.40 | miércoles 22 | ~$172 |\n| House Dblcssg Sand | 10 (1 caja) | $19.70 | jueves 23 | ~$28 |\n\nLas tres primeras tienen riesgo **100%** de quedarse sin producto. Ninguna pide menos del mínimo de caja, así que no hay problema de pedido mínimo.\n\n### Al revés: dos productos que se están tirando\n\n- **12 Croiss-Ant Donuts** – se tiraron $417 en14 días; en 28 díasuffs: recibieron 300 y vendieron 126. Omitir el pedido ahorra ~$59 y el costo de no hacerlo es $88.38 por ciclo.\n- **6 Bacon Donuts** – $385 de merma en 14 días (recibieron 336, vendieron 77). Omitir ahorra ~$36 frente a $64 de costo por ciclo.\n\n### Dos advertencias importantes\n1. **Confianza baja en las cantidades**: en los productos con riesgo de quiebre hay cukupedatos de días sin stock (45–52% de los días), así que la demanda real puede estar subestimada.\n2. **Pioneer Merch & Packaging** es el proveedor menos puntual (86.3%) — no tiene líneas en el plan de hoy, pero vale la pena tenerlo en mente.\n\n¿Quieres que proponga las opciones concretas (omitir los dos donuts, pedir los tres sandwiches de Summit)?",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_briefing": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [
+          "garbled"
+        ],
+        "internal_names": [],
+        "numbers_checked": 50,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "20",
+          "19",
+          "11",
+          "21",
+          "21",
+          "150",
+          "15",
+          "130.50",
+          "21",
+          "345",
+          "70",
+          "82.60",
+          "21",
+          "302",
+          "60",
+          "97.20",
+          "22",
+          "264",
+          "40",
+          "74.40",
+          "22",
+          "172",
+          "19.70",
+          "23",
+          "28",
+          "100",
+          "12",
+          "417",
+          "28",
+          "300",
+          "126",
+          "59",
+          "88.38",
+          "385",
+          "14",
+          "336",
+          "77",
+          "36",
+          "64",
+          "45",
+          "52",
+          "86.3"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": [
+          "en14"
+        ]
+      },
+      "expect": {
+        "intent": "order_plan"
+      },
+      "repeat": 1,
+      "fast_path": "pass:complex"
+    },
+    {
+      "case_id": "intent_stockout_risk",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué productos me voy a quedar sin inventario esta semana?",
+      "backend_case_id": "f3c71d7a37c0",
+      "first_text_s": 8.68,
+      "first_progress_s": null,
+      "polls": 12,
+      "turn_id": "57050465-6122-40c0-938e-d9f0a8e32fe6",
+      "status": "done",
+      "latency_s": 11.29,
+      "reply": "Los productos con mayor riesgo de quedarse sin inventario son:\n\n- **Ya están agotados:** Better For You Breakfast Sandwich, Southwest Veggie Powr Brkfst Sandwich, Angus SteakSandwich, Sm Cold Brew Latte, 3 Donut Holes, 50 Donut Holes y Hummus (Mod). Todos tienen entregas programadas para **2026-07-20**.\n- **Todavía tienen inventario, pero su cobertura es de 0.7 días:** Oatmeal W Brown Sugar And Fruit y 2 Mffin 6Pc Hb. Ambos tienen entrega programada para **2026-07-20**, pero aparecen con fecha projected de agotamiento **2026-07-22**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_inventory_status": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 5,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "50",
+          "0.7"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "stockout_risk"
+      },
+      "repeat": 1,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_expiring_items",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué productos están por caducar en los próximos días?",
+      "backend_case_id": "617b803742f6",
+      "first_text_s": 8.62,
+      "first_progress_s": null,
+      "polls": 11,
+      "turn_id": "b4c2836e-0d30-40ea-b54f-d041f9134c25",
+      "status": "done",
+      "latency_s": 10.28,
+      "reply": "- **20 de julio:** Bacon Roll Up.\n- **21 de julio:** Fall Lip Balm Pumpkin, Bagel W Butter, 8 Count Mini Chocolate Chip Cookie, Hm And Ew Western, Blueberry Coffee Cake Muffin, Cheesecake Square Cookie Crumb y Brownie.\n- **22 de julio:** Md Choc Stout C.B. Wsweet Cold Foam y Pancake Morning Wrap Bacon, Egg And Cheese.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_expiring": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 4,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "20",
+          "21",
+          "22"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "expiring_items"
+      },
+      "repeat": 1,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_upcoming_deliveries",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué entregas de proveedores llegan esta semana?",
+      "backend_case_id": "53d86e957b79",
+      "first_text_s": 6.0,
+      "first_progress_s": null,
+      "polls": 9,
+      "turn_id": "2a0a9480-a4ae-46ff-8c12-87b0e41b8b10",
+      "status": "done",
+      "latency_s": 8.31,
+      "reply": "- **19 de julio:** Northfield Bakery Partners, Summit Frozen Foods, Riverbend Fresh & Dairy y Evergreen Coffee Roasters. Hubo entregas a tiempo y **3 atrasadas**.\n- **20 de julio:** Northfield Bakery Partners, Coastal Beverage Distribution, Summit Frozen Foods, Riverbend Fresh & Dairy y Evergreen Coffee Roasters; también hay una entrega programada de Pioneer Merch & Packaging.\n- **21 de julio:** Summit Frozen Foods y Pioneer Merch & Packaging; además, hay entregas programadas de Northfield Bakery Partners y Riverbend Fresh & Dairy.\n- **22 de julio:** Coastal Beverage Distribution y Evergreen Coffee Roasters; también están programadas entregas de Northfield Bakery Partners, Riverbend Fresh & Dairy y Pioneer Merch & Packaging.\n- **23 de julio:** Evergreen Coffee Roasters; también están programadas entregas de Northfield Bakery Partners, Coastal Beverage Distribution, Riverbend Fresh & Dairy y Pioneer Merch & Packaging.\n- **24 de julio:** Pioneer Merch & Packaging; también están programadas entregas de Northfield Bakery Partners, Summit Frozen Foods y Riverbend Fresh & Dairy.\n- **25 de julio:** Pioneer Merch & Packaging; también están programadas entregas de Northfield Bakery Partners y Riverbend Fresh & Dairy.\n- **26 de julio:** solo hay entregas programadas de Northfield Bakery Partners, Riverbend Fresh & Dairy y Pioneer Merch & Packaging.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_deliveries": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 9,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "19",
+          "20",
+          "21",
+          "22",
+          "23",
+          "24",
+          "25",
+          "26"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "upcoming_deliveries"
+      },
+      "repeat": 1,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_staffing",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cómo está el personal para los próximos días? ¿Me alcanzan los turnos?",
+      "backend_case_id": "80a55b331b63",
+      "first_text_s": 31.26,
+      "first_progress_s": 7.24,
+      "polls": 35,
+      "turn_id": "6ec71ccb-eb84-45fc-831e-e0131e97cc7b",
+      "status": "done",
+      "latency_s": 35.04,
+      "reply": "Los turnos: no hay dato. En los sistemas no aparece el cuadro de personal asignado del 20 al 26 de julio, así que no puedo decirte si alcanzan ni qué días sobran. Lo que sí existe es la demanda prevista y cuántas horas harían falta; el dato es diario, no por turno.\n\n| Día | Transacciones previstas | Horas de personal que harían falta |\n|---|---|---|\n| lun 20 | ~355 | ~62 h |\n| mar 21 | ~355 | ~62 h |\n| mié 22 | ~336 | ~59 h |\n| jue 23 | ~400 | ~70 h |\n| vie 24 | ~417 | ~73 h |\n| sáb 25 | ~289 | ~50 h |\n| dom 26 | ~422 | ~74 h |\n\nEn total, del lunes al domingo harían falta alrededor de 463 horas, con un margen de entre 399 y 515.\n\nDónde poner el peso:\n- Sábado 25 es el día flojo: casi 290 transacciones y unas 50 horas. Ahí es donde un turno extra se paga solo.\n- Viernes 24 y domingo 26 son los dos picos: si vas al extremo alto del rango, 76 y 83 horas.\n- Lunes a miércoles, con58 a 62 horas vas bien.\n\nPásame el roster o los turnos ya asignados y te regreso el cruce de lo programado contra lo que hace falta, día por día, con los faltantes y los excesos.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "strategist",
+          "display_name_es": "Estratega",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 1,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 1
+      },
+      "peers": [
+        "glazed_strategist"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [
+          "garbled"
+        ],
+        "internal_names": [],
+        "numbers_checked": 34,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "463",
+          "290"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": [
+          "con58"
+        ]
+      },
+      "expect": {
+        "intent": "staffing"
+      },
+      "repeat": 1,
+      "fast_path": "pass:uncovered"
+    },
+    {
+      "case_id": "intent_promo_list",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué promociones activas tengo ahorita?",
+      "backend_case_id": "3658738df1da",
+      "first_text_s": 3.75,
+      "first_progress_s": null,
+      "polls": 5,
+      "turn_id": "97a0416c-3df6-4f27-8c5a-8bc0b9603bfa",
+      "status": "done",
+      "latency_s": 4.17,
+      "reply": "No tienes promociones activas ahorita en **Harborview International Airport · Food Court – Full Counter 1**. La única mostrada, **Summer Iced Coffee Week**, figura como pasada y terminó el **2026-07-19**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_promos": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 1,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "promo_list"
+      },
+      "repeat": 1,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_data_integrity",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Hay datos que no cuadran en el inventario o las ventas?",
+      "backend_case_id": "d901101e7032",
+      "first_text_s": 1.79,
+      "first_progress_s": 5.2,
+      "polls": 24,
+      "turn_id": "f928393b-172c-4241-9f16-37766be3100c",
+      "status": "done",
+      "latency_s": 23.64,
+      "reply": "Sí, hay dos desajustes de datos. Esto no es un problema del día de hoy: viene de claves de productos mal escritas.\n\n**1. El sándwich \"Better For You\" aparece con dos nombres distintos**\nEn las ventas está como SKU-100040 y en el catálogo como SKU100040. Es el mismo producto, escrito de dos formas. No es un producto nuevo.\n\n- En esta tienda: **$20,360.04** de ventas en 5,173 filas quedan fuera del costo, la categoría y el pedido automático.\n- En toda la cadena: $301,950.59.\n- Hay otras 206 claves mal escritas más, por $16,566 en total.\n\n**2. Códigos de la serie SKU- que no existen en el catálogo**\nSon 309 códigos distintos, en 309 filas. No aparecen en el catálogo ni siquiera después de normalizarlos, así que **no sabemos qué producto son**.\n\n- En esta tienda: $223.60 de ventas.\n- En toda la cadena: $14,537.12.\n\n**Por qué importa:** mientras la clave no sea correcta, esas ventas no tienen costo ni margen asignado, y el sistema nunca va a reabastecer ese producto por su cuenta.\n\nEn los dos casos la solución recomendada es una tarea manual de corrección de datos — reportar los códigos desconocidos a corporativo y arreglar la clave del sándwich. Ninguna de las dos es automática: hay que revisarlas a mano. Los montos de toda la cadena son la suma de las filas afectadas; los de esta tienda son los que te tocan.\n\nQuieres que abra las dos tareas de corrección para que las envíe a corporativo?",
+      "error": null,
+      "sanitized_fragments": 1,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "sentinel",
+          "display_name_es": "Centinela",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 1,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 1
+      },
+      "peers": [
+        "glazed_auditor"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 11,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "20,360.04",
+          "5,173",
+          "301,950.59",
+          "16,566",
+          "14,537.12"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "data_integrity"
+      },
+      "repeat": 1,
+      "fast_path": "pass:uncovered"
+    },
+    {
+      "case_id": "intent_transfer_options",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Puedo traer de otra sucursal algún producto que me esté faltando?",
+      "backend_case_id": "27f5d45d1b33",
+      "first_text_s": 14.48,
+      "first_progress_s": 4.18,
+      "polls": 18,
+      "turn_id": "3191ee13-ebeb-410c-8a2e-0ea85b280834",
+      "status": "done",
+      "latency_s": 17.57,
+      "reply": "Hoy no hay ninguna opción de traslado **hacia** tu tienda: lo único disponible son salidas desde tu propio mostrador.\n\nLo que sí vi:\n\n**Tu tienda (Harborview International Airport · Food Court – Full Counter 1), domingo 19 de julio**\n\n- Productos que se te van a acabar antes de la próxima entrega (martes 21 de julio): Angus Steak Sandwich (de0 piezas), Southwest Veggie Breakfast Sandwich (de 0) y Spicy Omlet Flatbread (55 en mano).\n- Sobrante que se está tirando: 12 Croiss-Ant Donuts ($417.35 en 14 días) y 6 Bacon Donuts ($384.80 en 14 días).\n- De las salidas posibles, la única con ganancia clara es enviar 8 unidades de Md Choc Stout Cold Foam a **Terminal C – Full Counter 3** de este mismo aeropuerto: cuesta $15.80 y deja cerca de $20.92. Las otras cuatro sucursales quedan casi en cero ($0.12) o en negativo.\n- Ojo: la confianza en estos números de traslado es **baja** (el sistema no tiene historial de traslados), y hoy **no vence ningún pedido**, así que nada de esto corre prisa hoy.\n\nSi quieres, reviso un producto puntual para ver si existe algún traslado entrante desde otra sucursal, o te dejo una propuesta para el envío del cold foam a Terminal C.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "liaison",
+          "display_name_es": "Enlace entre sucursales",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 1,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 1
+      },
+      "peers": [
+        "glazed_liaison"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [
+          "garbled"
+        ],
+        "internal_names": [],
+        "numbers_checked": 16,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "55",
+          "417.35",
+          "384.80"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": [
+          "de0"
+        ]
+      },
+      "expect": {
+        "intent": "transfer_options"
+      },
+      "repeat": 1,
+      "fast_path": "pass:complex"
+    },
+    {
+      "case_id": "specialist_past",
+      "kind": "specialist",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cómo nos fue la última vez que decidimos pedir de más antes de un fin de semana?",
+      "backend_case_id": "51feddc1df96",
+      "first_text_s": 22.25,
+      "first_progress_s": 6.16,
+      "polls": 27,
+      "turn_id": "8d01f599-8f5c-4d9e-ba49-9e8d98ce14e2",
+      "status": "done",
+      "latency_s": 26.7,
+      "reply": "No hay antecedente: **no existe ninguna decisión registrada con resultado medido** en Harborview International Airport · Food Court – Full Counter 1. El historial de decisiones viene vacío, y lo que hay en la memoria de la tienda son solo apuntes de aprobación o rechazo, sin resultado comprobado.\n\nLo más parecido que hay son tres decisiones **de hoy** que muestran esa misma preferencia de \"no quedarme corto\", pero todavía sin resultado medido:\n\n- Rechazar el corte de pedido de 12 Croiss-Ant Donuts (lo que se ganaba: 58.90 USD netos, confianza 0.83, nivel N2).\n- Rechazar el corte de pedido de 6 Bacon Donuts (35.52 USD netos, confianza 0.83, nivel N2).\n- Rechazar el pedido de Spicy Omlet Flatbread, 6 cajas por 97.20 USD (lo que se ganaba: 155.79 USD netos, confianza 0.29, nivel N2).\n\nNota importante para hoy: el calendario marca domingo19 de julio como día de fin de semana, y hay notas del gerente de una feria de barrio del 19 al 21 de julio con más tráfico, pero también una nota de hoy que anticipa menos ventas por cierre de calle. Son apuntes sin cifras verificadas, así que no sirven como base numérica.\n\n¿Quieres que miremos cómo va hoy en la tienda y qué te convendría pedir para mañana?",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "past",
+          "display_name_es": "Analista histórico",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 1,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 1
+      },
+      "peers": [
+        "glazed_past"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 13,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "profile": "glazed_past"
+      },
+      "repeat": 1,
+      "fast_path": "pass:complex"
+    },
+    {
+      "case_id": "specialist_supply",
+      "kind": "specialist",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué proveedor ha cumplido peor con sus entregas últimamente?",
+      "backend_case_id": "c0e15c5c426b",
+      "first_text_s": 4.86,
+      "first_progress_s": null,
+      "polls": 17,
+      "turn_id": "c5ba269f-48f7-4bd2-a309-aeaca118d726",
+      "status": "done",
+      "latency_s": 16.62,
+      "reply": "**Pioneer Merch & Packaging es el proveedor con peor cumplimiento de entregas** (ventana de 180 días, datos al 2026-07-19):\n\n- Puntualidad: **86.3 %**, la más baja de los seis proveedores (y por debajo de su meta contractual de 85 %… solo1.3 puntos arriba, pero es el mínimo del grupo).\n- Completitud de pedidos: **97.0 %**, también la más baja.\n- Lead time medio: **7.21 días** (p90: 8.0 días) frente a 7 días de contrato.\n\nContraste rápido: Coastal Beverage Distribution va mejor (94.5 % puntual, 99.1 % completo) y Northfield Bakery Partners (92.3 % / 99.4 %). Ninguno de los proveedores cumple estrictamente su nivel de servicio pactado salvo ese mismo margen mínimo de Pioneer.\n\nDato de contexto: Pioneer mueve solo **73 líneas de pedido** en la ventana, así que su volumen es bajo y la muestra es más pequeña; su próxima entrega es el 2026-07-20.\n\nNota: los riesgos de que aparecen en los análisis de faltantes son de Summit Frozen Foods (entrega tardía en 10 % de sus pedidos, 2 días de lead time), no de Pioneer — pero ahí el problema es inventario, no desempeño del proveedor.",
+      "error": null,
+      "sanitized_fragments": 1,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1,
+        "get_supplier_performance": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 14,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "180",
+          "86.3",
+          "85",
+          "97.0",
+          "7.21",
+          "8.0",
+          "94.5",
+          "99.1",
+          "92.3",
+          "99.4",
+          "73"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "profile": "glazed_supply"
+      },
+      "repeat": 1,
+      "fast_path": "defer:no_intent"
+    },
+    {
+      "case_id": "specialist_strategist",
+      "kind": "specialist",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cuántas transacciones esperas para el fin de semana y en qué horas habrá más gente?",
+      "backend_case_id": "5e3479e381bf",
+      "first_text_s": 6.35,
+      "first_progress_s": null,
+      "polls": 11,
+      "turn_id": "a4f06d7b-78cb-45e1-bbdd-77cbdb3bd7d2",
+      "status": "done",
+      "latency_s": 10.34,
+      "reply": "**Fin de semana en Harborview International Airport · Food Court – Full Counter 1** (próximo: sáb25 y dom 26 de julio de 2026).\n\n- **Sábado 2026-07-25:** transacciones p10 274.0 – p50 288.5 – p90 348.0; ticket medio p10 8.21 – p50 8.84 – p90 9.58 USD; asistencia p10 2707.4 – p50 2905.0 – p90 3167.4.\n- **Domingo 2026-07-26:** transacciones p10 354.7 – p50 421.5 – p90 476.7; ticket medio p10 7.89 – p50 8.38 – p90 9.03 USD; asistencia p10 3358.0 – p50 3581.5 – p90 4022.6.\n\nModelo: flujo por día de la semana de 8 semanas, con origen el2026-07-19. Son proyecciones diarias, no datos reales.\n\n**Sobre \"en qué horas habrá más gente\":** no dispongo de ese dato. Las Forecast son diarias y no hay desglose por hora ni por hora del día en el pronóstico; solo puedo darle el total del día. Si quiere, le puedo indicar las horas de personal recomendadas para cada día (también a nivel diario).\n\nContexto: el domingo sería el día fuerte del fin de semana (mediana ~421 transacciones frente a ~288 el sábado), así que planearía el refuerzo de personal hacia el domingo.",
+      "error": null,
+      "sanitized_fragments": 1,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 3,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1,
+        "forecast_daily_flow": 2
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [
+          "garbled"
+        ],
+        "internal_names": [],
+        "numbers_checked": 26,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "26",
+          "2026",
+          "274.0",
+          "288.5",
+          "348.0",
+          "8.21",
+          "8.84",
+          "9.58",
+          "2707.4",
+          "2905.0",
+          "3167.4",
+          "354.7",
+          "421.5",
+          "476.7",
+          "7.89",
+          "8.38",
+          "9.03",
+          "3358.0",
+          "3581.5",
+          "4022.6",
+          "19",
+          "421",
+          "288"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": [
+          "el2026"
+        ]
+      },
+      "expect": {
+        "profile": "glazed_strategist"
+      },
+      "repeat": 1,
+      "fast_path": "defer:no_intent"
+    },
+    {
+      "case_id": "multi_specialist",
+      "kind": "multi_specialist",
+      "turn_index": 0,
+      "burst": false,
+      "question": "Prepárame el plan de mañana: qué pedir, qué está por caducar y si me alcanza el personal para atenderlo.",
+      "backend_case_id": "8b7e321daf64",
+      "first_text_s": 43.17,
+      "first_progress_s": 6.19,
+      "polls": 51,
+      "turn_id": "32dca4ed-40ab-4b0e-ab01-a18e36e894e8",
+      "status": "done",
+      "latency_s": 51.56,
+      "reply": "Plan de mañana, lunes 20 de julio, para Harborview International Airport · Food Court – Full Counter 1.\n\n## 1. Qué pedir\n\nNo hay ninguna entrega prevista mañana: las 11 líneas del plan son de Summit Frozen Foods y llegan el martes 21. Además, el plazo para ordenarlas ya venció en las 11 líneas, así que si las quieres es una excepción, no la ruta normal.\n\nLas que más pesan (las cuatro primeras), del proveedor Summit Frozen Foods:\n\n| Producto | Cantidad | Cajas | Costo est. | Entrega | Si no pides, dejas de vender |\n|---|---|---|---|---|---|\n| Angus Steak Sandwich | 150 u | 15 | $130.50 | martes 21 | $344.74 |\n| Southwest Veggie Breakfast Sandwich | 70 u | 7 | $82.60 | martes 21 | $301.93 |\n| Spicy Omlet Flatbread | 60 u | 6 | $97.20 | martes 21 | $264.42 |\n| Better For You Breakfast Sandwich | 40 u | 4 | $74.40 | martes 21 | $171.64 |\n\nLas otras siete líneas son de 1 a 3 cajas (Cold Foam, Tomato Pesto Grilled Cheese, Chicken Wrap, Tuna Wrap, House Dblcssg, Pancake Wrap, Wake Up Wrap) y el pedido completo suma $547.40. Ojo: Summit Frozen Foods pide un mínimo de $300 por pedido, así que si recortas solo los renglones chicos puedes quedarte por debajo y que no te acepten el pedido.\n\nConfianza: baja. Se apoya en 228 pruebas retrospectivas y casi la mitad de los días recientes hubo quiebres, así que la demanda se corrigió al alza. El proveedor se atrasa en 10% de sus pedidos y un día de retraso ya está descontado en las cifras.\n\nOportunidad de ahorro de panadería (para el pedido de hoy de Northfield Bakery Partners): conviene omitir el próximo pedido de 12 Croiss-Ant Donuts (neto +$58.90; si no, la merma esperada es $88.38 por ciclo) y de 6 Bacon Donuts (neto +$35.52; merma $64.01). No está confirmado si el proveedor acepta menos de una caja completa.\n\n## 2. Qué está por caducar\n\n- Mañana lunes 20: un solo producto — Bacon Roll Up, 10 unidades, merma $6.90.\n- Hoy domingo 19: la herramienta de caducidades no reporta nada que venza hoy.\n- En los próximos dos días: 11 lotes, merma total entre $27.07 y $55.96 (punto medio $37.56). El grueso es del martes 21.\n\nLos mayores de ese martes: Bagel W Butter (36 u), French Toast Bagl (54 u), Fall Lip Balm Pumpkin (6 u), 8 Count Mini Chocolate Chip Cookie (10 u). Las edades de lote son inferidas, no medidas.\n\n## 3. Personal\n\nAquí no puedo darte un sí o un no: falta el dato de horas ya asignadas para mañana. Lo que sí está calculado:\n\n- Tráfico esperado: entre 328 y 436 transacciones (lo más probable, 354);-afluencia de 2,908 a 3,576 clientes.\n- Horas necesarias: 57.4 (tramo bajo), 62.0 (medio), 76.2 (alto).\n- Tu formato rinde5.72 transacciones por hora de personal.\n\nLectura práctica: si mañana te quedas cerca de 354 transacciones, el punto medio de 62 horas alcanza. Si el día se va al extremo alto (436), conviene apuntar al tramo superior. Dime cuántas horas dejaste asignadas y te digo si hay que mover gente.\n\n## 4. Advertencia de datos\n\nHay dos hallazgos de integridad que conviene corregir antes de que distorsionen los conteos: un código de producto duplicado por formato (SKU-100040 es el mismo \"Better For You Breakfast Sandwich\" escrito de otra manera, con $301,950.59 de exposición) y un grupo de códigos que no existen en el maestro de productos ($14,537.12).\n\n¿Quieres que formalice alguna de las opciones de pedido o el ahorro en panadería?",
+      "error": null,
+      "sanitized_fragments": 1,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "strategist",
+          "display_name_es": "Estratega",
+          "state": "done"
+        },
+        {
+          "agent_id": "supply",
+          "display_name_es": "Analista de abastecimiento",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 3,
+      "peer_asks": 2,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 2
+      },
+      "peers": [
+        "glazed_strategist",
+        "glazed_supply"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {
+        "multi_peer": true
+      },
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 68,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "344.74",
+          "301.93",
+          "264.42",
+          "171.64",
+          "547.40",
+          "228",
+          "12",
+          "58.90",
+          "88.38",
+          "35.52",
+          "64.01",
+          "6.90",
+          "27.07",
+          "55.96",
+          "37.56",
+          "36",
+          "54",
+          "2,908",
+          "3,576",
+          "301,950.59",
+          "14,537.12"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "min_peer_asks": 2
+      },
+      "repeat": 1,
+      "fast_path": "pass:complex"
+    },
+    {
+      "case_id": "proposal",
+      "kind": "proposal",
+      "turn_index": 0,
+      "burst": false,
+      "question": "Propón el pedido para el producto con más riesgo de agotarse y déjalo pendiente de mi aprobación.",
+      "backend_case_id": "cb3500d8e7bc",
+      "first_text_s": 1.62,
+      "first_progress_s": null,
+      "polls": 9,
+      "turn_id": "5805d12a-bdc9-4840-8c24-e64e61eebe0b",
+      "status": "done",
+      "latency_s": 8.3,
+      "reply": "Propuesta lista y **pendiente de tu aprobación**.\n\n**Angus Steak Sandwich (SKU-100161)** — el de mayor riesgo de agotarse:\n- Inventario de cierre hoy: **0 unidades**\n- Riesgo de quiebre sin pedido: **1.0** (es decir, seguro)\n- Quiebre proyectado: **2026-07-21**, misma fecha de la próxima entrega de Summit Frozen Foods\n- Demanda promedio: **61.79 unidades/día**\n- Venta perdida estimada si no pides: **$344.74**\n\n**Lo que se propone:** 150 unidades (15 cajas de 10) a Summit Frozen Foods, costo estimado **$130.50**. Neto esperado **$207.66** (rango $183.21–$225.94). Nivel de decisión N2, o sea, se queda en tus manos.\n\n**Con reservas:** la fecha límite de pedido ya venció y la entrega más temprana es el 21. Además, estos números vienen de una demanda corregida al alza (52% de los días hubo quiebres) y Summit retrasa 10% de sus pedidos. Quedaría cerca de $12.35 de merma.\n\nNada se ha ejecutado. Si quieres, también puedo dejar preparado el pedido de Southwest Veggie Powr Brkfst Sandwich ($82.60, neto $214.41), que es el segundo más crítico y también está en cero.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 0,
+      "tools": {
+        "get_briefing": 1,
+        "propose_action": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {
+        "proposal_pending": true
+      },
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 17,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "1.0",
+          "61.79",
+          "344.74",
+          "150",
+          "15",
+          "130.50",
+          "207.66",
+          "183.21",
+          "225.94",
+          "21",
+          "52",
+          "12.35",
+          "82.60",
+          "214.41"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "proposal": true
+      },
+      "repeat": 1,
+      "fast_path": "pass:action_request"
+    },
+    {
+      "case_id": "unsupported",
+      "kind": "unsupported",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cuánto vendió la tienda de la competencia de enfrente la semana pasada?",
+      "backend_case_id": "f4986bf9c44e",
+      "first_text_s": 6.05,
+      "first_progress_s": null,
+      "polls": 11,
+      "turn_id": "ad7bb30f-fc5f-4c14-844f-a555839f2eab",
+      "status": "done",
+      "latency_s": 10.33,
+      "reply": "No tengo ese dato — y no es algo que pueda obtener.\n\nMis herramientas solo cubren **nuestra** tienda, **Harborview International Airport · Food Court – Full Counter 1**. No hay ninguna fuente de datos de competidores: no puedo ver ventas, tráfico ni tickets de otros negocios, ni estimarlos. Cualquier cifra que te dé para \"la tienda de enfrente\" sería inventada.\n\nLo que sí puedo mostrarte es nuestro contexto de la semana del 13 al 19 de julio de 2026:\n\n| Indicador | Valor |\n|---|---|\n| Venta neta | $22,900.91 |\n| Transacciones | 2,713 |\n| Merma | $928.08 |\n| Ventas perdidas | $934.71 – $1,398.28 – $1,620.21 (bajo/medio/alto) |\n| Transacciones por hora de personal | 6.45 |\n\nSi quieres una referencia de mercado indirecta, dímelo y puedo mostrarte nuestros problemas abiertos (merma por sobrepedido y riesgo de quiebre de stock) — pero sigue siendo únicamente sobre nuestro local.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {
+        "refusal": true
+      },
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 11,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "13",
+          "19",
+          "2026",
+          "22,900.91",
+          "2,713",
+          "928.08",
+          "934.71",
+          "1,398.28",
+          "1,620.21",
+          "6.45"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "refusal": true
+      },
+      "repeat": 1,
+      "fast_path": "defer:no_intent"
+    },
+    {
+      "case_id": "follow_up",
+      "kind": "follow_up",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cuáles son los productos con más riesgo de agotarse esta semana?",
+      "backend_case_id": "dd197aba0fc7",
+      "first_text_s": 5.65,
+      "first_progress_s": null,
+      "polls": 9,
+      "turn_id": "0ff74b25-cc1d-462d-aa4c-546ac6853102",
+      "status": "done",
+      "latency_s": 8.47,
+      "reply": "Los productos con mayor riesgo son los que ya están agotados hoy:\n\n- **Angus SteakSandwich:** agotado desde hace **9.4 h**; llegan **100 unidades** el **2026-07-20**.\n- **Southwest Veggie Powr Brkfst Sandwich:** agotado desde hace **9.8 h**; llegan **40 unidades** el **2026-07-20**.\n- **50 Donut Holes:** agotado desde hace **13.2 h**; llegan **12 unidades** el **2026-07-20**.\n- **Hummus (Mod):** agotado desde hace **13.1 h**; llegan **36 unidades** el **2026-07-20**.\n- **Better For You Breakfast Sandwich:** agotado desde hace **6.9 h**; llegan **40 unidades** el **2026-07-20**.\n\nTambién están en riesgo inmediato **3 Donut Holes**, agotado desde hace **6 h**, y **Sm Cold Brew Latte**, agotado desde hace **18 h**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_inventory_status": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 14,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "9.4",
+          "100",
+          "9.8",
+          "40",
+          "50",
+          "13.2",
+          "12",
+          "13.1",
+          "36",
+          "6.9",
+          "40",
+          "18"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {},
+      "repeat": 1,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "follow_up",
+      "kind": "follow_up",
+      "turn_index": 1,
+      "burst": false,
+      "question": "¿Y cuál de esos es el más urgente?",
+      "backend_case_id": "dd197aba0fc7",
+      "first_text_s": 3.75,
+      "first_progress_s": null,
+      "polls": 10,
+      "turn_id": "57ce8df1-4768-4693-bd10-7253cd94eb0b",
+      "status": "done",
+      "latency_s": 9.32,
+      "reply": "El más urgente es el **Angus SteakSandwich**:\n\n- **Cierre de hoy: 0 unidades** (agotado), con demanda de **61.79 unidades/día**.\n- Entrega del proveedor **Summit Frozen Foods el 2026-07-21**, y el quiebre se proyecta **justo ese mismo día** → riesgo de agotamiento **1.0** (100%) sin pedido.\n- Venta perdida esperada si no se hace nada: **$344.74** (rango $315.53–$373.95), la mayor de todos los quiebres.\n\nLo sigue de cerca el **Southwest Veggie Powr Brkfst Sandwich** (también 0 unidades, quiebre proyectado 2026-07-21, $301.93). Después, el **Spicy Omlet Flatbread** (55 unidades en cierre, pero agota el 2026-07-22, $264.42).\n\nUna corrección a lo que te dije antes: la entrega de Summit Frozen Foods es el **21 de julio**, no el 20 — el 20 solo traen Northfield Bakery, Riverbend, Coastal Beverage, Evergreen Coffee y Pioneer Merch.\n\nNota: la fecha límite de pedido de las 11 líneas ya pasó (pedidos con fecha límite vencida), así que estas acciones habría que Pedirlas hoy mismo aunque el margen de entrega esté sobrepasado. Si quieres, levanto la propuesta de pedido del Angus (150 unidades, $130.50, neto esperado +$207.66) — ojo, la confianza es baja (0.29) y el proveedor llega tarde 10% de las veces.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_briefing": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 20,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "61.79",
+          "1.0",
+          "100",
+          "344.74",
+          "315.53",
+          "373.95",
+          "301.93",
+          "55",
+          "264.42",
+          "21",
+          "20",
+          "20",
+          "11",
+          "150",
+          "130.50",
+          "207.66",
+          "0.29"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {},
+      "repeat": 1,
+      "fast_path": "pass:depends_on_history"
+    },
+    {
+      "case_id": "follow_up",
+      "kind": "follow_up",
+      "turn_index": 2,
+      "burst": false,
+      "question": "¿Cuánto debería pedir de ese y cuándo llegaría?",
+      "backend_case_id": "dd197aba0fc7",
+      "first_text_s": 3.98,
+      "first_progress_s": null,
+      "polls": 9,
+      "turn_id": "aca2d7e0-1d96-4b50-9725-671e5a803dce",
+      "status": "done",
+      "latency_s": 8.27,
+      "reply": "Según el plan de pedidos de la tienda, para el **Angus SteakSandwich** lo recomendado es **150 unidades (15 cajas de 10)**, con un costo estimado de **$130.50**.\n\n**¿Cuándo llegaría?** El proveedor es **Summit Frozen Foods** (tiempo de entrega de 2 días). Pero ojo: la fecha límite de ese pedido ya pasó, así que la fecha de llegada esperada es **2026-07-21 (martes)** — que es justo el día en que se proyecta que se agota. Es decir, el pedido no te salva del quiebre de hoy; te cubre desde el martes.\n\nResumen de la línea:\n\n| Dato | Valor |\n|---|---|\n| Producto | Angus SteakSandwich |\n| Pedido recomendado | 150 unidades / 15 cajas |\n| Costo estimado | $130.50 |\n| Entrega estimada | 2026-07-21 (martes) |\n| Quiebre proyectado sin pedido | 2026-07-21 |\n| Riesgo de quiebre sin pedido | 100% |\n| Venta perdida si no pides | $344.74 |\n| Ganancia neta esperada | +$207.66 |\n\nTres salvedades de los datos: el 52% de los últimos días ya tuvo quiebres, así que la demanda se corrigió al alza (con tope); y el proveedor se atrasa en el 10% de sus pedidos, por lo que un día de retraso ya está contado dentro del cálculo (dejando ~$12.35 de merma). Mi confianza en la cantidad es baja (0.29), así que toma el número como referencia, no como orden cerrada.\n\n¿Quieres que levante la propuesta para que tú la apruebes?",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 0,
+      "peer_asks": 0,
+      "tools": {},
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": true,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 15,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "150",
+          "15",
+          "130.50",
+          "150",
+          "15",
+          "130.50",
+          "100",
+          "344.74",
+          "207.66",
+          "52",
+          "12.35",
+          "0.29"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {},
+      "repeat": 1,
+      "fast_path": "pass:depends_on_history"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 0,
+      "burst": true,
+      "question": "¿Cuánto vendimos ayer?",
+      "backend_case_id": "382bfde1b4c8",
+      "first_text_s": 6.16,
+      "first_progress_s": null,
+      "polls": 7,
+      "turn_id": "67b1819b-a381-4a25-872b-bded8920b085",
+      "status": "done",
+      "latency_s": 6.61,
+      "reply": "Ayer, en Harborview International Airport · Food Court – Full Counter 1, vendimos un total neto de **$22,900.91**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 2,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "22,900.91"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 1,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 1,
+      "burst": true,
+      "question": "¿Cuántas alertas abiertas tengo?",
+      "backend_case_id": "3cc6ad7cbe19",
+      "first_text_s": 4.74,
+      "first_progress_s": null,
+      "polls": 6,
+      "turn_id": "40ae51a0-6a9e-470a-973f-877b46a961cc",
+      "status": "done",
+      "latency_s": 5.56,
+      "reply": "No se devuelve un total de alertas abiertas en los resultados.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_issues": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 0,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 1,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 2,
+      "burst": true,
+      "question": "¿Qué entrega llega primero esta semana?",
+      "backend_case_id": "8080744fd922",
+      "first_text_s": 5.61,
+      "first_progress_s": null,
+      "polls": 7,
+      "turn_id": "1bde7c27-f6db-4c93-92d1-0df4c2b5b551",
+      "status": "done",
+      "latency_s": 6.55,
+      "reply": "La próxima entrega programada es el **2026-07-20**. Llegan productos de **Northfield Bakery Partners, Coastal Beverage Distribution, Summit Frozen Foods, Riverbend Fresh & Dairy, Evergreen Coffee Roasters y Pioneer Merch & Packaging**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_deliveries": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 0,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 1,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 3,
+      "burst": true,
+      "question": "¿Hay alguna promoción vigente?",
+      "backend_case_id": "51c315623085",
+      "first_text_s": 5.9,
+      "first_progress_s": null,
+      "polls": 7,
+      "turn_id": "1c62c7e5-6236-4a0e-9bde-c063ea0286ec",
+      "status": "done",
+      "latency_s": 6.61,
+      "reply": "No. La única promoción registrada-termina el 2026-07-19 y ya figura como pasada.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_promos": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 0,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 1,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 4,
+      "burst": true,
+      "question": "¿Cuál es el producto que más se vende?",
+      "backend_case_id": "8bfe06314bda",
+      "first_text_s": 3.32,
+      "first_progress_s": null,
+      "polls": 11,
+      "turn_id": "b59b5a2e-21f8-4e30-a82c-d12d213c5a94",
+      "status": "done",
+      "latency_s": 10.66,
+      "reply": "No tengo esa respuesta — y no la voy a estimar.\n\n**Lo que sí puedo afirmar**\n\nLos datos disponibles en el corte de **hoy (2026-07-19, domingo)** de *Harborview International Airport · Food Court – Full Counter 1* **no incluyen un ranking de productos por ventas**. Son sólo KPIs agregados:\n\n- **Ventas netas:** 22 900,91 USD (13–19 jul, 7 días)\n- **Transacciones:** 2 713\n- **Merma:** 928,08 USD\n- **Ventas perdidas:** 934,71 / 1 398,28 / 1 620,21 USD (bajo/medio/alto)\n- **Tickets por hora de personal:** 6,45\n\n**Los únicos datos por producto que tengo son de merma, no de ventas** (unidades vendidas a28 días):\n\n| Producto | Recibido 28d | Vendido 28d | Merma 14d |\n|---|---|---|---|\n| 12 Croiss-Ant Donuts | 300 u | 126 u | 417,35 USD |\n| 6 Bacon Donuts | 336 u | 77 u | 384,80 USD |\n\nEstos dos aparecen porque son los de mayor exceso de inventario, **no porque sean los más vendidos** — de hecho, un volumen vendido bajo es parte de la razón por la que generan merma. Usarlos para responder tu pregunta sería concluir al revés.\n\n**Para obtener el producto más vendido** harían falta datos de ventas por artículo (unidades o ingresos por SKU en un periodo), que esta fuente no expone. Si hay un reporte de/ventas por producto en tu sistema, con gusto lo reviso.\n\nUn dato adicional que sí es relevante y está disponible: los tres productos con mayor **demanda diaria** —que es lo más cercano a \"lo que más se vende\" entre los datos actuales— son los que hoy tienen riesgo de quiebre de inventario:\n\n- **Angus SteakSandwich** — 61,79 u/día, existencia en cierre: 0\n- **Spicy Omlet Flatbread** — 42,75 u/día, existencia en cierre: 55 u\n- **Southwest Veggie Powr Brkfst Sandwich** — 26,39 u/día, existencia en cierre: 0\n\nLos tres vienen de **Summit Frozen Foods**, cuya próxima entrega es el 2026-07-21 y cuya puntualidad es del 90,0%.\n\n¿Quieres que arme el detalle de opciones de pedido de esas líneas, o prefieres primero el reporte de ventas por producto?",
+      "error": null,
+      "sanitized_fragments": 1,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 33,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "22",
+          "900",
+          "13",
+          "19",
+          "713",
+          "928",
+          "934",
+          "398",
+          "620",
+          "28",
+          "28",
+          "14",
+          "12",
+          "300",
+          "126",
+          "417",
+          "336",
+          "77",
+          "384",
+          "61",
+          "42",
+          "55",
+          "26",
+          "90"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 1,
+      "fast_path": "defer:no_intent"
+    },
+    {
+      "case_id": "simple",
+      "kind": "simple",
+      "turn_index": 0,
+      "burst": false,
+      "question": "Hola, ¿cómo va la tienda hoy?",
+      "backend_case_id": "d33a1ddc83fb",
+      "first_text_s": 5.1,
+      "first_progress_s": null,
+      "polls": 8,
+      "turn_id": "43760350-ab13-4685-8c24-5c1457172cc5",
+      "status": "done",
+      "latency_s": 7.35,
+      "reply": "La tienda **Harborview International Airport · Food Court – Full Counter 1** lleva hoy, domingo 2026-07-19:\n\n- Ventas netas: **$22,900.91 USD**\n- Transacciones: **2713**\n- Ventas perdidas: **$1,398.28 USD**\n- Desperdicio: **$928.08 USD**\n\nEn general, la actividad comercial va activa, aunque hay ventas perdidas y desperdicio que conviene revisar.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 5,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "22,900.91",
+          "2713",
+          "1,398.28",
+          "928.08"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {},
+      "repeat": 2,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_day_summary",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "Dame el resumen del día de hoy.",
+      "backend_case_id": "696847513405",
+      "first_text_s": 3.64,
+      "first_progress_s": null,
+      "polls": 7,
+      "turn_id": "09e421bd-8bfd-481b-9721-70dd139758de",
+      "status": "done",
+      "latency_s": 6.24,
+      "reply": "Resumen de hoy, domingo 2026-07-19, para Harborview International Airport · Food Court – Full Counter 1:\n\n- Ventas netas: **$22,900.91** en **2,713** transações.\n- Lo que se tira: **$928.08**. Lo que se dejó de vender: entre **$934.71** y **$1,620.21**, con un punto medio de **$1,398.28**.\n- Hay **11 líneas de pedido** cuyo plazo ya venció; no hay pedidos pendientes para hoy ni para mañana.\n- Riesgos principales: falta prevista de Angus SteakSandwich, Southwest Veggie Powr Brkfst Sandwich y Spicy Omlet Flatbread antes de la entrega del **2026-07-21**.\n- Sobrestock más importante: **12 Croiss-Ant Donuts**, con **$417.35** de merma en los últimos **14 días**; la recomendación es omitir el siguiente pedido, con beneficio esperado de **$58.90**, pero todavía no está confirmado si el proveedor acepta pedir menos de una caja completa.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 12,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "22,900.91",
+          "2,713",
+          "928.08",
+          "934.71",
+          "1,620.21",
+          "1,398.28",
+          "11",
+          "12",
+          "417.35",
+          "14",
+          "58.90"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "day_summary"
+      },
+      "repeat": 2,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_active_issues",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué problemas o alertas urgentes tengo abiertos?",
+      "backend_case_id": "5084a3682458",
+      "first_text_s": 3.87,
+      "first_progress_s": null,
+      "polls": 20,
+      "turn_id": "d7798e39-1887-4589-b92d-c6a1d10a1543",
+      "status": "done",
+      "latency_s": 19.53,
+      "reply": "## Alertas abiertas — Harborview International Airport · Food Court – Full Counter 1\n*Corte: domingo 19 de julio de 2026*\n\n### 🔴 1. Riesgos de quiebre de stock (SUMMIT Frozen Foods) — lo más urgente\nLas **11 líneas del plan de pedidos ya tienen la fecha de corte vencida**. No hay pedidos que venzan hoy ni mañana, así que la próxima entrega de Summit es el martes 21.\n\n| Producto | Estado | Entrega | Se projected agota | Pedir (cajas) | Costo | Neto | Si no haces nada |\n|---|---|---|---|---|---|---|---|\n| Angus SteakSandwich | 0 unidades | 21-jul | 21-jul | 15 (150 u) | $130.50 | **+$207.66** | −$344.74 |\n| Southwest Veggie Powr Brkfst | 0 unidades | 21-jul | 21-jul | 7 (70 u) | $82.60 | **+$214.41** | −$301.93 |\n| Spicy Omlet Flatbread | 55 unidades | 21-jul | 22-jul | 6 (60 u) | $97.20 | **+$155.79** | −$264.42 |\n| Better For You Bkfst Sand. | — | 21-jul | 22-jul | 4 (40 u) | $74.40 | ver opción | −$171.64 |\n| House Dblcssg Sand | — | 21-jul | 23-jul | 1 (10 u) | $19.70 | ver opción | −$29.54 |\n\n⚠️ **Ojo con la confianza:** estos números de quiebre tienen **confianza baja (0.29)** — el proveedor se atrasa 10% de las veces y hay queNF stockouts recurrentes en 45–52% de los días, lo que distorsiona la demanda estimada al alza. Aun así el número pequeño (27 días de entrega) es el argumento a favor de pedir.\n\n### 🟠 2. Sobreexceso / merma (Northfield Bakery Partners)\n- **12 Croiss-Ant Donuts** — $417.35 de merma en 14 días. Recibiste 300 u y vendiste 126 en 28 días.\n- **6 Bacon Donuts** — $384.80 de merma en 14 días. Recibiste 336 u y vendiste 77.\n\nAcción recomendada en ambos: **saltar el próximo pedido** (+$58.90 y +$35.52 netos). ⚠️ *No está confirmado si el proveedor acepta pedidos de menos de una caja completa.*\n\n### 🟡 3. Integridad de datos — el más caro de todos\n- **$301,950.59** — SKU-100040 no es un producto nuevo: es el mismo SKU100040 (Better For You Breakfast Sandwich) escrito con otro formato. Está duplicando todo el historial.\n- **$14,537.12** — códigos SKU- que no existen en el catálogo maestro ni tras normalizar.\n\nEstos dosos no son de merma real; son exposición contable por registros mal emparejados.\n\n### 📊 Panorama\n- Venta neta: **$22,900.91** · 2,713 tickets · 6.45 tickets/hora-empleado\n- Merma 7 días: **$928.08** · Venta perdida: **$935 – $1,620**\n- Proveedor menos puntual: **Pioneer Merch & Packaging (86.3%)**\n- Sin propuestas pendientes ni decisiones previas registradas.\n\n---\n\n**¿Qué hago?** Puedo dejar lista una propuesta para ti. Recomiendo empezar por el **Angus SteakSandwich** (mayor pérdida evitable: $344.74) y el **12 Croiss-Ant Donuts** (mayor merma: $58.90 recuperables). Nada se ejecuta hasta que tú lo apruebes — dime cuáles quieres que proponga.\n\nUn detalle que conviene tener presente: la `$301,950` de \"pérdida\" por el SKU duplicado es con diferencia la cifra más grande del día, y sin embargo no aparece en el resumen de arriba como alerta urgente. Antes de mover dinero por los quiebres, valdría la pena confirmar con auditoría si ese desdoblamiento está distorsionando también los números de demanda que justifican los pedidos.",
+      "error": null,
+      "sanitized_fragments": 2,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_briefing": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 66,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "19",
+          "2026",
+          "11",
+          "21",
+          "15",
+          "150",
+          "130.50",
+          "207.66",
+          "344.74",
+          "70",
+          "82.60",
+          "214.41",
+          "301.93",
+          "55",
+          "60",
+          "97.20",
+          "155.79",
+          "264.42",
+          "40",
+          "74.40",
+          "171.64",
+          "19.70",
+          "29.54",
+          "0.29",
+          "45",
+          "52",
+          "27",
+          "12",
+          "417.35",
+          "14",
+          "300",
+          "126",
+          "28",
+          "384.80",
+          "14",
+          "336",
+          "77",
+          "58.90",
+          "35.52",
+          "301,950.59",
+          "14,537.12",
+          "22,900.91",
+          "2,713",
+          "6.45",
+          "928.08",
+          "935",
+          "1,620",
+          "86.3",
+          "344.74",
+          "12",
+          "58.90",
+          "301,950"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "active_issues"
+      },
+      "repeat": 2,
+      "fast_path": "pass:uncovered"
+    },
+    {
+      "case_id": "intent_order_plan",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cuál es el plan de pedido para mañana?",
+      "backend_case_id": "715145a3b99d",
+      "first_text_s": 4.53,
+      "first_progress_s": null,
+      "polls": 13,
+      "turn_id": "27d6d5d0-1f99-40ed-87a8-f555cd083fe7",
+      "status": "done",
+      "latency_s": 12.49,
+      "reply": "## Plan de pedido para mañana (lun 20-jul-2026)\n\n**No hay pedidos con vencimiento mañana.** está vacío (y también). Mañana llegan Northfield Bakery Partners, Riverbend Fresh & Dairy, Coastal Beverage, Pioneer Merch y Evergreen Coffee.\n\nLo que sí está abierto es el **plan de Summit Frozen Foods (SUP03), 11 líneas**, con entrega prevista **martes 21-jul**. Las 11 tienen el plazo de pedido **ya vencido**, por lo que la decisión es urgentísima:\n\n| SKU | Producto | Cant. | Costo est. | Quiebre proy. | Net vs. no hacer nada |\n|---|---|---|---|---|---|\n| SKU-100161 | Angus SteakSandwich | 150 (15 cs) | $130.50 | 21-jul | **−$344.74** en riesgo |\n| SKU-100101 | Southwest Veggie Powr Brkfst | 70 (7 cs) | $82.60 | 21-jul | −$301.93 |\n| SKU-100023 | Spicy Omlet Flatbread | 60 (6 cs) | $97.20 | 22-jul | −$264.42 |\n| SKU-100040 | Better For You Breakfast Sandwich | 40 (4 cs) | $74.40 | 22-jul | −$171.64 |\n| SKU-100222 | House Dblcssg Sand | 10 (1 cs) | $19.70 | 23-jul | −$29.54 (riesgo 72%) |\n\nNinguna línea está bajo el mínimo de pedido (por debajo del pedido mínimo: no), ninguna tiene advertencia de mínimo, y ninguna tiene. Confianza calibrada 0.2939 en todas — baja, por el patrón de quiebres previo (~50% de días con stockout) y por el10% de retrasos del proveedor.\n\n### Dos cosas que conviene mirar antes de confirmar\n\n1. **Riesgo real de perder la venta.** Los tres primeros SKUs están en 0 o casi0 al cierre de hoy, con probabilidad de quiebre 1.0. Lo que hoy existe ya no alcanza para el lunes.\n2. **⚠️ SKU-100040 está mal escrito en los datos.** El auditor reporta: \"SKU-100040\" es en realidad **SKU100040** (Better For You Breakfast Sandwich) en otro formato, con **$301,950.59 de exposición**. Además hay códigos huérfanos por $14,537.12. Antes de convertir esta línea en pedido, conviene confirmar que no es un duplicado que esté duplicando la demanda.\n\n### Además: dos donas con sobrepedido\n\n- **12 Croiss-Ant Donuts** (SKU-100502): merma $417.35 en 14 días —300 unidades recibidas vs. 126 vendidas en 28 días. Continuar cuesta ~$88.38/ciclo.\n- **6 Bacon Donuts** (SKU-100473): merma $384.80 en 14 días — 336 recibidas vs. 77 vendidas. Continuar cuesta ~$64.01/ciclo.\n\nSi quieres, puedo plantear la orden de Summit Frozen Foods como propuesta y la reducción de esas dos donas. No he enviado nada todavía.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_briefing": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [
+          "garbled"
+        ],
+        "internal_names": [],
+        "numbers_checked": 45,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "-2026",
+          "11",
+          "11",
+          "150",
+          "15",
+          "130.50",
+          "344.74",
+          "70",
+          "82.60",
+          "301.93",
+          "60",
+          "97.20",
+          "264.42",
+          "40",
+          "74.40",
+          "171.64",
+          "19.70",
+          "29.54",
+          "72",
+          "0.2939",
+          "50",
+          "1.0",
+          "301,950.59",
+          "14,537.12",
+          "12",
+          "417.35",
+          "14",
+          "300",
+          "126",
+          "28",
+          "88.38",
+          "384.80",
+          "14",
+          "336",
+          "77",
+          "64.01"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": [
+          "el10"
+        ]
+      },
+      "expect": {
+        "intent": "order_plan"
+      },
+      "repeat": 2,
+      "fast_path": "pass:complex"
+    },
+    {
+      "case_id": "intent_stockout_risk",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué productos me voy a quedar sin inventario esta semana?",
+      "backend_case_id": "5854cb290532",
+      "first_text_s": 7.43,
+      "first_progress_s": null,
+      "polls": 12,
+      "turn_id": "1f3e9db8-5d78-4998-b744-24084673ffaa",
+      "status": "done",
+      "latency_s": 11.3,
+      "reply": "Los productos con mayor riesgo de quedarse sin inventario son:\n\n- **Angus SteakSandwich**: ya está agotado y se estima que nuevamente se will agote el **2026-07-22**.\n- **Southwest Veggie Powr Brkfst Sandwich**: ya está agotado; se estima que se will agote el **2026-07-22**.\n- **50 Donut Holes** y **3 Donut Holes**: ya están agotados; ambos se estiman para el **2026-07-21**.\n- **Sm Cold Brew Latte**: ya está agotado; se estima que se will agote el **2026-07-24**.\n- **Better For You Breakfast Sandwich** y **Hummus (Mod)**: ya están agotados; se estiman para el **2026-07-23**.\n- **Oatmeal W Brown Sugar And Fruit** y **2 Mffin 6Pc Hb**: tienen **12 unidades** cada uno y su inventario podría terminarse el **2026-07-22**.\n\nA todos les llega un pedido mañana, **2026-07-20**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_inventory_status": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [
+          "garbled"
+        ],
+        "internal_names": [],
+        "numbers_checked": 5,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "50",
+          "12"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": [
+          "will",
+          "will",
+          "will"
+        ]
+      },
+      "expect": {
+        "intent": "stockout_risk"
+      },
+      "repeat": 2,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_expiring_items",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué productos están por caducar en los próximos días?",
+      "backend_case_id": "518b08a6c2ba",
+      "first_text_s": 2.04,
+      "first_progress_s": null,
+      "polls": 4,
+      "turn_id": "0686c970-69fa-4c0e-aec1-21c41f73d702",
+      "status": "done",
+      "latency_s": 3.13,
+      "reply": "- **20 de julio:** Bacon Roll Up.\n- **21 de julio:** Fall Lip Balm Pumpkin, Bagel W Butter, 8 Count Mini Chocolate Chip Cookie, Hm And Ew Western, Blueberry Coffee Cake Muffin, Cheesecake Square Cookie Crumb y Brownie.\n- **22 de julio:** Md Choc Stout C.B. Wsweet Cold Foam y Pancake Morning Wrap Bacon, Egg And Cheese.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_expiring": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 4,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "20",
+          "21",
+          "22"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "expiring_items"
+      },
+      "repeat": 2,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_upcoming_deliveries",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué entregas de proveedores llegan esta semana?",
+      "backend_case_id": "6a808252b8b4",
+      "first_text_s": 3.29,
+      "first_progress_s": null,
+      "polls": 7,
+      "turn_id": "a324d9cf-4de3-4201-b144-2f6a72c382ad",
+      "status": "done",
+      "latency_s": 6.23,
+      "reply": "Esta semana llegan entregas de estos proveedores:\n\n- **2026-07-20:** Northfield Bakery Partners, Coastal Beverage Distribution, Summit Frozen Foods, Riverbend Fresh & Dairy y Evergreen Coffee Roasters. Pioneer Merch & Packaging también tiene una entrega programada, pero sin productos detallados.\n- **2026-07-21:** Summit Frozen Foods con productos como Spicy Omlet Flatbread y sandwiches; Pioneer Merch & Packaging con Mug Ceramic Pink/White 12 Count.\n- **2026-07-22:** Coastal Beverage Distribution con bebidas y café en lata; Evergreen Coffee Roasters con 1 Lb Coffee Whole Bean Dec.\n- **2026-07-23:** Evergreen Coffee Roasters con K Cup Decaf y 2 Lbs. Coffee.\n- **2026-07-24:** Pioneer Merch & Packaging con Tumbler Iconic Sipper.\n- **2026-07-25:** Pioneer Merch & Packaging con Premium S/Steel Tumbler y 14 Oz House Destination Mug.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_deliveries": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 4,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "12",
+          "14"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "upcoming_deliveries"
+      },
+      "repeat": 2,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_staffing",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cómo está el personal para los próximos días? ¿Me alcanzan los turnos?",
+      "backend_case_id": "de83534230b1",
+      "first_text_s": 14.13,
+      "first_progress_s": 4.18,
+      "polls": 18,
+      "turn_id": "6a4c99da-3a59-4bb9-a6d1-f283e28d876a",
+      "status": "done",
+      "latency_s": 17.55,
+      "reply": "Resumen: **no puedo decirte si los turnos alcanzan**, porque en los datos de Harborview no hay horario ni horas planificadas cargadas. No existe un plan de turnos para comparar contra la demanda prevista, así que cualquier \"déficit\" o \"sobra\" de personal tendría que inventarse.\n\nLo que sí está calculado es lo que **debería** programarse:\n\n| Día | Transacciones previstas | Horas recomendadas (bajo–medio–alto) |\n|---|---|---|\n| lun 20 | 328–355–436 | 57–62–76 h |\n| mar 21 | 321–355–409 | 56–62–72 h |\n| mié 22 | 310–336–378 | 54–59–66 h |\n| jue 23 | 353–400–460 | 62–70–81 h |\n| vie 24 | 355–417–438 | 62–73–77 h |\n| sáb 25 | 274–289–348 | 48–50–61 h |\n| dom 26 | 355–422–477 | 62–74–83 h |\n\nDónde poner el foco:\n- **Jueves a domingo son los días fuertes**, con hasta ~422 transacciones y hasta ~74 h el domingo 26.\n- **Sábado 25 es el más tranquilo** (~289 transacciones, ~50 h): ahí es donde más fácil se te acumulan horas de sobra si mantienes el mismo ritmo del resto de la semana.\n- La referencia de productividad es **5.72 transacciones por hora de personal**; tu semana del 13–19 rinde6.45, así que estás por encima de la referencia.\n\nDos límites honestos: las horas son por día, **no por franja horaria**, así que no puedo decirte cómo cubrir los picos del aeropuerto; y si me pasas tuprograma real de turnos, sí puedo compararla día por día y decirte dónde sobra y dónde falta.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "strategist",
+          "display_name_es": "Estratega",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 1,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 1
+      },
+      "peers": [
+        "glazed_strategist"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 58,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "staffing"
+      },
+      "repeat": 2,
+      "fast_path": "pass:uncovered"
+    },
+    {
+      "case_id": "intent_promo_list",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué promociones activas tengo ahorita?",
+      "backend_case_id": "f49bab17aea6",
+      "first_text_s": 10.69,
+      "first_progress_s": null,
+      "polls": 12,
+      "turn_id": "43e6f1d1-07cf-4ed8-b592-53f67f5f5472",
+      "status": "done",
+      "latency_s": 11.32,
+      "reply": "No tienes promociones activas ahorita en **Harborview International Airport · Food Court – Full Counter 1**. La promoción **Summer Iced Coffee Week** aparece como **pasada**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_promos": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 1,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "promo_list"
+      },
+      "repeat": 2,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "intent_data_integrity",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Hay datos que no cuadran en el inventario o las ventas?",
+      "backend_case_id": "f0fe42edb08d",
+      "first_text_s": 8.91,
+      "first_progress_s": 15.39,
+      "polls": 37,
+      "turn_id": "0dd4a8f8-908e-4672-acc4-8169da635fd5",
+      "status": "done",
+      "latency_s": 37.09,
+      "reply": "## Sí, hay dos problemas de datos en **Harborview International Airport · Food Court – Full Counter 1**\n\nCentinela revisó la tienda y **no encontró nada más**: no hay duplicados, ni ventas sin stock, ni conteos descuadrados entre inventario y ventas. Los dos hallazgos siguientes son los únicos, y **ambos siguen activos** — ninguno se ha corregido.\n\n**1) El mismo producto registrado con dos formatos de llave**\n\nEl sándwich \"Better For You Breakfast Sandwich\" aparece a veces como `SKU100040` y a veces como `SKU-100040`. Son el mismo producto, no uno nuevo. Lo grave es la consecuencia: esas ventas quedan **sin costo y sin categoría**, y por lo tanto fuera del pedido de reposición.\n\n- **5,173 registros** afectados, hasta el 19 de julio de 2026.\n- Ventas de esta tienda afectadas: **$20,360.04 USD**. El número de $301,950.59 que aparece en el resumen es el **total de toda la cadena**, no solo de tu tienda.\n- Hay otras **206 llaves** con el mismo problema en la cadena, que suman $16,566 USD; cada una por debajo de $10,000, por eso no se detallan una por una.\n\n**2) Códigos de producto que no existen en el maestro**\n\nUn grupo de códigos que empiezan con 7 no corresponde a ningún producto registrado.\n\n- **309 registros y 309 códigos** afectados; el reporte a corporativo incluye20 códigos de ejemplo (de `SKU-700001` a `SKU-706937`).\n- Ventas de esta tienda afectadas: **$223.60 USD**. Los **$14,537.12 USD** del resumen son de nuevo el **total de la cadena**.\n\nEn este caso también falta costo y categoría, así que esas ventas no tienen margen ni entran en la reposición.\n\n**Qué sigue:** en ninguno de los dos casos se puede arreglar de forma automática. Lo que procede es una **tarea de corrección de datos** (emparejar las dos llaves del sándwich) y, en el segundo, **reportar los códigos desconocidos a corporativo**. Ambas son de confianza 1.0 y requieren aprobación de nivel N2; la alternativa de no hacer nada es N0.\n\nUn detalle a tener en cuenta: el reporte del auditor trae una línea sobre las 206 llaves sin desglosar una por una, así que no hay detalle individual de cuáles son. Si necesitas esa lista exacta, se tendría que pedir a corporativo.\n\nNota: estos hallazgos no explican por sí solos la merma de $928.08 de los últimos 7 días ni la venta perdida estimada de $935–$1,620 — ésos vienen de los problemas de de inventario y de quiebre de stock, que son asunto aparte. ¿Quieres que mira alguno de esos?",
+      "error": null,
+      "sanitized_fragments": 1,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "sentinel",
+          "display_name_es": "Centinela",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 1,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 1
+      },
+      "peers": [
+        "glazed_auditor"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 22,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "5,173",
+          "20,360.04",
+          "301,950.59",
+          "16,566",
+          "10,000",
+          "14,537.12",
+          "928.08",
+          "935",
+          "1,620"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "data_integrity"
+      },
+      "repeat": 2,
+      "fast_path": "pass:uncovered"
+    },
+    {
+      "case_id": "intent_transfer_options",
+      "kind": "intent",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Puedo traer de otra sucursal algún producto que me esté faltando?",
+      "backend_case_id": "702fcfca9924",
+      "first_text_s": 22.56,
+      "first_progress_s": 8.3,
+      "polls": 30,
+      "turn_id": "9ff601c3-aaca-4597-b01b-fc386a83998e",
+      "status": "done",
+      "latency_s": 29.84,
+      "reply": "Buenas. Revisé con el enlace de transferencias y la respuesta corta es: **hoy no puedes traer producto de otra sucursal.**\n\n**Por qué**\n\n- Consulté uno por uno los cinco productos que están en riesgo de quedarte sin stock (el sándwich de res, el sándwich vegetal del suroeste, el pan plano con huevo, el sándwich de desayuno \"Better For You\" y el sándwich doble de la casa) y el sistema no encontró **ninguna** opción: en ninguna de las 14 sucursales candidatas se proyecta que sobre producto sin vender de esos. No hay sobrante, ni cantidades, ni costo ni tiempo de traslado que reportar.\n- Al revés, lo único que hay disponible es hacia fuera: tu tienda tiene unas 9 unidades de Cold Foam de chocolate que se proposes enviar a otras siete sucursales, pero eso no te ayuda a lo que te falta.\n- Ojo con las estimaciones: la confianza en estas cuentas de traslado es baja (no hay historial que las respalde), así que yo no basaría una decisión importante solo en ellas.\n\n**Lo que sí importa hoy**\n\nTus problemas grandes no son de surtido ajeno, son de pedido: cuatro productosUEDEN de Summit Frozen Foods (res, vegetal, pan plano y el de desayuno) se Projection agotarse entre el 21 y el 22 de julio, y la entrega más cercana llega el 21. Si no haces nada, se estima que dejarías de vender entre 264 y 345 dólares en cada uno de los primeros tres.\n\nAl revés, sobran las donas: 12 Croiss-Ant Donuts y 6 Bacon Donuts generando417 y 385 dólares de merma en 14 días.\n\n¿Quieres que te proponga formalizar los pedidos urgentes de Summit, o que revisemos primero el producto de desayuno \"Better For You\", que además tiene un problema de registro en el catálogo?",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "liaison",
+          "display_name_es": "Enlace entre sucursales",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 1,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 1
+      },
+      "peers": [
+        "glazed_liaison"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 11,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "264",
+          "345",
+          "12",
+          "385"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "intent": "transfer_options"
+      },
+      "repeat": 2,
+      "fast_path": "pass:complex"
+    },
+    {
+      "case_id": "specialist_past",
+      "kind": "specialist",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cómo nos fue la última vez que decidimos pedir de más antes de un fin de semana?",
+      "backend_case_id": "5d30d8741b43",
+      "first_text_s": 20.1,
+      "first_progress_s": 6.25,
+      "polls": 25,
+      "turn_id": "6b329e34-c331-4975-8f32-16af18ce4187",
+      "status": "done",
+      "latency_s": 24.74,
+      "reply": "No tengo esa experiencia que contar, y quiero ser claro por qué.\n\nEl registro de decisiones de la tienda está vacío: no hay ninguna decisión de pedir producto de más antes de un fin de semana, ni con fecha, ni con resultado medido (ventas, merma o producto sin vender). Así que no puedo darte un \"la última vez salió así\" con números, porque ese antecedente no existe en lo que tengo.\n\nLo único parecido son dos rechazos del 19 de julio, por el mismo motivo: \"prefiero no quedarme corto\" y un evento cercano. Uno fue un pedido de 60 unidades (6 cajas de 10) del Spicy Omlet Flatbread, y el otro fue omitir el pedido de 12 Croiss-Ant Donuts. Ninguno tiene resultado registrado y ninguno era un caso de fin de semana, así que no sirven como precedente.\n\nLo que sí veo hoy, que es distinto pero relacionado:\n- Estamos en domingo. El problema actual no es la falta de producto sino el exceso: 12 Croiss-Ant Donuts con $417 de merma en 14 días (se recibieron 300 unidades en 28 días y se vendieron 126), y 6 Bacon Donuts con $385 de merma (336 recibidas, 77 vendidas).\n- Al revés, hay riesgo real de quedarnos cortos: Angus SteakSandwich, Southwest Veggie Powr Brkfst Sandwich y Spicy Omlet Flatbread tienen la fecha de pedido ya vencida y proyección de quiebre de inventario mañana o pasado mañana.\n\n¿Reviso el plan de pedidos vigente para el próximo fin de semana, o prefieres que primero arreglemos el exceso de donas?",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "past",
+          "display_name_es": "Analista histórico",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 1,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 1
+      },
+      "peers": [
+        "glazed_past"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 15,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "417",
+          "14",
+          "300",
+          "28",
+          "126",
+          "385",
+          "336",
+          "77"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "profile": "glazed_past"
+      },
+      "repeat": 2,
+      "fast_path": "pass:complex"
+    },
+    {
+      "case_id": "specialist_supply",
+      "kind": "specialist",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Qué proveedor ha cumplido peor con sus entregas últimamente?",
+      "backend_case_id": "188886d9a317",
+      "first_text_s": 2.21,
+      "first_progress_s": null,
+      "polls": 14,
+      "turn_id": "d8b32913-5174-4143-ba1f-8c1865de5b32",
+      "status": "done",
+      "latency_s": 13.38,
+      "reply": "**Pioneer Merch & Packaging** es el proveedor con peor cumplimiento en los últimos 180 días en **Harborview International Airport · Food Court – Full Counter 1**:\n\n- **Puntualidad:** 86.3 % (la más baja de los seis proveedores; el mejor es Coastal Beverage Distribution con 94.5 %)\n- **Fill rate (completitud del pedido):** 97.0 % (también el más bajo)\n- **Lead time medio:** 7.21 días, con p90 de 8.0 días — frente a un lead time contratado de 7 días\n- Volumen bajo: solo 73 órdenes recibidas en la ventana\n\nEs decir, es el único proveedor que queda por debajo tanto de su nivel de puntualidad contratado (85.0 %) como del resto de la cadena. Le sigue en puntualidad Summit Frozen Foods con 90.0 %.\n\nMatiz importante: el mal desempeño de Pioneer **no está impacting hoy las ventas**. Los problemas urgentes de la semana vienen de **Summit Frozen Foods** (90.0 % puntual, lead time medio 2.16 días vs. 2 contratados), que trae los riesgos de quiebre de stock más severos — las 5 líneas principales del plan de pedidos son de ese proveedor, todas con fecha de entrega el 2026-07-21 y fecha límite de pedido ya vencida. Los ~\\US$1,000 de ventas perdidas por semana están concentrados ahí, no en Pioneer.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1,
+        "get_supplier_performance": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 16,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "180",
+          "86.3",
+          "94.5",
+          "97.0",
+          "7.21",
+          "8.0",
+          "73",
+          "85.0",
+          "90.0",
+          "90.0",
+          "2.16",
+          "1,000"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "profile": "glazed_supply"
+      },
+      "repeat": 2,
+      "fast_path": "defer:no_intent"
+    },
+    {
+      "case_id": "specialist_strategist",
+      "kind": "specialist",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cuántas transacciones esperas para el fin de semana y en qué horas habrá más gente?",
+      "backend_case_id": "bf185b4f151c",
+      "first_text_s": 5.63,
+      "first_progress_s": null,
+      "polls": 8,
+      "turn_id": "e2ac305b-6ba5-4eed-a127-335d89e5e804",
+      "status": "done",
+      "latency_s": 7.3,
+      "reply": "**Fin de semana del25 y 26 de julio** en Harborview International Airport · Food Court – Full Counter 1 (prON \"flow-weekday-8w\", con origen el 19 de julio de 2026):\n\n- **Sábado 2026-07-25:** transacciones p10 274.0, p50 288.5, p90 348.0. Afluencia p10 2,707.4, p50 2,905.0, p90 3,167.4. Ticket medio p10 8.21, p50 8.84, p90 9.58 USD.\n- **Domingo 2026-07-26:** transacciones p10 354.7, p50 421.5, p90 476.7. Afluencia p10 3,358.0, p50 3,581.5, p90 4,022.6. Ticket medio p10 7.89, p50 8.38, p90 9.03 USD.\n\nEl domingo es el día fuerte: casi la mitad más de transacciones que el sábado en el valor central.\n\nSobre las horas: **no hay dato por hora**. Los datos son únicamente diarios, así que no puedo decir a qué hora habrá más gente dentro del día; solo puedo afirmar que el domingo espera más carga que el sábado. Si necesitaIMAL dimensionar personal, el dato disponible son horas recomendadas por día completo, no por turno.",
+      "error": null,
+      "sanitized_fragments": 1,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 4,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1,
+        "get_outlook": 1,
+        "forecast_daily_flow": 2
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [
+          "garbled"
+        ],
+        "internal_names": [],
+        "numbers_checked": 22,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "26",
+          "19",
+          "2026",
+          "274.0",
+          "288.5",
+          "348.0",
+          "2,707.4",
+          "2,905.0",
+          "3,167.4",
+          "8.21",
+          "8.84",
+          "9.58",
+          "354.7",
+          "421.5",
+          "476.7",
+          "3,358.0",
+          "3,581.5",
+          "4,022.6",
+          "7.89",
+          "8.38",
+          "9.03"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": [
+          "del25"
+        ]
+      },
+      "expect": {
+        "profile": "glazed_strategist"
+      },
+      "repeat": 2,
+      "fast_path": "defer:no_intent"
+    },
+    {
+      "case_id": "multi_specialist",
+      "kind": "multi_specialist",
+      "turn_index": 0,
+      "burst": false,
+      "question": "Prepárame el plan de mañana: qué pedir, qué está por caducar y si me alcanza el personal para atenderlo.",
+      "backend_case_id": "390e3ae7ae28",
+      "first_text_s": 2.01,
+      "first_progress_s": 5.24,
+      "polls": 34,
+      "turn_id": "05fe0361-dd3d-4f50-8d33-b6b6a3e12c7e",
+      "status": "done",
+      "latency_s": 34.13,
+      "reply": "# Plan de mañana · lunes 20 de julio — Harborview International Airport · Food Court – Full Counter 1\n\n## 1. Qué pedir\n\n**Donuts (Northfield Bakery Partners, llega mañana): saltar el pedido**\n| Producto | Acción | Ganancia | vs. no hacer nada | Qué tan seguro |\n|---|---|---|---|---|\n| 12 Croiss-Ant Donuts | Saltar el pedido | **+$58.90** | No hacer nada = **-$88.38** de merma por ciclo | Bastante seguro |\n| 6 Bacon Donuts | Saltar el pedido | **+$35.52** | No hacer nada = **-$64.01** de merma por ciclo | Bastante seguro |\n\nVienen de sobreexceso: 300 unidades recibidas contra 126 vendidas en 28 días (Croiss-Ant) y 336 contra 77 (Bacon). Si no los saltas, esos dos productos suman $152 de merma por ciclo. **Dudas a tener en cuenta:** saltar un pedido puede dejarte sin producto antes de la siguiente entrega, y no está confirmado que el proveedor acepte menos de una caja completa.\n\n**Sandwiches congelados (Summit Frozen Foods): aquí sí hay que pedir, pero Summit NO entrega el lunes; su próxima entrega es el martes 21.** Las 11 líneas del plan ya tienen la fecha de pedido vencida. Las principales:\n\n| Producto | Cantidad | Costo | Se agota | Riesgo sin pedir | Seguro |\n|---|---|---|---|---|---|\n| Angus SteakSandwich | 150 u (15 cajas) | $130.50 | martes 21 | 100% | Poco |\n| Southwest Veggie Powr Brkfst | 70 u (7 cajas) | $82.60 | martes 21 | 100% | Poco |\n| Spicy Omlet Flatbread | 60 u (6 cajas) | $97.20 | martes 22 | 100% | Poco |\n| Better For You Breakfast Sandwich | 40 u (4 cajas) | $74.40 | martes 22 | 100% | Poco |\n| House Dblcssg Sand | 10 u (1 caja) | $19.70 | martes 23 | 72% | Poco |\n\nCuatro de estos ya **están agotados hoy** y came a la mitad de los últimos 28 días faltaron, así que la demanda real probablemente es mayor que la registrada. Si no pides, dejas de vender entre $1,083 y $1,226. Si pides, te puede quedar un sobrante de $11.80 a $15.07 por línea. Aquí **estoy poco seguro** y el tiempo ya venció: hay que talking con Summit hoy mismo.\n\n## 2. Qué está por caducar\n\nMañana se estima tirar **$6.90**:10 unidades de **Bacon Roll Up**.\n\nEn los siguientes dos días el total ronda **$27 a $56**, con los lotes más pesados: Bagel W Butter (36 u.), Fall Lip Balm Pumpkin (6 u., $10.56), 8 Count Mini Chocolate Chip Cookie (10 u., $6.17) y Blueberry Coffee Cake Muffin (7 u.). Las fechas de estos lotes son estimadas por antigüedad, no medidas.\n\nAdemás, ya se está tirando producto **todos los días al cierre** por descarte de perecederos: 12 Croiss-Ant Donuts (8 u.), 6 Bacon Donuts (7 u.), 4 Donut Holes (9 u.), 6 Donuts (4 u.), Donut Holes 5 Count (7 u.) y 8 Donut Holes (3 u.). Eso no es quiebre: es producto que llega y no se vende.\n\n## 3. Personal\n\nElKas se **sí alcanza, pero justo.**\n- Lo recomendado para mañana: entre **57.4 y 76.2 horas**, con un punto medio de **62 horas**.\n- Lo que se usó los últimos dos lunes: **58.4 horas** (434 transacciones el 6 de julio; 350 el 13).\n- Con58 horas quedarías apenas en el nivel de servicio de un lunes normal. Si mañana se mueve como el lunes 6, te vas a quedar corto.\n- **Lo que no puedo decirte:** no hay horario cargado en el sistema, así que no puedo comparar contra lo que ya tienes planeado. El dato es diario, no por hora.\n\nMi recomendación: programa alrededor de **62 horas** y deja margen para subir en la mañana si la fila se mueve.\n\n## 4. Dos cosas que hay que arreglar antes de que contamine el plan\n\n1. El código **SKU-100040 no es un producto nuevo**: es \"SKU100040\" escrito con otro formato. Si no se corrige el maestro, hay **$301,950.59** de exposición mal atribuida.\n2. Hay códigos **huérfanos** (formato ) que no existen en el maestro, por **$14,537.12**.\n\n¿Quieres que proponga formalmente saltar los dos pedidos de donuts y revisar con Summit lo de los sandwiches? Las decisiones las tomas tú; solo hace falta que me digas.",
+      "error": null,
+      "sanitized_fragments": 2,
+      "rewritten": false,
+      "progress": [
+        {
+          "agent_id": "supply",
+          "display_name_es": "Analista de abastecimiento",
+          "state": "done"
+        },
+        {
+          "agent_id": "strategist",
+          "display_name_es": "Estratega",
+          "state": "done"
+        }
+      ],
+      "usage": null,
+      "tool_calls": 3,
+      "peer_asks": 2,
+      "tools": {
+        "get_briefing": 1,
+        "ask_peer": 2
+      },
+      "peers": [
+        "glazed_supply",
+        "glazed_strategist"
+      ],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {
+        "multi_peer": true
+      },
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 87,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "152",
+          "70",
+          "82.60",
+          "60",
+          "97.20",
+          "22",
+          "40",
+          "74.40",
+          "22",
+          "19.70",
+          "23",
+          "72",
+          "1,083",
+          "1,226",
+          "11.80",
+          "15.07",
+          "6.90",
+          "56",
+          "10.56",
+          "6.17",
+          "301,950.59",
+          "14,537.12"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "min_peer_asks": 2
+      },
+      "repeat": 2,
+      "fast_path": "pass:complex"
+    },
+    {
+      "case_id": "proposal",
+      "kind": "proposal",
+      "turn_index": 0,
+      "burst": false,
+      "question": "Propón el pedido para el producto con más riesgo de agotarse y déjalo pendiente de mi aprobación.",
+      "backend_case_id": "dd6caa5b9206",
+      "first_text_s": 1.94,
+      "first_progress_s": null,
+      "polls": 12,
+      "turn_id": "c2e2c0f8-21a0-4940-b5d4-ff700ead6e32",
+      "status": "done",
+      "latency_s": 11.37,
+      "reply": "Propuesta lista y **pendiente de tu aprobación** (nada se ha enviado al proveedor).\n\n**Producto con más riesgo de agotarse: Angus Steak Sandwich** (SKU-100161)\n\n- Inventario de cierre hoy: **0 unidades**\n- Riesgo de quiebre sin pedido: **100%**\n- Quiebre proyectado: **21 de julio** — la fecha límite del pedido ya pasó, la entrega más temprana de Summit Frozen Foods es el 21.\n- Demanda: 61.79 unidades/día (últimos 28 días)\n\n**Lo que se propone:** pedir **150 unidades (15 cajas)** a Summit Frozen Foods.\n\n| | Con pedido | Sin hacer nada |\n|---|---|---|\n| Beneficio neto estimado | **+207.66 USD** (rango 183.21–225.94) | 0 USD |\n| Costo | 130.50 USD | — |\n| Pérdida | ~12.35 USD de merma | **344.74 USD** en ventas perdidas |\n\nDos advertencias del análisis que conviene que tengas presentes: la confianza de este pronóstico es **baja** (0.29), porque el 52% de los días ya venía con quiebres y la demanda se corrigió al alza; y el proveedor se atrasa en el 10% de sus pedidos, por lo que el propio modelo ya descontó un día de retraso. Aun así, la brecha entre +207.66 y 0 es amplia.\n\nAdemás hay un problema de datos relacionado que **no** afecta a esta propuesta: el SKU-100040 aparece duplicado en el maestro de productos (exposición de 301,950.59 USD). Te lo menciono solo por si quieres que alguien lo revise.\n\n¿Quieres que revise las otras dos Referential de riesgo de quiebre (Southwest Veggie y Spicy Omlet), que también están en cero o por agotarse?",
+      "error": null,
+      "sanitized_fragments": 1,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 2,
+      "peer_asks": 0,
+      "tools": {
+        "get_briefing": 1,
+        "propose_action": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {
+        "proposal_pending": true
+      },
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 21,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "100",
+          "21",
+          "21",
+          "61.79",
+          "28",
+          "150",
+          "15",
+          "207.66",
+          "183.21",
+          "225.94",
+          "130.50",
+          "12.35",
+          "344.74",
+          "0.29",
+          "52",
+          "207.66",
+          "301,950.59"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "proposal": true
+      },
+      "repeat": 2,
+      "fast_path": "pass:action_request"
+    },
+    {
+      "case_id": "unsupported",
+      "kind": "unsupported",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cuánto vendió la tienda de la competencia de enfrente la semana pasada?",
+      "backend_case_id": "96e48294fb25",
+      "first_text_s": 4.39,
+      "first_progress_s": null,
+      "polls": 9,
+      "turn_id": "fc6d109f-4e7d-46db-98de-a07226c7c144",
+      "status": "done",
+      "latency_s": 8.29,
+      "reply": "No tengo ese dato. Los sistemas a los que tengo acceso solo cubren **nuestra** tienda — **Harborview International Airport · Food Court – Full Counter 1** — con datos de ventas propias, inventario, proveedores y mermas. No hay ninguna fuente que registre las ventas de negocios vecinos o competidores, así que no puedo decirte cuánto vendió la tienda de enfrente la semana pasada, ni siquiera de forma aproximada. No lo voy a estimar.\n\nLo que sí puedo mostrarte es nuestro contexto comparable de la última semana (2026-07-13 a 2026-07-19):\n\n| Indicador | Valor |\n|---|---|\n| Venta neta | 22,900.91 USD |\n| Transacciones | 2,713 |\n| Merma | 928.08 USD |\n| Ventas perdidas (rango) | 934.71 – 1,398.28 – 1,620.21 USD (bajo / medio / alto) |\n| Transacciones por hora de personal | 6.45 |\n\nSi necesitas comparar desempeño con la competencia, habría que obtener esos datos de otra fuente (por ejemplo, un informe de investigación de mercado del operador o del landlord del centro de comidas), ya que no forman parte de los sistemas que manejo.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {
+        "refusal": true
+      },
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 8,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "22,900.91",
+          "2,713",
+          "928.08",
+          "934.71",
+          "1,398.28",
+          "1,620.21",
+          "6.45"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "refusal": true
+      },
+      "repeat": 2,
+      "fast_path": "defer:no_intent"
+    },
+    {
+      "case_id": "follow_up",
+      "kind": "follow_up",
+      "turn_index": 0,
+      "burst": false,
+      "question": "¿Cuáles son los productos con más riesgo de agotarse esta semana?",
+      "backend_case_id": "a1385dbacfff",
+      "first_text_s": 12.33,
+      "first_progress_s": null,
+      "polls": 14,
+      "turn_id": "41231351-f2e5-4394-8301-11c566a2549f",
+      "status": "done",
+      "latency_s": 13.37,
+      "reply": "- **Angus SteakSandwich**, **Southwest Veggie Brkfst Sandwich** y **Better For You Breakfast Sandwich** son los de mayor riesgo: ya se agotaron hoy y tienen la mayor venta prevista para la semana, de **161.38**, **63.74** y **51.31 unidades**, respectivamente. Les llegan **100**, **40** y **40 unidades mañana**.\n- Entre los que aún tienen producto, **Oatmeal W Brown Sugar And Fruit** y **2 Mffin 6Pc Hb** tienen solo **0.7 días** de cobertura. Les llegan **24 unidades mañana**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_inventory_status": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 10,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "161.38",
+          "63.74",
+          "51.31",
+          "100",
+          "40",
+          "40",
+          "0.7",
+          "24"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {},
+      "repeat": 2,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "follow_up",
+      "kind": "follow_up",
+      "turn_index": 1,
+      "burst": false,
+      "question": "¿Y cuál de esos es el más urgente?",
+      "backend_case_id": "a1385dbacfff",
+      "first_text_s": 10.49,
+      "first_progress_s": null,
+      "polls": 16,
+      "turn_id": "f78dd59a-2150-4abe-b71e-d92f96bd2ffb",
+      "status": "done",
+      "latency_s": 15.39,
+      "reply": "**Angus SteakSandwich** es el más urgente. Ya está en cero hoy, el riesgo de agotarse sin pedido es del 100%, y la venta perdida sería de unos **$345** (rango $316–$374).\n\nAhora, una corrección a lo que te dije antes: **no les llega mañana**. El proveedor es Summit Frozen Foods, cuya próxima entrega es el **martes 21**. Para esas tres referencias la fecha de entrega es 2026-07-21, no el lunes20 — así que les quedan dos días sin producto, no uno.\n\nEl orden por urgencia real (fecha de quiebre proyectada):\n\n| Producto | Estado hoy | Se agota | Venta perdida si no pides |\n|---|---|---|---|\n| Angus SteakSandwich | 0 | 21-jul | $345 |\n| Southwest Veggie Powr Brkfst | 0 | 21-jul | $302 |\n| Better For You Breakfast | 0 | 22-jul | $172 |\n| Spicy Omlet Flatbread | 55 u. | 22-jul | $264 |\n\nLos tres primeros ya están agotados y son los que más duele. Nota: el pedido de las 11 líneas del plan tiene la fecha de corte ya vencida (pedidos con fecha límite vencida), así que hay que confirmar con Summit si todavía accepts el pedido para entrega el martes. ¿Te propongo el pedido del plan para el Angus ($207 netos) o prefieres revisar las líneas primero?",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_briefing": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 15,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "100",
+          "345",
+          "316",
+          "374",
+          "21",
+          "345",
+          "302",
+          "172",
+          "55",
+          "264",
+          "11",
+          "207"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {},
+      "repeat": 2,
+      "fast_path": "pass:depends_on_history"
+    },
+    {
+      "case_id": "follow_up",
+      "kind": "follow_up",
+      "turn_index": 2,
+      "burst": false,
+      "question": "¿Cuánto debería pedir de ese y cuándo llegaría?",
+      "backend_case_id": "a1385dbacfff",
+      "first_text_s": 7.67,
+      "first_progress_s": null,
+      "polls": 12,
+      "turn_id": "ff32ffea-0923-4765-8039-5c63b9a3aca5",
+      "status": "done",
+      "latency_s": 11.37,
+      "reply": "Del **Angus SteakSandwich**:\n\n- **Cantidad:** 150 unidades (15 cajas de 10), tal como está en el plan de pedido.\n- **Llegada:** el **martes 21 de julio**, con Summit Frozen Foods (plazo de 2 días).\n- **Costo estimado:** $130.50.\n\nVentaja esperada frente a no hacer nada: **$207.66 netos** (te ahorras unos $338 de venta perdida y dejas ~$12 de merma).\n\nDos avisos honestos:\n- **La fecha de corte ya venció** (pedidos con fecha límite vencida). No hay fecha límite guardada para esta línea, así que hay que confirmar con Summit si todavía entra el pedido para entrega el martes. Si no entra, el producto llega más tarde y el beneficio baja.\n- **La confianza es baja (0.29)** — de cada10hind guesses, fallamos. Motivo: el52% de los últimos28 días hubo quiebres, así que la demanda real está corregida al alza y podría sobreestimarse; además el proveedor se atrasa en 10% de sus pedidos, y eso ya está descontado en el cálculo.\n\nEl pedido no está por debajo del mínimo, así que no hay aviso de pedido mínimo. ¿Lo propongo?",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 0,
+      "peer_asks": 0,
+      "tools": {},
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": true,
+      "checks": {},
+      "quality": {
+        "flags": [
+          "garbled"
+        ],
+        "internal_names": [],
+        "numbers_checked": 11,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "150",
+          "15",
+          "21",
+          "130.50",
+          "207.66",
+          "338",
+          "12",
+          "0.29"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": [
+          "el52"
+        ]
+      },
+      "expect": {},
+      "repeat": 2,
+      "fast_path": "pass:depends_on_history"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 0,
+      "burst": true,
+      "question": "¿Cuánto vendimos ayer?",
+      "backend_case_id": "0a87925d5bca",
+      "first_text_s": 4.33,
+      "first_progress_s": null,
+      "polls": 6,
+      "turn_id": "424f03a3-bd55-48fd-a388-1904b2faf746",
+      "status": "done",
+      "latency_s": 5.42,
+      "reply": "Los resultados no indican cuánto vendimos ayer; solo muestran una venta neta de 22,900.91 USD con corte al 2026-07-19.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 1,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "22,900.91"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 2,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 1,
+      "burst": true,
+      "question": "¿Cuántas alertas abiertas tengo?",
+      "backend_case_id": "07432dbe9e3f",
+      "first_text_s": 3.86,
+      "first_progress_s": null,
+      "polls": 5,
+      "turn_id": "9013fcc1-8b9a-4416-86a6-21a2b393616b",
+      "status": "done",
+      "latency_s": 4.38,
+      "reply": "No se devolvió el número total de alertas abiertas.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_issues": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 0,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 2,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 2,
+      "burst": true,
+      "question": "¿Qué entrega llega primero esta semana?",
+      "backend_case_id": "f65f6148b057",
+      "first_text_s": 3.81,
+      "first_progress_s": null,
+      "polls": 6,
+      "turn_id": "170f0832-5cae-4be6-8dc8-82f922d44080",
+      "status": "done",
+      "latency_s": 5.43,
+      "reply": "La próxima entrega llega el **20 de julio de 2026**. Ese día se esperan envíos de **Northfield Bakery Partners, Coastal Beverage Distribution, Summit Frozen Foods, Riverbend Fresh & Dairy, Evergreen Coffee Roasters y Pioneer Merch & Packaging**.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_deliveries": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 2,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "20",
+          "2026"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 2,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 3,
+      "burst": true,
+      "question": "¿Hay alguna promoción vigente?",
+      "backend_case_id": "ec1924af77ff",
+      "first_text_s": 3.01,
+      "first_progress_s": null,
+      "polls": 5,
+      "turn_id": "27889353-dff1-4a7c-8c32-08a3e34f1b9a",
+      "status": "done",
+      "latency_s": 4.38,
+      "reply": "No. La promoción **Summer Iced Coffee Week** aparece como **pasada**, aunque su fecha de terminación figura como **2026-07-19**. No se reporta ninguna promoción vigente.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_promos": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 0,
+        "untraceable_numbers": [],
+        "unverified_numbers": [],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 2,
+      "fast_path": "composite"
+    },
+    {
+      "case_id": "burst",
+      "kind": "burst",
+      "turn_index": 4,
+      "burst": true,
+      "question": "¿Cuál es el producto que más se vende?",
+      "backend_case_id": "c7d26eccd83f",
+      "first_text_s": 9.56,
+      "first_progress_s": null,
+      "polls": 16,
+      "turn_id": "49b19b12-1f01-44c0-85e5-837b561e8add",
+      "status": "done",
+      "latency_s": 15.63,
+      "reply": "**Store: Harborview International Airport · Food Court – Full Counter 1** (corte al 19/07/2026)\n\n**No tengo el dato de \"producto más vendido\".** El panorama de hoy no incluye un ranking de ventas por producto: los números de venta por artículo que trae son solo de demanda media diaria de los productos mencionados en los problemas activos, no de todo el catálogo.\n\nLo único disponível como referencia:\n\n| Producto | Demanda media diaria (28 días) |\n|---|---|\n| Angus SteakSandwich | 61,79 unidades/día |\n| Spicy Omlet Flatbread | 42,75 unidades/día |\n| Southwest Veggie Powr Brkfst Sandwich | 26,39 unidades/día |\n\nEsto solo cubre los productos con problemas activos (agosto de resorte), así que **no puedo afirmar cuál es el más vendido de la tienda** — sería inventar el dato. Los productos con mayor demanda observada, de todos modos, están entre los que tienen problemas de abasto ahora mismo.\n\nAdemás, dos avisos sobre calidad de datos que afectan cualquier conteo por producto:\n- El código SKU-100040 aparece duplicado bajo otro formato (es \"Better For You Breakfast Sandwich\"); la exposición asociada es de 301.950,59 USD, así que su venta puede estar repartida en dos registros.\n- Hay códigos de producto que no existen en el maestro de productos, con una exposición de 14.537,12 USD.\n\n**Resumen de la semana (13/07–19/07):** venta neta 22.900,91 USD, 2.713 transacciones, 6,45 transacciones por hora de personal. Merma928,08 USD. Ventas perdidas estimadas: entre 934,71 y 1.620,21 USD (punto medio 1.398,28 USD).\n\nSi necesitas el ranking real de ventas por producto, habría que consultar el detalle de ventas por artículo, que no está en esta vista.",
+      "error": null,
+      "sanitized_fragments": 0,
+      "rewritten": false,
+      "progress": [],
+      "usage": null,
+      "tool_calls": 1,
+      "peer_asks": 0,
+      "tools": {
+        "get_snapshot": 1
+      },
+      "peers": [],
+      "policy_denials": 0,
+      "results_complete": false,
+      "checks": {},
+      "quality": {
+        "flags": [],
+        "internal_names": [],
+        "numbers_checked": 20,
+        "untraceable_numbers": [],
+        "unverified_numbers": [
+          "19",
+          "2026",
+          "28",
+          "61",
+          "42",
+          "26",
+          "301.950",
+          "14.537",
+          "13",
+          "19",
+          "22.900",
+          "2.713",
+          "934",
+          "1.620",
+          "1.398"
+        ],
+        "sources_complete": false,
+        "garbled_fragments": []
+      },
+      "expect": {
+        "concurrent": true
+      },
+      "repeat": 2,
+      "fast_path": "defer:no_intent"
+    }
+  ],
+  "repeat": 3,
+  "aggregate": {
+    "turns": 75,
+    "failed": 0,
+    "failure_rate": 0.0,
+    "latency_p50_s": 10.33,
+    "latency_p95_s": 40.05,
+    "latency_max_s": 51.56,
+    "first_text_turns": 75,
+    "first_text_p50_s": 4.86,
+    "first_text_p95_s": 31.26,
+    "tool_calls_total": 101,
+    "peer_asks_total": 19,
+    "flag_counts": {
+      "garbled": 11
+    },
+    "garbled_fragments_total": 16,
+    "garbled_turns": 11,
+    "burst": {
+      "turns": 15,
+      "failed": 0,
+      "latency_max_s": 15.63,
+      "latency_p50_s": 6.61
+    },
+    "paths": {
+      "composite": {
+        "turns": 34,
+        "latency_p50_s": 6.25,
+        "first_text_p50_s": 4.54
+      },
+      "other": {
+        "turns": 41,
+        "latency_p50_s": 15.63,
+        "first_text_p50_s": 5.63
+      },
+      "unknown": {
+        "turns": 0,
+        "latency_p50_s": null,
+        "first_text_p50_s": null
+      }
+    }
+  },
+  "llm_calls_estimate": 233,
+  "finished_at": "20261015T072623Z"
+}
