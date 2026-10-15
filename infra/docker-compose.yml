@@ -41,6 +41,10 @@ x-core: &core
     AGENT_CORE_ADDON__SYSTEM_ONE_ROUTER__API_KEY_ENV: JEV_API_KEY
     AGENT_CORE_ADDON__SYSTEM_ONE_ROUTER__THRESHOLD: "0.5"
     JEV_API_KEY: ${JEV_API_KEY:-}
+    # P11: stream each manager turn's reply (routed turns and intent plans included) to Core's SSE feed as it is
+    # written, so the backend reports first-text latency and a partial reply. Peer turns never stream. ON by default;
+    # .env AGENT_CORE_STREAM_REPLIES=false turns it off with a recreate of core and core-peer-worker (no drain).
+    AGENT_CORE_STREAM_REPLIES: ${AGENT_CORE_STREAM_REPLIES:-true}
   depends_on:
     db:
       condition: service_healthy

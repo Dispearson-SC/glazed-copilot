@@ -167,6 +167,11 @@ for first-text latency (`GLAZED_CORE_STREAM`, on by default; `false` = polling o
 - **Streams are capped**: the backend keeps at most `GLAZED_CORE_MAX_STREAMS` (default 16) SSE streams open; a turn
   past the cap is polled as before, so streams never take the connections sending and polling need. A partial reply
   is shown only when the final reply's quality guard would keep it.
+- **Reply streaming (P11)**: `AGENT_CORE_STREAM_REPLIES` defaults to `true` in the compose file, so the Core puts each
+  manager turn's reply on the SSE feed as it is written (routed turns and intent plans included; peer turns never).
+  Without it the feed carries only progress and `first_text` stays empty. When an intent plan's compose is cut and
+  the turn falls back, the Core takes the draft back (one empty chunk) and the manager's partial reply is cleared.
+  Off: `AGENT_CORE_STREAM_REPLIES=false` in `.env`, recreate `core` and `core-peer-worker`; no drain either way.
 
 What the router did, and as whom (Agent-Core `docs/OPERATIONS.md` has more):
 
