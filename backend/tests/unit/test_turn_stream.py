@@ -523,7 +523,9 @@ def test_a_stream_opened_before_the_core_knows_the_turn_is_retried_briefly_on_40
     assert frames == [("delta", {"turn_id": "t1", "text": "Hola"}), ("end", {})]
     assert seen == ["/turns/t1/events"] * 3
     assert sleeps == list(AgentCoreHttp.STREAM_OPEN_RETRY_DELAYS_S[:2])
-    assert sum(AgentCoreHttp.STREAM_OPEN_RETRY_DELAYS_S) <= 2.0, "a short wait, then polling"
+    # L24: the route step (800 ms router deadline) and the queue pick-up run before the turn exists;
+    # a window of about 1 s missed it after a restart and the whole turn was shown only when done.
+    assert 2.5 <= sum(AgentCoreHttp.STREAM_OPEN_RETRY_DELAYS_S) <= 3.5, "a short wait, then polling"
 
 
 def test_a_turn_still_unknown_after_the_retries_breaks_the_stream_and_other_errors_never_retry():

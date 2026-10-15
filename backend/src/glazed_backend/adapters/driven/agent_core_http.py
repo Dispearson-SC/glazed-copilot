@@ -94,7 +94,9 @@ class AgentCoreHttp:
     # Right after POST /turns the Core may not know the turn yet (its route step runs before the turn exists), so a
     # 404 on the events route is retried after each of these waits before the turn falls back to polling (L18: without
     # it every stream of the phase5 battery was refused and first_text was never measured). Other errors never retry.
-    STREAM_OPEN_RETRY_DELAYS_S: tuple[float, ...] = (0.15, 0.3, 0.6)
+    # About 3 s in all (L24): the route step (800 ms router deadline) and the queue pick-up come first, and a 1 s
+    # window missed them after a restart, so the whole turn was shown only when it finished.
+    STREAM_OPEN_RETRY_DELAYS_S: tuple[float, ...] = (0.15, 0.3, 0.6, 1.0, 1.0)
 
     def stream_turn(self, turn_id: str, store_id: str) -> Iterator[tuple[str, dict[str, Any]]]:
         """The turn's Server-Sent Events as (event, data) pairs, until the server closes the stream. Comments
