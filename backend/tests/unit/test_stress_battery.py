@@ -252,3 +252,52 @@ def test_aggregate_and_compare_report_first_text_latency():
     assert cmp["aggregate"]["first_text_p50_s"] == {"before": None, "after": 2.0, "delta": None}
     md = battery.render_markdown({"label": "a", "turns": turns, "aggregate": agg})
     assert "first text p50 2 s" in md
+
+
+# ---- garbled fragments (P12) ----
+
+
+@pytest.mark.parametrize(("reply", "fragment"), [
+    ("Las ventas de hoyusted van bien.", "hoyusted"),
+    ("Tienes que pedir en1 hora la harina.", "en1"),
+    ("Hoy vendiste 1,200 piezas and la merma bajó.", "and"),
+    ("La merma bajó，pero la venta perdida subió.", "，"),
+    ("**Ventas**: 1,200\n**: merma 30", "**:"),
+    ("Pide dela harina que falta.", "dela"),
+])
+def test_garbled_fragments_are_found_in_a_spanish_reply(reply, fragment):
+    found = battery.garbled_fragments(reply)
+    assert fragment in found
+    q = battery.quality(reply, ["1200 30"], "¿cómo vamos?")
+    assert "garbled" in q["flags"] and fragment in q["garbled_fragments"]
+
+
+@pytest.mark.parametrize("reply", [
+    "Hoy vendiste 1,200 piezas y la merma bajó a 30.",
+    "**Ventas:** 1,200 piezas. **Merma:** 30 piezas.",
+    "Te sugiero pedir 12 charolas para el sábado; el proveedor entrega el lunes.",
+    "Revisa el SKU S030 y la sucursal Centro.",
+    "Paraguas, contraseña y sobremesa son palabras normales.",
+    "Porque la tienda contiene media charola de más; ellas y los demás lo saben.",
+    "Pide 10 de Better For You Breakfast Sandwich y de Oatmeal W Brown Sugar And Fruit.",
+])
+def test_a_clean_spanish_reply_has_no_garbled_fragments(reply):
+    assert battery.garbled_fragments(reply) == []
+    assert "garbled" not in battery.quality(reply, ["1200 30 12"], "")["flags"]
+
+
+def test_garbled_fragments_are_counted_per_turn_in_aggregates_and_compare():
+    def turn(case, fragments):
+        return {"case_id": case, "turn_index": 0, "status": "done", "latency_s": 1.0,
+                "quality": {"flags": ["garbled"] if fragments else [], "garbled_fragments": fragments}}
+
+    before_turns = [turn("a", ["hoyusted", "and"]), turn("b", [])]
+    after_turns = [turn("a", []), turn("b", ["，"])]
+    before = {"label": "shadow", "turns": before_turns, "aggregate": battery.aggregate(before_turns)}
+    after = {"label": "on", "turns": after_turns, "aggregate": battery.aggregate(after_turns)}
+    assert before["aggregate"]["garbled_fragments_total"] == 2
+    assert before["aggregate"]["garbled_turns"] == 1
+    cmp = battery.compare(before, after)
+    assert cmp["aggregate"]["garbled_fragments_total"] == {"before": 2, "after": 1, "delta": -1}
+    assert "garbled fragments" in battery.render_markdown(after)
+    assert "garbled_fragments_total" in battery.render_compare_markdown(cmp)

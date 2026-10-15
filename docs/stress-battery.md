@@ -23,7 +23,8 @@ expectation checks (`proposal_pending`, `refusal`, `multi_peer`) and quality fla
 | flag | meaning |
 |---|---|
 | `think_tags` | `<think>` tags leaked into the reply |
-| `foreign_script` / `garbled` | non-Latin script characters or replacement characters |
+| `foreign_script` | non-Latin script characters |
+| `garbled` | replacement characters, or garbled fragments (P12): a preposition glued to an article (`dela`, `enel`), `hoy`/`usted` glued to a word (`hoyusted`), a word glued to a number (`en1`), lower-case English function words inside a Spanish reply (`and`, `the`; capitalised product names do not count), full-width punctuation (`，`) and markdown debris (`**:` with nothing before it, a lone `**` or `#`). Each turn's `quality.garbled_fragments` lists them; the aggregates add `garbled_fragments_total` and `garbled_turns`, and `compare` shows both |
 | `non_spanish` | English stopwords dominate |
 | `internal_names` | snake_case identifiers (agents, tools, fields) or words like orchestrator/peer/backend; two Spanish function words a model joined with `_` (`de_no`) are a typo, not a name |
 | `untraceable_numbers` | a number (>10 or decimal) absent from the tool results and peer answers of this turn AND the earlier turns of the same conversation (a follow-up repeats figures it already fetched) |

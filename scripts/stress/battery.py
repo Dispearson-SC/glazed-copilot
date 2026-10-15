@@ -138,6 +138,43 @@ def _traceable(token: str, values: list[float]) -> bool:
     return False
 
 
+# ---- garbled fragments (P12): text a model mangled ----
+
+# Glued words. Spanish has many real words made of two frequent ones (porque, contiene, media, demás, ellas), so
+# only pairs that are never a word count: a preposition run into an article (`dela`, `enel`, `conlos`), and `hoy` or
+# `usted` run into another word (`hoyusted`, `ustedtiene`).
+_GLUED_PAIR = re.compile(
+    r"\b(?:de|en|con|por|para|a|que|y)(?:el|la|los|las)\b|\bhoy[a-záéíóúñü]{3,}|[a-záéíóúñü]{2,}usted(?:es)?\b|"
+    r"\busted(?:es)?[a-záéíóúñü]{3,}")
+_REAL_WORDS = frozenset({"ella", "ellas", "yla", "alas", "ala", "hoyos", "hoyo", "hoya"})  # real words the pattern hits
+_GLUED_DIGIT = re.compile(r"\b(?:a|al|con|de|del|el|en|la|las|los|para|por|un|una|y)\d+[\w.,]*", re.IGNORECASE)
+# English function words that do not exist in Spanish (so `no`, `a` and `es` are not among them), written in lower
+# case: product names are English but capitalised ("Better For You Breakfast Sandwich").
+_STRAY_EN = frozenset({"the", "and", "with", "which", "however", "also", "will", "should", "would", "your", "you",
+                       "this", "that", "there", "here", "about", "from", "into", "but", "or", "of", "is", "are",
+                       "today", "sales", "order", "orders", "store"})
+_FULL_WIDTH = re.compile(r"[，。：；！？（）、【】「」]")
+_MD_DEBRIS = re.compile(r"(?m)(?:^|\s)\*\*\s*:|\*{3,}\s*$|^\s*\*\*\s*$|^#{1,6}\s*$")
+
+
+def garbled_fragments(reply: str) -> list[str]:
+    """Fragments of a Spanish reply a model mangled: words glued together (`hoyusted`, `dela`) or to a number
+    (`en1`), English function words inside Spanish (`and`), full-width punctuation (`，`) and markdown debris (`**:`
+    with nothing bold before it, a lone `**` or `#`). Only English inside a reply that is otherwise Spanish counts:
+    an English reply is the `non_spanish` flag's."""
+    text = reply or ""
+    found: list[str] = []
+    tokens = re.findall(r"[A-Za-záéíóúñüÁÉÍÓÚÑÜ]+", text)
+    words = [w.lower() for w in tokens]
+    found += [m.group(0) for m in _GLUED_PAIR.finditer(text.lower()) if m.group(0) not in _REAL_WORDS]
+    found += [m.group(0) for m in _GLUED_DIGIT.finditer(text)]
+    if sum(w in _ES for w in words) > sum(w in _EN for w in words):
+        found += [w for w in tokens if w in _STRAY_EN]  # lower case as written: not a product name
+    found += _FULL_WIDTH.findall(text)
+    found += [m.group(0).strip() for m in _MD_DEBRIS.finditer(text)]
+    return found
+
+
 def quality(reply: str, tool_results: list[str], question: str = "", complete: bool | None = None) -> dict[str, Any]:
     """Flags: think_tags, foreign_script, garbled, non_spanish, internal_names, untraceable_numbers.
     Numbers are traced against the turn's tool results (and the question). A clipped result (the public trace keeps
@@ -149,7 +186,8 @@ def quality(reply: str, tool_results: list[str], question: str = "", complete: b
         flags.append("think_tags")
     if _FOREIGN.search(text):
         flags.append("foreign_script")
-    if "�" in text:
+    fragments = garbled_fragments(text)
+    if "�" in text or fragments:
         flags.append("garbled")
     words = re.findall(r"[a-záéíóúñü]+", text.lower())
     en, es = sum(w in _EN for w in words), sum(w in _ES for w in words)
@@ -169,7 +207,7 @@ def quality(reply: str, tool_results: list[str], question: str = "", complete: b
         flags.append("untraceable_numbers")
     return {"flags": flags, "internal_names": internal, "numbers_checked": len(numbers),
             "untraceable_numbers": untraceable, "unverified_numbers": [] if complete else misses,
-            "sources_complete": complete}
+            "sources_complete": complete, "garbled_fragments": fragments}
 
 
 # ---- trace metrics ----
@@ -253,6 +291,8 @@ def aggregate(turns: list[dict[str, Any]]) -> dict[str, Any]:
         "tool_calls_total": sum(t.get("tool_calls") or 0 for t in turns),
         "peer_asks_total": sum(t.get("peer_asks") or 0 for t in turns),
         "flag_counts": dict(sorted(flags.items())),
+        "garbled_fragments_total": sum(len((t.get("quality") or {}).get("garbled_fragments") or []) for t in turns),
+        "garbled_turns": sum(1 for t in turns if (t.get("quality") or {}).get("garbled_fragments")),
         "burst": {"turns": len(burst), "failed": sum(1 for t in burst if t in failed),
                   "latency_max_s": max(burst_lat) if burst_lat else None,
                   "latency_p50_s": percentile(burst_lat, 50)} if burst else None,
@@ -289,7 +329,7 @@ def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     ab, aa = before.get("aggregate") or {}, after.get("aggregate") or {}
     agg = {}
     for name in ("latency_p50_s", "latency_p95_s", "latency_max_s", "first_text_p50_s", "first_text_p95_s",
-                 "failure_rate", "tool_calls_total", "peer_asks_total"):
+                 "failure_rate", "tool_calls_total", "peer_asks_total", "garbled_fragments_total", "garbled_turns"):
         b, a = ab.get(name), aa.get(name)
         agg[name] = {"before": b, "after": a,
                      "delta": round(a - b, 3) if isinstance(a, (int, float)) and isinstance(b, (int, float)) else None}
@@ -326,6 +366,7 @@ def render_markdown(run: dict[str, Any]) -> str:
               f"({_fmt(agg.get('first_text_turns'))} turns streamed text)",
               f"- tool calls {agg['tool_calls_total']}, peer asks {agg['peer_asks_total']}",
               f"- flags: {json.dumps(agg['flag_counts'], ensure_ascii=False) if agg['flag_counts'] else 'none'}",
+              f"- garbled fragments {_fmt(agg.get('garbled_fragments_total'))} in {_fmt(agg.get('garbled_turns'))} turns",
               f"- burst: {json.dumps(agg['burst']) if agg.get('burst') else 'none'}", ""]
     return "\n".join(lines)
 
