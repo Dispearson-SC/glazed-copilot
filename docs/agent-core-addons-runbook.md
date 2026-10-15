@@ -192,3 +192,32 @@ docker exec glazed-core python -m agent_core stranded-turns # exit 0
 
 Rollback: `git -C ../Agent-Core-deploy checkout --detach 7a33df4`, restore the `:pre-p5` images and the dumps as
 in "Rollback" above (the `.11` build cannot recover turns started under `.12`: drain again or cancel them).
+
+## Phase 5: the fast path (P12, Agent-Core S10)
+
+"System One decides, code executes, the model only writes", behind one switch, `AGENT_CORE_FAST_PATH`:
+
+| `.env` value | What the manager gets |
+|---|---|
+| `shadow` (compose default) | exactly today's behaviour; each turn's `audit_turn_routes` row records what the fast path WOULD have done |
+| `on` | a question about two or three frequent topics ("¿Cómo voy hoy y qué tengo que pedir?") runs the plans of every topic in parallel and one short reply written by the orchestrator; a request to do something, a follow-up that depends on the conversation or a complex question runs the orchestrator as today |
+| `off` | Jev is asked only the route question, as before P12 |
+
+Switching: set the value in `.env`, `make up SERVICES="core core-peer-worker"`. No drain either way (the pinned
+workflow version stays `.12`). Needs Agent-Core `feat/fast-comms` at the P12 commits or later and this backend
+(it sends the case date as `X-Data-Version`). Migration `0049` is additive.
+
+Compare shadow before turning it on:
+
+```
+docker exec glazed-db psql -U postgres -d agent_core -c "SELECT fast_path, count(*) FROM audit_turn_routes WHERE fast_path_mode = 'shadow' GROUP BY 1 ORDER BY 2 DESC;"
+docker exec glazed-db psql -U postgres -d agent_core -c "SELECT turn_id, fast_path, fast_path_intents, assessment FROM audit_turn_routes WHERE fast_path_mode IS NOT NULL ORDER BY id DESC LIMIT 20;"
+```
+
+With `on`, each composite member is an `audit_turn_intents` row (`reply_mode = 'composite'`, or `'cache'` from the
+reply cache) and its reads are `audit_tool_calls` rows of `peer-agent` on behalf of the manager; a composite that
+fails (`planned` = `fallback:<reason>`) runs the orchestrator. Knobs: `AGENT_CORE_FAST_PATH_INTENT_THRESHOLD` (0.7
+here), `AGENT_CORE_FAST_PATH_CACHE_SECONDS` (0 = off; a remembered reply is keyed by case, case date and the exact
+question). The stress battery's `garbled` flag counts glued words, stray English and markdown debris per turn: run it
+in shadow and in on and compare (`python3 scripts/stress/run.py compare <shadow>.json <on>.json`).
+

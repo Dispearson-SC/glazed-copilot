@@ -45,6 +45,17 @@ x-core: &core
     # written, so the backend reports first-text latency and a partial reply. Peer turns never stream. ON by default;
     # .env AGENT_CORE_STREAM_REPLIES=false turns it off with a recreate of core and core-peer-worker (no drain).
     AGENT_CORE_STREAM_REPLIES: ${AGENT_CORE_STREAM_REPLIES:-true}
+    # P12 (Agent-Core S10, D100): the fast path - one Jev call also says which of the ten intents the message asks
+    # for, whether it asks to DO something, whether it depends on the conversation and how complex it is; with `on`
+    # two or more detected intents run ONE composite (all their plans in parallel, one compose by the orchestrator).
+    # SHADOW by default: the verdict is audited in audit_turn_routes (fast_path*) but every turn runs as before, so
+    # live traffic can be compared first. .env AGENT_CORE_FAST_PATH=on applies it, =off asks Jev only the route
+    # question again; either is a recreate of core and core-peer-worker, no drain. Intent threshold 0.7 from the
+    # P12 benchmark (precision 86%, recall 84%). The composite reply cache is off unless
+    # AGENT_CORE_FAST_PATH_CACHE_SECONDS is set (the backend sends the case date as X-Data-Version).
+    AGENT_CORE_FAST_PATH: ${AGENT_CORE_FAST_PATH:-shadow}
+    AGENT_CORE_FAST_PATH_INTENT_THRESHOLD: ${AGENT_CORE_FAST_PATH_INTENT_THRESHOLD:-0.7}
+    AGENT_CORE_FAST_PATH_CACHE_SECONDS: ${AGENT_CORE_FAST_PATH_CACHE_SECONDS:-0}
   depends_on:
     db:
       condition: service_healthy
