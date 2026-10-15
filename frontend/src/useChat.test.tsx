@@ -436,6 +436,25 @@ describe("useChat partial reply", () => {
     expect(result.current.partialReply).toBe("");
   });
 
+  it("clears the shown partial when the backend sends an empty one (the Core took its draft back)", async () => {
+    const getTurn = vi
+      .fn()
+      .mockResolvedValueOnce({ turn_id: "t1", status: "pending", partial_reply: "Producto A tiene 3" })
+      .mockImplementationOnce(async () => {
+        await new Promise((r) => setTimeout(r, 200));
+        return { turn_id: "t1", status: "pending", partial_reply: "" };
+      })
+      .mockImplementation(async () => {
+        await new Promise((r) => setTimeout(r, 200));
+        return { turn_id: "t1", status: "pending" };
+      });
+    const { result } = setup(fakeApi({ getTurn }));
+    act(() => { void result.current.send("hola"); });
+    await waitFor(() => expect(result.current.partialReply).toBe("Producto A tiene 3"));
+    await waitFor(() => expect(result.current.partialReply).toBe(""));
+    expect(result.current.status).not.toBe("idle");
+  });
+
   it("has no partial reply when the backend does not send one", async () => {
     const { result } = setup(fakeApi());
     await act(async () => { await result.current.send("hola"); });

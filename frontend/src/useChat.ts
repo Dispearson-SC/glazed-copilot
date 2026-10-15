@@ -204,7 +204,9 @@ export function useChat(caseId: string, opts: UseChatOptions = {}) {
             setStillRunning(Boolean(t.still_running));
             setProgress(t.progress ?? []);
             const partial = partialText(t);
-            if (partial) setPartialReply(partial); // a read without one keeps the last: no flicker
+            // A read without one keeps the last (no flicker); an EMPTY one means the Core took its draft back.
+            if (t.partial_reply === "") setPartialReply("");
+            else if (partial) setPartialReply(partial);
           } else {
             setStillRunning(false);
             setProgress([]);
