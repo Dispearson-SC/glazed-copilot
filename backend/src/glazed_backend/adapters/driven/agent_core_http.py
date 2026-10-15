@@ -84,7 +84,7 @@ class AgentCoreHttp:
     def create_conversation(self, case_id: str, store_id: str) -> str:
         return case_id  # the Core creates the session lazily on the first turn
 
-    def send_turn(self, conversation_id: str, store_id: str, text: str, service: bool = False,
+    def send_turn(self, conversation_id: str, store_id: str, text: str, *, service: bool = False,
                   data_version: str | None = None) -> str:
         """`data_version` (the case's as_of date) travels as X-Data-Version: the Core's fast path answer cache keys a
         remembered reply by it, so a reply is never reused for another day of the case (Agent-Core S10)."""

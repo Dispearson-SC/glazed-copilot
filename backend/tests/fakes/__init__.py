@@ -176,7 +176,7 @@ class FakeCore:
         self.created.append(case_id)
         return f"conv-{case_id}"
 
-    def send_turn(self, conversation_id, store_id, text, data_version=None):
+    def send_turn(self, conversation_id, store_id, text, *, data_version=None):
         self.sent.append((conversation_id, store_id, text))
         self.data_versions.append(data_version)
         tid = f"turn-{len(self.sent)}"

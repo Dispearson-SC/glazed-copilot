@@ -122,3 +122,21 @@ def test_send_turn_sends_the_data_version_header_only_when_given():
     client.send_turn("c1", "S030", "hola")
     assert seen[0]["x-data-version"] == "2026-10-15"
     assert "x-data-version" not in seen[1]
+
+
+def test_send_turn_options_are_keyword_only_in_the_port_and_the_adapter():
+    """A positional fourth argument meant `data_version` to the port but `service` to the adapter (review
+    warning, P12): both now take their options by keyword only, so no call can mix them up."""
+    import inspect
+
+    from glazed_backend.ports import CorePort
+
+    port = inspect.signature(CorePort.send_turn).parameters
+    adapter = inspect.signature(AgentCoreHttp.send_turn).parameters
+    assert port["data_version"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert adapter["data_version"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert adapter["service"].kind is inspect.Parameter.KEYWORD_ONLY
+    positional = [n for n, p in port.items() if p.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD]
+    assert positional == [n for n, p in adapter.items() if p.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD]
+    with pytest.raises(TypeError):
+        make(lambda r: httpx.Response(202, json={"turn_id": "t"})).send_turn("c", "S", "x", "2026-10-15")
